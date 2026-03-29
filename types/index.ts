@@ -45,6 +45,12 @@ export enum CompanyStatus {
   PROSPECT = "prospect",
 }
 
+// Export customer journey types
+export * from "./customer-journey";
+
+// Export conversion rate types
+export * from "./conversion-rate";
+
 export interface Deal {
   id: string;
   title: string;

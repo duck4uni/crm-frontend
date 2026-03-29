@@ -12,6 +12,7 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: FiHome },
+  { name: "Customers", href: "/customers", icon: FiUsers },
   { name: "Contacts", href: "/contacts", icon: FiUsers },
   { name: "Companies", href: "/companies", icon: FiBriefcase },
   { name: "Deals", href: "/deals", icon: FiDollarSign },

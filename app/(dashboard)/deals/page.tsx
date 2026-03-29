@@ -9,7 +9,7 @@ import { mockDeals } from "@/lib/mock-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { FiPlus, FiSearch } from "react-icons/fi";
 
-const stageColors: Record<string, "default" | "info" | "warning" | "success"> =
+const stageColors: Record<string, "default" | "info" | "warning" | "success" | "danger"> =
   {
     prospecting: "default",
     qualification: "info",
