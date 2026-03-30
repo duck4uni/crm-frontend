@@ -12,10 +12,14 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { mockCustomerJourneyData } from "@/mock-data/customer-journey";
-import { CustomerJourneyData, JourneyStage } from "@/types/customer-journey";
+import { CustomerJourneyData, JourneyStage, JourneyCategory } from "@/types/customer-journey";
 import { JourneyCategoryColumn, JourneyStageCard } from "./JourneyStageCard";
 import { FiPlus } from "react-icons/fi";
 import { Toggle } from "@/components/ui/Toggle";
+import { AddCategoryModal } from "./AddCategoryModal";
+import { AddStageModal } from "./AddStageModal";
+import { ReportModal } from "../reports/ReportModal";
+import { useToast } from "@/components/ui/ToastProvider";
 
 function getTotalCount(stages: JourneyStage[]): number {
   return stages.reduce((sum, stage) => sum + stage.count, 0);
@@ -106,6 +110,11 @@ export function CustomerJourneyView() {
   const [showAll, setShowAll] = useState(true);
   const [showAllCustomers, setShowAllCustomers] = useState(true);
   const [activeStage, setActiveStage] = useState<JourneyStage | null>(null);
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [isAddStageOpen, setIsAddStageOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const toast = useToast();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -152,9 +161,46 @@ export function CustomerJourneyView() {
     setActiveStage(null);
   }, []);
 
-  const handleAddCategory = () => {
-    console.log("Add new category");
-    // TODO: Implement add category modal
+  const handleAddCategory = (name: string, color: string) => {
+    const newCategory: CustomerJourneyData = {
+      category: name as JourneyCategory,
+      stages: [],
+      totalCount: 0,
+    };
+    setJourneyData([...journeyData, newCategory]);
+    toast.success("Thêm thành công", `Thư mục "${name}" đã được tạo`);
+  };
+
+  const handleAddStage = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setIsAddStageOpen(true);
+  };
+
+  const handleSaveStage = (name: string, description: string) => {
+    const categoryIndex = journeyData.findIndex((c) => c.category === selectedCategory);
+    if (categoryIndex >= 0) {
+      const currentStages = journeyData[categoryIndex].stages;
+      const newStage: JourneyStage = {
+        id: `stage-${Date.now()}`,
+        name,
+        description,
+        count: 0,
+        percentage: 0,
+        category: selectedCategory as JourneyCategory,
+        color: "border-blue-500",
+        order: currentStages.length,
+      };
+
+      const updatedData = [...journeyData];
+      updatedData[categoryIndex] = {
+        ...updatedData[categoryIndex],
+        stages: [...currentStages, newStage],
+        totalCount: updatedData[categoryIndex].totalCount,
+      };
+
+      setJourneyData(updatedData);
+      toast.success("Thêm thành công", `Giai đoạn "${name}" đã được tạo`);
+    }
   };
 
   return (
@@ -189,7 +235,10 @@ export function CustomerJourneyView() {
 
           <div className="flex-1" />
 
-          <button className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={() => setIsReportOpen(true)}
+            className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
             Báo cáo
           </button>
         </div>
@@ -204,14 +253,14 @@ export function CustomerJourneyView() {
                 categoryId={categoryData.category}
                 stages={categoryData.stages}
                 isDragEnabled={dragEnabled}
-                onAddStage={() => console.log("Add stage to", categoryData.category)}
+                onAddStage={() => handleAddStage(categoryData.category)}
               />
             ))}
 
             {/* Add Category Button */}
             <div className="flex-shrink-0 w-72">
               <button
-                onClick={handleAddCategory}
+                onClick={() => setIsAddCategoryOpen(true)}
                 className="
                   w-full h-40 border-2 border-dashed border-gray-300 
                   rounded-lg bg-white text-gray-500 hover:border-gray-400 
@@ -225,6 +274,26 @@ export function CustomerJourneyView() {
             </div>
           </div>
         </div>
+
+        {/* Modals */}
+        <AddCategoryModal
+          isOpen={isAddCategoryOpen}
+          onClose={() => setIsAddCategoryOpen(false)}
+          onAdd={handleAddCategory}
+        />
+
+        <AddStageModal
+          isOpen={isAddStageOpen}
+          onClose={() => setIsAddStageOpen(false)}
+          onAdd={handleSaveStage}
+          categoryName={selectedCategory}
+        />
+
+        <ReportModal
+          isOpen={isReportOpen}
+          onClose={() => setIsReportOpen(false)}
+          reportType="journey"
+        />
       </div>
 
       <DragOverlay>

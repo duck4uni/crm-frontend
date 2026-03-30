@@ -4,7 +4,9 @@ import { useState } from "react";
 import { mockConversionRateData } from "@/mock-data/conversion-rate";
 import { ConversionStage, ConversionMetricItem } from "@/types/conversion-rate";
 import { Toggle } from "@/components/ui/Toggle";
+import { Select } from "@/components/ui/Select";
 import { FiDownload } from "react-icons/fi";
+import { ReportModal } from "../reports/ReportModal";
 
 // Funnel Stage Card Component
 function FunnelStageCard({ stage, isLast }: { stage: ConversionStage; isLast: boolean }) {
@@ -24,22 +26,22 @@ function FunnelStageCard({ stage, isLast }: { stage: ConversionStage; isLast: bo
   };
 
   return (
-    <div className="flex-1 min-w-0">
+    <div className="flex-1 min-w-[280px]">
       {/* Stage Card */}
       <div className="flex flex-col h-full bg-white rounded-lg overflow-hidden border border-gray-200">
         {/* Header */}
         <div className={`
           px-4 py-4
-          ${stage.isRevenue 
-            ? 'bg-blue-900' 
+          ${stage.isRevenue
+            ? 'bg-blue-900'
             : 'bg-blue-100'
           }
         `}>
           <div className="flex items-center gap-2 mb-3">
             <div className={`
               w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold
-              ${stage.isRevenue 
-                ? 'bg-white/20 text-white' 
+              ${stage.isRevenue
+                ? 'bg-white/20 text-white'
                 : 'bg-white text-blue-900'
               }
             `}>
@@ -71,7 +73,7 @@ function FunnelStageCard({ stage, isLast }: { stage: ConversionStage; isLast: bo
               <span className="text-sm text-gray-700 flex-1">
                 {item.label}
               </span>
-              
+
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="text-sm font-semibold text-gray-900">
                   {typeof item.value === 'number' && !Number.isInteger(item.value)
@@ -98,6 +100,7 @@ export function ConversionRateView() {
   const [relationship, setRelationship] = useState("");
   const [timePeriod, setTimePeriod] = useState("this-month");
   const [showAllCustomers, setShowAllCustomers] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const { stages } = mockConversionRateData;
 
@@ -105,40 +108,57 @@ export function ConversionRateView() {
     <div className="space-y-4">
       {/* Filters Bar */}
       <div className="flex items-center gap-3 bg-white p-4 rounded-lg border border-gray-200 flex-wrap">
-        <select
-          value={reportType}
-          onChange={(e) => setReportType(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded text-sm text-gray-700 focus:outline-none focus:border-blue-500 bg-white"
-        >
-          <option value="all">Loại bảo cáo</option>
-        </select>
+        <div className="w-48">
+          <Select
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value)}
+            options={[
+              { value: "all", label: "Loại bảo cáo" },
+            ]}
+            variant="subtle"
+          />
+        </div>
 
-        <select
-          value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded text-sm text-gray-700 focus:outline-none focus:border-blue-500 bg-white"
-        >
-          <option value="">Người phụ trách</option>
-        </select>
+        <div className="w-48">
+          <Select
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            options={[
+              { value: "getfly_admin", label: "Getfly Admin" },
+              { value: "nguyen_van_a", label: "Nguyễn Văn A" },
+              { value: "tran_thi_b", label: "Trần Thị B" },
+            ]}
+            variant="subtle"
+            placeholder="Người phụ trách"
+          />
+        </div>
 
-        <select
-          value={relationship}
-          onChange={(e) => setRelationship(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded text-sm text-gray-700 focus:outline-none focus:border-blue-500 bg-white"
-        >
-          <option value="">Mối quan hệ</option>
-        </select>
+        <div className="w-48">
+          <Select
+            value={relationship}
+            onChange={(e) => setRelationship(e.target.value)}
+            options={[
+              { value: "new", label: "Khách hàng mới" },
+              { value: "old", label: "Khách cũ" },
+            ]}
+            variant="subtle"
+            placeholder="Mối quan hệ"
+          />
+        </div>
 
-        <select
-          value={timePeriod}
-          onChange={(e) => setTimePeriod(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded text-sm text-gray-700 focus:outline-none focus:border-blue-500 bg-white"
-        >
-          <option value="this-month">Tháng này</option>
-          <option value="last-month">Tháng trước</option>
-          <option value="this-quarter">Quý này</option>
-          <option value="this-year">Năm nay</option>
-        </select>
+        <div className="w-48">
+          <Select
+            value={timePeriod}
+            onChange={(e) => setTimePeriod(e.target.value)}
+            options={[
+              { value: "this-month", label: "Tháng này" },
+              { value: "last-month", label: "Tháng trước" },
+              { value: "this-quarter", label: "Quý này" },
+              { value: "this-year", label: "Năm nay" },
+            ]}
+            variant="subtle"
+          />
+        </div>
 
         <Toggle
           label="Tất cả KH"
@@ -148,7 +168,10 @@ export function ConversionRateView() {
 
         <div className="flex-1" />
 
-        <button className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+        <button
+          onClick={() => setIsReportOpen(true)}
+          className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+        >
           Báo cáo
         </button>
       </div>
@@ -164,8 +187,8 @@ export function ConversionRateView() {
         </div>
 
         {/* Funnel Flow */}
-        <div className="p-6">
-          <div className="flex gap-4">
+        <div className="p-6 overflow-x-auto">
+          <div className="flex gap-4 min-w-max">
             {stages.map((stage, index) => (
               <FunnelStageCard
                 key={stage.id}
@@ -176,6 +199,13 @@ export function ConversionRateView() {
           </div>
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        reportType="conversion"
+      />
     </div>
   );
 }

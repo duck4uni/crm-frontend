@@ -4,18 +4,19 @@ import { Customer } from "@/types/customer";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { formatDateVN } from "@/lib/utils";
-import { FiMoreVertical } from "react-icons/fi";
+import { FiMoreVertical, FiEye, FiEdit2 } from "react-icons/fi";
 import { useState } from "react";
 
 interface CustomerTableProps {
   customers: Customer[];
   onCustomerClick?: (customer: Customer) => void;
+  onCustomerEdit?: (customer: Customer) => void;
 }
 
 type SortField = keyof Customer | null;
 type SortDirection = "asc" | "desc";
 
-export function CustomerTable({ customers, onCustomerClick }: CustomerTableProps) {
+export function CustomerTable({ customers, onCustomerClick, onCustomerEdit }: CustomerTableProps) {
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -49,13 +50,13 @@ export function CustomerTable({ customers, onCustomerClick }: CustomerTableProps
 
   const sortedCustomers = [...customers].sort((a, b) => {
     if (!sortField) return 0;
-    
+
     const aVal = a[sortField];
     const bVal = b[sortField];
-    
+
     if (aVal === undefined || aVal === null) return 1;
     if (bVal === undefined || bVal === null) return -1;
-    
+
     const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
     return sortDirection === "asc" ? comparison : -comparison;
   });
@@ -87,7 +88,7 @@ export function CustomerTable({ customers, onCustomerClick }: CustomerTableProps
               <TableHeader label="Giới tính" field="gender" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <TableHeader label="Buổi học" field="sessionCount" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <TableHeader label="Số buổi còn lại" field="remainingSessions" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12"></th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -97,7 +98,8 @@ export function CustomerTable({ customers, onCustomerClick }: CustomerTableProps
                 customer={customer}
                 isSelected={selectedRows.has(customer.id)}
                 onSelect={handleSelectRow}
-                onClick={onCustomerClick}
+                onView={onCustomerClick}
+                onEdit={onCustomerEdit}
               />
             ))}
           </tbody>
@@ -134,7 +136,7 @@ interface TableHeaderProps {
 
 function TableHeader({ label, field, onSort, sortField, sortDirection }: TableHeaderProps) {
   const isSorted = sortField === field;
-  
+
   return (
     <th
       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -157,15 +159,13 @@ interface CustomerTableRowProps {
   customer: Customer;
   isSelected: boolean;
   onSelect: (id: string) => void;
-  onClick?: (customer: Customer) => void;
+  onView?: (customer: Customer) => void;
+  onEdit?: (customer: Customer) => void;
 }
 
-function CustomerTableRow({ customer, isSelected, onSelect, onClick }: CustomerTableRowProps) {
+function CustomerTableRow({ customer, isSelected, onSelect, onView, onEdit }: CustomerTableRowProps) {
   return (
-    <tr 
-      className="hover:bg-gray-50 cursor-pointer transition-colors"
-      onClick={() => onClick?.(customer)}
-    >
+    <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
@@ -200,10 +200,23 @@ function CustomerTableRow({ customer, isSelected, onSelect, onClick }: CustomerT
       <td className="px-4 py-4 text-sm text-center text-gray-900">
         {customer.remainingSessions || 0}
       </td>
-      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-        <button className="text-gray-400 hover:text-gray-600">
-          <FiMoreVertical className="w-5 h-5" />
-        </button>
+      <td className="px-4 py-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onView?.(customer)}
+            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            title="Xem chi tiết"
+          >
+            <FiEye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onEdit?.(customer)}
+            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            title="Chỉnh sửa"
+          >
+            <FiEdit2 className="w-4 h-4" />
+          </button>
+        </div>
       </td>
     </tr>
   );

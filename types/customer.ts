@@ -21,7 +21,6 @@ export interface Customer {
 }
 
 export enum CustomerStatus {
-  ALL = "all", // Tất cả
   NEW = "new", // Đang mới
   QUOTED = "quoted", // Dự báo giá
   CONTACTED = "contacted", // Đã liên hệ
