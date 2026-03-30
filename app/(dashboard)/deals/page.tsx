@@ -10,14 +10,14 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { FiPlus, FiSearch } from "react-icons/fi";
 
 const stageColors: Record<string, "default" | "info" | "warning" | "success" | "danger"> =
-  {
-    prospecting: "default",
-    qualification: "info",
-    proposal: "warning",
-    negotiation: "warning",
-    closed_won: "success",
-    closed_lost: "danger",
-  };
+{
+  prospecting: "default",
+  qualification: "info",
+  proposal: "warning",
+  negotiation: "warning",
+  closed_won: "success",
+  closed_lost: "danger",
+};
 
 export default function DealsPage() {
   const [deals] = useState(mockDeals);
@@ -32,7 +32,6 @@ export default function DealsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Deals</h1>
           <p className="mt-1 text-gray-500">
             Track and manage your sales pipeline
           </p>

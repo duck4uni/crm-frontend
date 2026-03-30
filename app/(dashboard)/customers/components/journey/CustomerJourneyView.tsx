@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { 
-  DndContext, 
-  DragEndEvent, 
-  DragOverEvent,
+import { useState, useCallback } from "react";
+import {
+  DndContext,
+  DragEndEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
@@ -17,6 +16,89 @@ import { CustomerJourneyData, JourneyStage } from "@/types/customer-journey";
 import { JourneyCategoryColumn, JourneyStageCard } from "./JourneyStageCard";
 import { FiPlus } from "react-icons/fi";
 import { Toggle } from "@/components/ui/Toggle";
+
+function getTotalCount(stages: JourneyStage[]): number {
+  return stages.reduce((sum, stage) => sum + stage.count, 0);
+}
+
+function moveStage(
+  data: CustomerJourneyData[],
+  activeId: string,
+  overId: string
+): CustomerJourneyData[] {
+  const activeCategoryIndex = data.findIndex((category) =>
+    category.stages.some((stage) => stage.id === activeId)
+  );
+
+  if (activeCategoryIndex < 0) {
+    return data;
+  }
+
+  const overCategoryIndexByStage = data.findIndex((category) =>
+    category.stages.some((stage) => stage.id === overId)
+  );
+  const overCategoryIndex = overCategoryIndexByStage >= 0
+    ? overCategoryIndexByStage
+    : data.findIndex((category) => category.category === overId);
+
+  if (overCategoryIndex < 0) {
+    return data;
+  }
+
+  const activeStages = data[activeCategoryIndex].stages;
+  const activeStageIndex = activeStages.findIndex((stage) => stage.id === activeId);
+
+  if (activeStageIndex < 0) {
+    return data;
+  }
+
+  if (activeCategoryIndex === overCategoryIndex) {
+    const overStageIndex = data[overCategoryIndex].stages.findIndex((stage) => stage.id === overId);
+
+    if (overStageIndex < 0 || activeStageIndex === overStageIndex) {
+      return data;
+    }
+
+    const reorderedStages = arrayMove(activeStages, activeStageIndex, overStageIndex);
+    const nextData = [...data];
+    nextData[activeCategoryIndex] = {
+      ...nextData[activeCategoryIndex],
+      stages: reorderedStages,
+    };
+
+    return nextData;
+  }
+
+  const sourceStages = [...activeStages];
+  const [movedStage] = sourceStages.splice(activeStageIndex, 1);
+
+  if (!movedStage) {
+    return data;
+  }
+
+  const targetStages = [...data[overCategoryIndex].stages];
+  const overStageIndex = targetStages.findIndex((stage) => stage.id === overId);
+  const insertIndex = overStageIndex >= 0 ? overStageIndex : targetStages.length;
+
+  targetStages.splice(insertIndex, 0, {
+    ...movedStage,
+    category: data[overCategoryIndex].category,
+  });
+
+  const nextData = [...data];
+  nextData[activeCategoryIndex] = {
+    ...nextData[activeCategoryIndex],
+    stages: sourceStages,
+    totalCount: getTotalCount(sourceStages),
+  };
+  nextData[overCategoryIndex] = {
+    ...nextData[overCategoryIndex],
+    stages: targetStages,
+    totalCount: getTotalCount(targetStages),
+  };
+
+  return nextData;
+}
 
 export function CustomerJourneyView() {
   const [journeyData, setJourneyData] = useState<CustomerJourneyData[]>(mockCustomerJourneyData);
@@ -55,66 +137,18 @@ export function CustomerJourneyView() {
     setActiveStage(stage);
   }, [findStageById]);
 
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    if (activeId === overId) return;
-
-    const activeCategory = findCategoryByStageId(activeId);
-    const overCategory = findCategoryByStageId(overId) || findCategoryById(overId);
-
-    if (!activeCategory || !overCategory) return;
-
-    setJourneyData((prev) => {
-      const newData = [...prev];
-      const activeCategoryIndex = newData.findIndex(c => c.category === activeCategory.category);
-      const overCategoryIndex = newData.findIndex(c => c.category === overCategory.category);
-
-      const activeStages = [...newData[activeCategoryIndex].stages];
-      const overStages = activeCategoryIndex === overCategoryIndex 
-        ? activeStages 
-        : [...newData[overCategoryIndex].stages];
-
-      const activeIndex = activeStages.findIndex(s => s.id === activeId);
-      const overIndex = overStages.findIndex(s => s.id === overId);
-
-      if (activeCategoryIndex === overCategoryIndex) {
-        // Same category - reorder
-        const reordered = arrayMove(activeStages, activeIndex, overIndex);
-        newData[activeCategoryIndex] = {
-          ...newData[activeCategoryIndex],
-          stages: reordered,
-        };
-      } else {
-        // Different category - move
-        const [movedStage] = activeStages.splice(activeIndex, 1);
-        const insertIndex = overIndex >= 0 ? overIndex : overStages.length;
-        overStages.splice(insertIndex, 0, {
-          ...movedStage,
-          category: overCategory.category,
-        });
-
-        newData[activeCategoryIndex] = {
-          ...newData[activeCategoryIndex],
-          stages: activeStages,
-          totalCount: activeStages.reduce((sum, s) => sum + s.count, 0),
-        };
-        newData[overCategoryIndex] = {
-          ...newData[overCategoryIndex],
-          stages: overStages,
-          totalCount: overStages.reduce((sum, s) => sum + s.count, 0),
-        };
-      }
-
-      return newData;
-    });
-  }, [findCategoryByStageId, findCategoryById]);
-
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over) {
+      const activeId = active.id as string;
+      const overId = over.id as string;
+
+      if (activeId !== overId) {
+        setJourneyData((prev) => moveStage(prev, activeId, overId));
+      }
+    }
+
     setActiveStage(null);
   }, []);
 
@@ -128,7 +162,6 @@ export function CustomerJourneyView() {
       key="customer-journey-dnd"
       sensors={sensors}
       onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="space-y-4">
@@ -139,23 +172,23 @@ export function CustomerJourneyView() {
             checked={dragEnabled}
             onChange={setDragEnabled}
           />
-          
+
           <div className="h-6 w-px bg-gray-300" />
-          
+
           <Toggle
             label="Tất cả"
             checked={showAll}
             onChange={setShowAll}
           />
-          
+
           <Toggle
             label="Tất cả KH"
             checked={showAllCustomers}
             onChange={setShowAllCustomers}
           />
-          
+
           <div className="flex-1" />
-          
+
           <button className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
             Báo cáo
           </button>
@@ -174,7 +207,7 @@ export function CustomerJourneyView() {
                 onAddStage={() => console.log("Add stage to", categoryData.category)}
               />
             ))}
-            
+
             {/* Add Category Button */}
             <div className="flex-shrink-0 w-72">
               <button
@@ -197,10 +230,10 @@ export function CustomerJourneyView() {
       <DragOverlay>
         {activeStage ? (
           <div className="rotate-3 scale-105">
-            <JourneyStageCard 
-              stage={activeStage} 
+            <JourneyStageCard
+              stage={activeStage}
               isDragEnabled={true}
-              onClick={() => {}}
+              onClick={() => { }}
             />
           </div>
         ) : null}
