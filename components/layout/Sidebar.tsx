@@ -10,6 +10,9 @@ import {
   FiDollarSign,
   FiCheckSquare,
   FiSettings,
+  FiUser,
+  FiBell,
+  FiShield,
 } from "react-icons/fi";
 
 const navigation = [
@@ -19,6 +22,9 @@ const navigation = [
   { name: "Companies", href: "/companies", icon: FiBriefcase },
   { name: "Deals", href: "/deals", icon: FiDollarSign },
   { name: "Tasks", href: "/tasks", icon: FiCheckSquare },
+  { name: "Users", href: "/users", icon: FiUser },
+  { name: "Notifications", href: "/notifications", icon: FiBell },
+  { name: "Permissions", href: "/permissions", icon: FiShield },
   { name: "Settings", href: "/settings", icon: FiSettings },
 ];
 

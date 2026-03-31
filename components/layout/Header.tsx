@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { FiSearch, FiBell, FiMenu } from "react-icons/fi";
+import { FiSearch, FiMenu } from "react-icons/fi";
 import { Avatar } from "@/components/ui/Avatar";
+import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
 
 const moduleTitleMap: Record<string, string> = {
   "/": "Dashboard",
@@ -12,6 +13,9 @@ const moduleTitleMap: Record<string, string> = {
   "/companies": "Companies",
   "/deals": "Deals",
   "/tasks": "Tasks",
+  "/users": "Users",
+  "/notifications": "Notifications",
+  "/permissions": "Permissions",
   "/settings": "Settings",
 };
 
@@ -61,10 +65,7 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
         </div>
 
         <div className="flex items-center space-x-4 justify-self-end">
-          <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-            <FiBell className="w-6 h-6" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          <NotificationDropdown />
 
           <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
             <Avatar name="John Doe" size="sm" />
