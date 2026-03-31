@@ -20,12 +20,12 @@ const priorityColors: Record<
 };
 
 const statusColors: Record<string, "default" | "info" | "success" | "default"> =
-  {
-    todo: "default",
-    in_progress: "info",
-    completed: "success",
-    cancelled: "default",
-  };
+{
+  todo: "default",
+  in_progress: "info",
+  completed: "success",
+  cancelled: "default",
+};
 
 export default function TasksPage() {
   const [tasks] = useState(mockTasks);
@@ -46,7 +46,6 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
           <p className="mt-1 text-gray-500">Manage and track your tasks</p>
         </div>
         <Button>
@@ -108,21 +107,19 @@ export default function TasksPage() {
               <div className="flex items-start space-x-4 flex-1">
                 <div className="mt-1">
                   <FiCheckCircle
-                    className={`w-5 h-5 ${
-                      task.status === "completed"
+                    className={`w-5 h-5 ${task.status === "completed"
                         ? "text-green-600"
                         : "text-gray-300"
-                    }`}
+                      }`}
                   />
                 </div>
 
                 <div className="flex-1">
                   <h3
-                    className={`text-lg font-semibold ${
-                      task.status === "completed"
+                    className={`text-lg font-semibold ${task.status === "completed"
                         ? "line-through text-gray-500"
                         : "text-gray-900"
-                    }`}
+                      }`}
                   >
                     {task.title}
                   </h3>

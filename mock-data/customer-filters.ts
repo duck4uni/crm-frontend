@@ -1,0 +1,173 @@
+// Mock data for customer filter buttons
+
+export interface FilterButton {
+  id: string;
+  label: string;
+  bgColor: string;
+  textColor: string;
+  activeBgColor: string;
+  activeTextColor: string;
+}
+
+export const CUSTOMER_FILTERS: FilterButton[] = [
+  {
+    id: "all",
+    label: "Tất cả",
+    bgColor: "bg-blue-500",
+    textColor: "text-white",
+    activeBgColor: "bg-blue-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "new",
+    label: "Data mới",
+    bgColor: "bg-green-500",
+    textColor: "text-white",
+    activeBgColor: "bg-green-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "quoted",
+    label: "Gửi báo giá",
+    bgColor: "bg-orange-500",
+    textColor: "text-white",
+    activeBgColor: "bg-orange-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "contacted",
+    label: "Đã liên hệ",
+    bgColor: "bg-green-500",
+    textColor: "text-white",
+    activeBgColor: "bg-green-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "not_contacted",
+    label: "Chưa liên hệ được",
+    bgColor: "bg-yellow-500",
+    textColor: "text-white",
+    activeBgColor: "bg-yellow-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "tested",
+    label: "Đã test đầu vào",
+    bgColor: "bg-orange-500",
+    textColor: "text-white",
+    activeBgColor: "bg-orange-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "registered",
+    label: "Đã đăng ký",
+    bgColor: "bg-red-500",
+    textColor: "text-white",
+    activeBgColor: "bg-red-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "considering",
+    label: "Đang cân nhắc",
+    bgColor: "bg-purple-500",
+    textColor: "text-white",
+    activeBgColor: "bg-purple-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "upsell",
+    label: "Upsell",
+    bgColor: "bg-cyan-500",
+    textColor: "text-white",
+    activeBgColor: "bg-cyan-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "approached",
+    label: "Đã tiếp cận",
+    bgColor: "bg-pink-500",
+    textColor: "text-white",
+    activeBgColor: "bg-pink-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "surveyed",
+    label: "Khảo sát",
+    bgColor: "bg-red-500",
+    textColor: "text-white",
+    activeBgColor: "bg-red-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "dang_hoc",
+    label: "Đang học",
+    bgColor: "bg-indigo-500",
+    textColor: "text-white",
+    activeBgColor: "bg-indigo-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "tam_ngung",
+    label: "Tạm ngưng",
+    bgColor: "bg-gray-500",
+    textColor: "text-white",
+    activeBgColor: "bg-gray-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "hoan_thanh",
+    label: "Hoàn thành",
+    bgColor: "bg-emerald-500",
+    textColor: "text-white",
+    activeBgColor: "bg-emerald-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "chuyen_khoa",
+    label: "Chuyển khóa",
+    bgColor: "bg-amber-500",
+    textColor: "text-white",
+    activeBgColor: "bg-amber-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "bao_luu",
+    label: "Bảo lưu",
+    bgColor: "bg-teal-500",
+    textColor: "text-white",
+    activeBgColor: "bg-teal-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "huy_khoa",
+    label: "Hủy khóa",
+    bgColor: "bg-rose-500",
+    textColor: "text-white",
+    activeBgColor: "bg-rose-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "cho_thu",
+    label: "Chờ thu",
+    bgColor: "bg-violet-500",
+    textColor: "text-white",
+    activeBgColor: "bg-violet-600",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "no_phi",
+    label: "Nợ phí",
+    bgColor: "bg-orange-600",
+    textColor: "text-white",
+    activeBgColor: "bg-orange-700",
+    activeTextColor: "text-white",
+  },
+  {
+    id: "tai_khoan_moi",
+    label: "Tài khoản mới",
+    bgColor: "bg-lime-500",
+    textColor: "text-white",
+    activeBgColor: "bg-lime-600",
+    activeTextColor: "text-white",
+  },
+];

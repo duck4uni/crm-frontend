@@ -22,7 +22,6 @@ export default function CompaniesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Companies</h1>
           <p className="mt-1 text-gray-500">
             Manage your company relationships
           </p>

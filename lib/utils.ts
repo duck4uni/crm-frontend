@@ -34,6 +34,16 @@ export function formatDateTime(date: Date | string): string {
   }).format(d);
 }
 
+export function formatDateVN(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${day}/${month}/${year}\n${hours}:${minutes}`;
+}
+
 export function getInitials(name: string): string {
   return name
     .split(" ")
