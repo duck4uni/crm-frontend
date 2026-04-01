@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CRM - Customer Relationship Management",
-  description: "Modern CRM system for managing contacts, companies, and deals",
+  title: "CRM - Quản lý quan hệ khách hàng",
+  description: "Hệ thống CRM hiện đại để quản lý liên hệ, công ty và thương vụ",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body className={inter.className}>{children}</body>
     </html>
   );

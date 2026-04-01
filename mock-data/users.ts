@@ -174,7 +174,7 @@ export const mockUserHistories: UserHistory[] = [
         id: "h4",
         user_id: "u3",
         title: "Phân quyền người dùng",
-        note: "Cấp quyền quản lý deal cho user sales01",
+        note: "Cấp quyền quản lý thương vụ cho người dùng sales01",
         created_at: new Date("2024-03-26T10:15:00"),
         created_by: "u3",
         updated_at: new Date("2024-03-26T10:15:00"),

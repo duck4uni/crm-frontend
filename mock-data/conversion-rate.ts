@@ -9,11 +9,11 @@ export const mockConversionRateData: ConversionRateData = {
       total: 13,
       items: [
         { label: "Không có nguồn", value: 9, percentage: 69, indent: 0 },
-        { label: "Email", value: 0, indent: 0 },
+        { label: "Thư điện tử", value: 0, indent: 0 },
         { label: "Sale tự tìm kiếm", value: 2, percentage: 15, indent: 0 },
         { label: "Tất cả", value: 1, percentage: 8, indent: 0 },
-        { label: "Google Ads", value: 1, percentage: 8, indent: 0 },
-        { label: "Facebook Marketing", value: 1, percentage: 8, indent: 0 },
+        { label: "Quảng cáo Google", value: 1, percentage: 8, indent: 0 },
+        { label: "Tiếp thị Facebook", value: 1, percentage: 8, indent: 0 },
       ],
     },
     {
@@ -22,7 +22,7 @@ export const mockConversionRateData: ConversionRateData = {
       title: "Tương tác",
       total: 122,
       items: [
-        { label: "Email", value: 0, indent: 0 },
+        { label: "Thư điện tử", value: 0, indent: 0 },
         { label: "Tin nhắn", value: 0, indent: 0 },
         { label: "Zns", value: 0, indent: 0 },
         { label: "Gọi điện", value: 2, indent: 0 },

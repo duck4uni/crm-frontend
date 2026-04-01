@@ -121,8 +121,8 @@ export function PermissionFormModal({ isOpen, onClose, onSave, permission }: Per
                         options={[
                             { value: PermissionGroup.USER, label: "Người dùng" },
                             { value: PermissionGroup.CUSTOMER, label: "Khách hàng" },
-                            { value: PermissionGroup.DEAL, label: "Deal" },
-                            { value: PermissionGroup.TASK, label: "Task" },
+                            { value: PermissionGroup.DEAL, label: "Thương vụ" },
+                            { value: PermissionGroup.TASK, label: "Công việc" },
                             { value: PermissionGroup.REPORT, label: "Báo cáo" },
                             { value: PermissionGroup.SETTING, label: "Cài đặt" },
                         ]}

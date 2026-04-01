@@ -124,8 +124,8 @@ export function NotificationFormModal({ isOpen, onClose, onSave, notification }:
                             onChange={handleChange}
                             options={[
                                 { value: NotificationCategory.SYSTEM, label: "Hệ thống" },
-                                { value: NotificationCategory.TASK, label: "Task" },
-                                { value: NotificationCategory.DEAL, label: "Deal" },
+                                { value: NotificationCategory.TASK, label: "Công việc" },
+                                { value: NotificationCategory.DEAL, label: "Thương vụ" },
                                 { value: NotificationCategory.CUSTOMER, label: "Khách hàng" },
                                 { value: NotificationCategory.REMINDER, label: "Nhắc nhở" },
                             ]}
@@ -137,7 +137,7 @@ export function NotificationFormModal({ isOpen, onClose, onSave, notification }:
                             name="sub_category"
                             value={formData.sub_category || ""}
                             onChange={handleChange}
-                            placeholder="Ví dụ: new_deal, overdue..."
+                            placeholder="Ví dụ: thuong_vu_moi, qua_han..."
                         />
                     </div>
                 </div>

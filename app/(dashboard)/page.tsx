@@ -11,38 +11,42 @@ import {
   FiUsers,
   FiBriefcase,
   FiDollarSign,
-  FiCheckSquare,
-  FiTrendingUp,
   FiAlertCircle,
 } from "react-icons/fi";
 
 export default function DashboardPage() {
   const stats = mockDashboardStats;
+  const stageLabelMap: Record<string, string> = {
+    Prospecting: "Tiềm năng",
+    Qualification: "Đánh giá",
+    Proposal: "Đề xuất",
+    Negotiation: "Đàm phán",
+  };
 
   const statCards = [
     {
-      title: "Total Contacts",
+      title: "Tổng liên hệ",
       value: stats.totalContacts,
       icon: FiUsers,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
     },
     {
-      title: "Total Companies",
+      title: "Tổng công ty",
       value: stats.totalCompanies,
       icon: FiBriefcase,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
     {
-      title: "Active Deals",
+      title: "Thương vụ đang mở",
       value: stats.activeDeals,
       icon: FiDollarSign,
       color: "text-green-600",
       bgColor: "bg-green-100",
     },
     {
-      title: "Tasks Overdue",
+      title: "Công việc quá hạn",
       value: stats.tasksOverdue,
       icon: FiAlertCircle,
       color: "text-red-600",
@@ -54,7 +58,7 @@ export default function DashboardPage() {
     <div className="p-6 space-y-6">
       <div>
         <p className="mt-1 text-gray-500">
-          Welcome back! Here&apos;s what&apos;s happening today.
+          Chào mừng bạn quay lại! Đây là tình hình hôm nay.
         </p>
       </div>
 
@@ -86,18 +90,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Revenue Overview</CardTitle>
+            <CardTitle>Tổng quan doanh thu</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-600">Total Revenue</p>
+                <p className="text-sm text-gray-600">Tổng doanh thu</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {formatCurrency(stats.totalRevenue)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">This Month</p>
+                <p className="text-sm text-gray-600">Tháng này</p>
                 <p className="text-2xl font-bold text-green-600">
                   {formatCurrency(stats.monthlyRevenue)}
                 </p>
@@ -118,7 +122,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Deals by Stage</CardTitle>
+            <CardTitle>Thương vụ theo giai đoạn</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -126,10 +130,10 @@ export default function DashboardPage() {
                 <div key={stage.stage}>
                   <div className="flex justify-between mb-1">
                     <span className="text-sm font-medium text-gray-700">
-                      {stage.stage}
+                      {stageLabelMap[stage.stage] ?? stage.stage}
                     </span>
                     <span className="text-sm text-gray-600">
-                      {stage.count} deals • {formatCurrency(stage.value)}
+                      {stage.count} thương vụ • {formatCurrency(stage.value)}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -148,24 +152,24 @@ export default function DashboardPage() {
       {/* Quick Stats */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Stats</CardTitle>
+          <CardTitle>Chỉ số nhanh</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <p className="text-sm text-gray-600">Deals Won This Month</p>
+              <p className="text-sm text-gray-600">Thương vụ chốt trong tháng</p>
               <p className="mt-2 text-2xl font-bold text-green-600">
                 {stats.dealsWonThisMonth}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Tasks Due Today</p>
+              <p className="text-sm text-gray-600">Công việc đến hạn hôm nay</p>
               <p className="mt-2 text-2xl font-bold text-blue-600">
                 {stats.tasksDueToday}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Tasks Overdue</p>
+              <p className="text-sm text-gray-600">Công việc quá hạn</p>
               <p className="mt-2 text-2xl font-bold text-red-600">
                 {stats.tasksOverdue}
               </p>

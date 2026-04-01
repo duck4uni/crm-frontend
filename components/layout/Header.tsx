@@ -7,16 +7,16 @@ import { Avatar } from "@/components/ui/Avatar";
 import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
 
 const moduleTitleMap: Record<string, string> = {
-  "/": "Dashboard",
-  "/customers": "Customers",
-  "/contacts": "Contacts",
-  "/companies": "Companies",
-  "/deals": "Deals",
-  "/tasks": "Tasks",
-  "/users": "Users",
-  "/notifications": "Notifications",
-  "/permissions": "Permissions",
-  "/settings": "Settings",
+  "/": "Bảng điều khiển",
+  "/customers": "Khách hàng",
+  "/contacts": "Liên hệ",
+  "/companies": "Công ty",
+  "/deals": "Thương vụ",
+  "/tasks": "Công việc",
+  "/users": "Người dùng",
+  "/notifications": "Thông báo",
+  "/permissions": "Phân quyền",
+  "/settings": "Cài đặt",
 };
 
 interface HeaderProps {
@@ -35,7 +35,7 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
     const segments = pathname.split("/").filter(Boolean);
     const modulePath = `/${segments[0]}`;
 
-    return moduleTitleMap[modulePath] ?? "Dashboard";
+    return moduleTitleMap[modulePath] ?? "Bảng điều khiển";
   }, [pathname]);
 
   return (
@@ -45,7 +45,7 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={onToggleSidebar}
-            aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            aria-label={isSidebarOpen ? "Thu gọn thanh bên" : "Mở rộng thanh bên"}
             className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
           >
             <FiMenu className="h-5 w-5" />
@@ -58,7 +58,7 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search contacts, companies, deals..."
+              placeholder="Tìm liên hệ, công ty, thương vụ..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
@@ -68,10 +68,10 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
           <NotificationDropdown />
 
           <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
-            <Avatar name="John Doe" size="sm" />
+            <Avatar name="Người dùng hệ thống" size="sm" />
             <div>
-              <p className="text-sm font-medium text-gray-900">John Doe</p>
-              <p className="text-xs text-gray-500">Sales Manager</p>
+              <p className="text-sm font-medium text-gray-900">Người dùng hệ thống</p>
+              <p className="text-xs text-gray-500">Quản lý kinh doanh</p>
             </div>
           </div>
         </div>

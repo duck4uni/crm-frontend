@@ -24,8 +24,8 @@ interface NotificationDetailModalProps {
 
 const CATEGORY_CONFIG: Record<string, { label: string; variant: "success" | "warning" | "danger" | "info" }> = {
     [NotificationCategory.SYSTEM]: { label: "Hệ thống", variant: "info" },
-    [NotificationCategory.TASK]: { label: "Task", variant: "warning" },
-    [NotificationCategory.DEAL]: { label: "Deal", variant: "success" },
+    [NotificationCategory.TASK]: { label: "Công việc", variant: "warning" },
+    [NotificationCategory.DEAL]: { label: "Thương vụ", variant: "success" },
     [NotificationCategory.CUSTOMER]: { label: "Khách hàng", variant: "info" },
     [NotificationCategory.REMINDER]: { label: "Nhắc nhở", variant: "danger" },
 };

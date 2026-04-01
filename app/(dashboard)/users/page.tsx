@@ -40,7 +40,7 @@ function UsersPageContent() {
 
 export default function UsersPage() {
     return (
-        <Suspense fallback={<div className="p-6">Loading...</div>}>
+        <Suspense fallback={<div className="p-6">Đang tải...</div>}>
             <UsersPageContent />
         </Suspense>
     );

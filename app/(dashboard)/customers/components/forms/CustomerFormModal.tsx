@@ -15,6 +15,32 @@ interface CustomerFormModalProps {
     customer?: Customer | null; // If provided, we're editing; otherwise, creating
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+    Referral: "Giới thiệu",
+    "Google Ads": "Quảng cáo Google",
+    "Walk-in": "Khách đến trực tiếp",
+    Website: "Trang web",
+    Email: "Thư điện tử",
+};
+
+const CUSTOMER_SOURCE_LABELS: Record<string, string> = {
+    "Data Import": "Nhập dữ liệu",
+    "Google Ads": "Quảng cáo Google",
+    "Walk-in": "Khách đến trực tiếp",
+    "Email Marketing": "Tiếp thị email",
+    Website: "Trang web",
+    Email: "Thư điện tử",
+};
+
+const ASSIGNEE_LABELS: Record<string, string> = {
+    "Getfly Admin": "Quản trị viên Getfly",
+};
+
+const RELATIONSHIP_LABELS: Record<string, string> = {
+    Data2: "Dữ liệu nhóm 2",
+    Data3: "Dữ liệu nhóm 3",
+};
+
 export function CustomerFormModal({
     isOpen,
     onClose,
@@ -46,7 +72,13 @@ export function CustomerFormModal({
     // Initialize form with customer data if editing
     useEffect(() => {
         if (customer) {
-            setFormData(customer);
+            setFormData({
+                ...customer,
+                source: SOURCE_LABELS[customer.source] ?? customer.source,
+                customerSource: CUSTOMER_SOURCE_LABELS[customer.customerSource || ""] ?? customer.customerSource,
+                assignee: ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee,
+                relationship: RELATIONSHIP_LABELS[customer.relationship || ""] ?? customer.relationship,
+            });
         } else {
             // Reset form for new customer
             setFormData({
@@ -137,9 +169,9 @@ export function CustomerFormModal({
     const salutationOptions = [
         { value: "Anh", label: "Anh" },
         { value: "Chị", label: "Chị" },
-        { value: "Mr", label: "Mr" },
-        { value: "Mrs", label: "Mrs" },
-        { value: "Ms", label: "Ms" },
+        { value: "Ông", label: "Ông" },
+        { value: "Bà", label: "Bà" },
+        { value: "Cô", label: "Cô" },
     ];
 
     const genderOptions = [
@@ -258,7 +290,7 @@ export function CustomerFormModal({
                             value={formData.source}
                             onChange={handleChange}
                             error={errors.source}
-                            placeholder="VD: Facebook, Website, Giới thiệu..."
+                            placeholder="VD: Facebook, Trang web, Giới thiệu..."
                             disabled={isLoading}
                         />
 
@@ -346,7 +378,7 @@ function getStatusLabel(status: CustomerStatus): string {
         [CustomerStatus.TESTED]: "Đã test đầu vào",
         [CustomerStatus.REGISTERED]: "Đã đăng ký",
         [CustomerStatus.CONSIDERING]: "Đang cân nhắc",
-        [CustomerStatus.UPSELL]: "Upsell",
+        [CustomerStatus.UPSELL]: "Bán thêm",
         [CustomerStatus.APPROACHED]: "Đã tiếp cận",
         [CustomerStatus.SURVEYED]: "Khảo sát",
     };

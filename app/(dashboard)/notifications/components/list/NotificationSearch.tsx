@@ -14,8 +14,8 @@ interface NotificationSearchProps {
 const CATEGORY_OPTIONS = [
     { value: "", label: "Tất cả danh mục" },
     { value: NotificationCategory.SYSTEM, label: "Hệ thống" },
-    { value: NotificationCategory.TASK, label: "Task" },
-    { value: NotificationCategory.DEAL, label: "Deal" },
+    { value: NotificationCategory.TASK, label: "Công việc" },
+    { value: NotificationCategory.DEAL, label: "Thương vụ" },
     { value: NotificationCategory.CUSTOMER, label: "Khách hàng" },
     { value: NotificationCategory.REMINDER, label: "Nhắc nhở" },
 ];

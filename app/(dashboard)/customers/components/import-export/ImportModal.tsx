@@ -101,14 +101,14 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="Import khách hàng"
+            title="Nhập khách hàng"
             size="lg"
             footer={
                 <div className="flex gap-3 justify-end">
                     {importResult ? (
                         <>
                             <Button variant="outline" onClick={handleReset}>
-                                Import tiếp
+                                Nhập tiếp
                             </Button>
                             <Button variant="primary" onClick={onClose}>
                                 Hoàn tất
@@ -124,7 +124,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                                 onClick={handleImport}
                                 disabled={!file || importing}
                             >
-                                {importing ? "Đang import..." : "Bắt đầu import"}
+                                {importing ? "Đang nhập dữ liệu..." : "Bắt đầu nhập"}
                             </Button>
                         </>
                     )}
@@ -214,13 +214,13 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                         {/* Instructions */}
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                                Hướng dẫn import
+                                Hướng dẫn nhập dữ liệu
                             </h4>
                             <ul className="text-sm text-gray-700 space-y-1">
                                 <li>• File phải có các cột: Tên KH, Số điện thoại, Email (bắt buộc)</li>
                                 <li>• Các cột tùy chọn: Địa chỉ, Người phụ trách, Trạng thái, Ghi chú</li>
                                 <li>• Mỗi dòng là một khách hàng</li>
-                                <li>• Tối đa 1000 khách hàng mỗi lần import</li>
+                                <li>• Tối đa 1000 khách hàng mỗi lần nhập</li>
                             </ul>
                         </div>
                     </>
@@ -232,7 +232,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                                 <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
                                 <div>
                                     <h4 className="text-sm font-semibold text-green-900">
-                                        Import thành công {importResult.success} khách hàng
+                                        Nhập thành công {importResult.success} khách hàng
                                     </h4>
                                     <p className="text-sm text-green-700 mt-1">
                                         Dữ liệu đã được thêm vào hệ thống

@@ -106,7 +106,7 @@ export function CustomerSearch({
             value={selectedAssignee}
             onChange={(e) => onAssigneeChange(e.target.value)}
             options={[
-              { value: "getfly_admin", label: "Getfly Admin" },
+              { value: "getfly_admin", label: "Quản trị viên Getfly" },
               { value: "nguyen_van_a", label: "Nguyễn Văn A" },
               { value: "tran_thi_b", label: "Trần Thị B" },
             ]}

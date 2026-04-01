@@ -23,12 +23,12 @@ export default function CompaniesPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="mt-1 text-gray-500">
-            Manage your company relationships
+            Quản lý thông tin công ty và mối quan hệ đối tác
           </p>
         </div>
         <Button>
           <FiPlus className="w-5 h-5 mr-2" />
-          Add Company
+          Thêm công ty
         </Button>
       </div>
 
@@ -39,13 +39,13 @@ export default function CompaniesPage() {
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search companies..."
+              placeholder="Tìm kiếm công ty..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Button variant="outline">Filter</Button>
+          <Button variant="outline">Lọc</Button>
         </CardContent>
       </Card>
 
@@ -66,7 +66,7 @@ export default function CompaniesPage() {
                 <Badge
                   variant={company.status === "active" ? "success" : "default"}
                 >
-                  {company.status}
+                  {company.status === "active" ? "Hoạt động" : "Không hoạt động"}
                 </Badge>
               </div>
 
@@ -101,9 +101,9 @@ export default function CompaniesPage() {
               {company.size && (
                 <div className="pt-3 border-t border-gray-200">
                   <p className="text-sm text-gray-600">
-                    Size:{" "}
+                    Quy mô:{" "}
                     <span className="font-medium">
-                      {company.size} employees
+                      {company.size} nhân viên
                     </span>
                   </p>
                 </div>
@@ -120,7 +120,7 @@ export default function CompaniesPage() {
               )}
 
               <div className="pt-3 border-t border-gray-200 text-xs text-gray-500">
-                <span>Created {formatDate(company.createdAt)}</span>
+                <span>Tạo ngày {formatDate(company.createdAt)}</span>
               </div>
             </CardContent>
           </Card>
@@ -130,7 +130,7 @@ export default function CompaniesPage() {
       {filteredCompanies.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
-            <p className="text-gray-500">No companies found</p>
+            <p className="text-gray-500">Không tìm thấy công ty nào</p>
           </CardContent>
         </Card>
       )}

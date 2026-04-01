@@ -162,7 +162,7 @@ export function CustomerListView() {
 
   const handleImport = (data: any[]) => {
     // In real app, this would parse and validate the imported data
-    toast.success("Import thành công", `Đã import ${data.length} khách hàng mới`);
+    toast.success("Nhập dữ liệu thành công", `Đã nhập ${data.length} khách hàng mới`);
   };
 
   return (

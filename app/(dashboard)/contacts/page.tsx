@@ -9,7 +9,6 @@ import { Avatar } from "@/components/ui/Avatar";
 import { mockContacts } from "@/lib/mock-data";
 import { formatDate } from "@/lib/utils";
 import { FiPlus, FiSearch, FiMail, FiPhone } from "react-icons/fi";
-import Link from "next/link";
 
 export default function ContactsPage() {
   const [contacts] = useState(mockContacts);
@@ -27,12 +26,12 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="mt-1 text-gray-500">
-            Manage your contacts and relationships
+            Quản lý danh bạ liên hệ và mối quan hệ khách hàng
           </p>
         </div>
         <Button>
           <FiPlus className="w-5 h-5 mr-2" />
-          Add Contact
+          Thêm liên hệ
         </Button>
       </div>
 
@@ -43,13 +42,13 @@ export default function ContactsPage() {
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search contacts..."
+              placeholder="Tìm kiếm liên hệ..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Button variant="outline">Filter</Button>
+          <Button variant="outline">Lọc</Button>
         </CardContent>
       </Card>
 
@@ -74,7 +73,7 @@ export default function ContactsPage() {
                 <Badge
                   variant={contact.status === "active" ? "success" : "default"}
                 >
-                  {contact.status}
+                  {contact.status === "active" ? "Hoạt động" : "Không hoạt động"}
                 </Badge>
               </div>
 
@@ -94,7 +93,7 @@ export default function ContactsPage() {
               {contact.companyName && (
                 <div className="pt-3 border-t border-gray-200">
                   <p className="text-sm text-gray-600">
-                    Company:{" "}
+                    Công ty:{" "}
                     <span className="font-medium">{contact.companyName}</span>
                   </p>
                 </div>
@@ -111,10 +110,10 @@ export default function ContactsPage() {
               )}
 
               <div className="pt-3 border-t border-gray-200 flex justify-between text-xs text-gray-500">
-                <span>Created {formatDate(contact.createdAt)}</span>
+                <span>Tạo ngày {formatDate(contact.createdAt)}</span>
                 {contact.lastContactedAt && (
                   <span>
-                    Last contact {formatDate(contact.lastContactedAt)}
+                    Liên hệ gần nhất {formatDate(contact.lastContactedAt)}
                   </span>
                 )}
               </div>
@@ -126,7 +125,7 @@ export default function ContactsPage() {
       {filteredContacts.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
-            <p className="text-gray-500">No contacts found</p>
+            <p className="text-gray-500">Không tìm thấy liên hệ nào</p>
           </CardContent>
         </Card>
       )}

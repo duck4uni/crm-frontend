@@ -4,8 +4,8 @@ export const mockNotifications: Notification[] = [
     {
         id: "n1",
         belongs_to_user_id: "u1",
-        title: "Deal mới được tạo",
-        content: "Deal 'Hợp đồng Enterprise Q2' đã được tạo bởi Trần Thị Bích",
+        title: "Thương vụ mới được tạo",
+        content: "Thương vụ 'Hợp đồng Enterprise Q2' đã được tạo bởi Trần Thị Bích",
         category: NotificationCategory.DEAL,
         sub_category: "new_deal",
         has_user_read: false,
@@ -32,8 +32,8 @@ export const mockNotifications: Notification[] = [
     {
         id: "n3",
         belongs_to_user_id: "u2",
-        title: "Task được giao",
-        content: "Bạn được giao task 'Liên hệ khách hàng tiềm năng' bởi Lê Hoàng Nam",
+        title: "Công việc được giao",
+        content: "Bạn được giao công việc 'Liên hệ khách hàng tiềm năng' bởi Lê Hoàng Nam",
         category: NotificationCategory.TASK,
         sub_category: "assigned",
         has_user_read: false,
@@ -74,8 +74,8 @@ export const mockNotifications: Notification[] = [
     {
         id: "n6",
         belongs_to_user_id: "u2",
-        title: "Deal sắp hết hạn",
-        content: "Deal 'Gói dịch vụ Premium' sẽ hết hạn trong 3 ngày",
+        title: "Thương vụ sắp hết hạn",
+        content: "Thương vụ 'Gói dịch vụ Premium' sẽ hết hạn trong 3 ngày",
         category: NotificationCategory.DEAL,
         sub_category: "expiring",
         has_user_read: false,
@@ -100,8 +100,8 @@ export const mockNotifications: Notification[] = [
     {
         id: "n8",
         belongs_to_user_id: "u4",
-        title: "Task quá hạn",
-        content: "Task 'Gửi báo giá cho công ty ABC' đã quá hạn 2 ngày",
+        title: "Công việc quá hạn",
+        content: "Công việc 'Gửi báo giá cho công ty ABC' đã quá hạn 2 ngày",
         category: NotificationCategory.TASK,
         sub_category: "overdue",
         has_user_read: false,

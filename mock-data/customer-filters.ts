@@ -76,7 +76,7 @@ export const CUSTOMER_FILTERS: FilterButton[] = [
   },
   {
     id: "upsell",
-    label: "Upsell",
+    label: "Bán thêm",
     bgColor: "bg-cyan-500",
     textColor: "text-white",
     activeBgColor: "bg-cyan-600",

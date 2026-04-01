@@ -16,16 +16,16 @@ import {
 } from "react-icons/fi";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: FiHome },
-  { name: "Customers", href: "/customers", icon: FiUsers },
-  { name: "Contacts", href: "/contacts", icon: FiUsers },
-  { name: "Companies", href: "/companies", icon: FiBriefcase },
-  { name: "Deals", href: "/deals", icon: FiDollarSign },
-  { name: "Tasks", href: "/tasks", icon: FiCheckSquare },
-  { name: "Users", href: "/users", icon: FiUser },
-  { name: "Notifications", href: "/notifications", icon: FiBell },
-  { name: "Permissions", href: "/permissions", icon: FiShield },
-  { name: "Settings", href: "/settings", icon: FiSettings },
+  { name: "Bảng điều khiển", href: "/", icon: FiHome },
+  { name: "Khách hàng", href: "/customers", icon: FiUsers },
+  { name: "Liên hệ", href: "/contacts", icon: FiUsers },
+  { name: "Công ty", href: "/companies", icon: FiBriefcase },
+  { name: "Thương vụ", href: "/deals", icon: FiDollarSign },
+  { name: "Công việc", href: "/tasks", icon: FiCheckSquare },
+  { name: "Người dùng", href: "/users", icon: FiUser },
+  { name: "Thông báo", href: "/notifications", icon: FiBell },
+  { name: "Phân quyền", href: "/permissions", icon: FiShield },
+  { name: "Cài đặt", href: "/settings", icon: FiSettings },
 ];
 
 interface SidebarProps {
@@ -37,7 +37,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   return (
     <aside
-      aria-label="Sidebar"
+      aria-label="Thanh điều hướng"
       className={cn(
         "flex h-screen flex-col overflow-hidden bg-gray-900 transition-[width] duration-300",
         isOpen ? "w-64" : "w-16",

@@ -81,7 +81,7 @@ export function FilterModal({ isOpen, onClose, onApply, initialFilters = {} }: F
                         onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}
                         options={[
                             { value: "", label: "Tất cả người phụ trách" },
-                            { value: "getfly_admin", label: "Getfly Admin" },
+                            { value: "getfly_admin", label: "Quản trị viên Getfly" },
                             { value: "nguyen_van_a", label: "Nguyễn Văn A" },
                             { value: "tran_thi_b", label: "Trần Thị B" },
                             { value: "le_van_c", label: "Lê Văn C" },
@@ -133,9 +133,9 @@ export function FilterModal({ isOpen, onClose, onApply, initialFilters = {} }: F
                         onChange={(e) => setFilters({ ...filters, source: e.target.value })}
                         options={[
                             { value: "", label: "Tất cả nguồn" },
-                            { value: "website", label: "Website" },
+                            { value: "website", label: "Trang web" },
                             { value: "facebook", label: "Facebook" },
-                            { value: "google", label: "Google Ads" },
+                            { value: "google", label: "Quảng cáo Google" },
                             { value: "referral", label: "Giới thiệu" },
                             { value: "direct", label: "Trực tiếp" },
                             { value: "other", label: "Khác" },

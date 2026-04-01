@@ -18,8 +18,8 @@ type SortDirection = "asc" | "desc";
 const GROUP_CONFIG: Record<string, { label: string; variant: "success" | "warning" | "danger" | "info" }> = {
     [PermissionGroup.USER]: { label: "Người dùng", variant: "info" },
     [PermissionGroup.CUSTOMER]: { label: "Khách hàng", variant: "success" },
-    [PermissionGroup.DEAL]: { label: "Deal", variant: "warning" },
-    [PermissionGroup.TASK]: { label: "Task", variant: "info" },
+    [PermissionGroup.DEAL]: { label: "Thương vụ", variant: "warning" },
+    [PermissionGroup.TASK]: { label: "Công việc", variant: "info" },
     [PermissionGroup.REPORT]: { label: "Báo cáo", variant: "warning" },
     [PermissionGroup.SETTING]: { label: "Cài đặt", variant: "danger" },
 };

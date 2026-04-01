@@ -7,37 +7,37 @@ export default function SettingsPage() {
     <div className="p-6 space-y-6">
       <div>
         <p className="mt-1 text-gray-500">
-          Manage your account and application settings
+          Quản lý tài khoản và các thiết lập hệ thống
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Profile Settings</CardTitle>
+            <CardTitle>Thiết lập hồ sơ</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">Profile settings coming soon...</p>
+            <p className="text-gray-600">Tính năng thiết lập hồ sơ sẽ sớm ra mắt...</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Notifications</CardTitle>
+            <CardTitle>Thông báo</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-600">
-              Notification settings coming soon...
+              Tính năng thiết lập thông báo sẽ sớm ra mắt...
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Account</CardTitle>
+            <CardTitle>Tài khoản</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">Account settings coming soon...</p>
+            <p className="text-gray-600">Tính năng thiết lập tài khoản sẽ sớm ra mắt...</p>
           </CardContent>
         </Card>
       </div>

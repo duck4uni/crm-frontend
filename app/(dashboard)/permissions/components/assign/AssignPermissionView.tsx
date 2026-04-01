@@ -12,8 +12,8 @@ import { useToast } from "@/components/ui/ToastProvider";
 const GROUP_LABELS: Record<PermissionGroup, string> = {
     [PermissionGroup.USER]: "Người dùng",
     [PermissionGroup.CUSTOMER]: "Khách hàng",
-    [PermissionGroup.DEAL]: "Deal",
-    [PermissionGroup.TASK]: "Task",
+    [PermissionGroup.DEAL]: "Thương vụ",
+    [PermissionGroup.TASK]: "Công việc",
     [PermissionGroup.REPORT]: "Báo cáo",
     [PermissionGroup.SETTING]: "Cài đặt",
 };

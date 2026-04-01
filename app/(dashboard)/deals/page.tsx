@@ -19,6 +19,15 @@ const stageColors: Record<string, "default" | "info" | "warning" | "success" | "
   closed_lost: "danger",
 };
 
+const stageLabels: Record<string, string> = {
+  prospecting: "Tiềm năng",
+  qualification: "Đánh giá",
+  proposal: "Đề xuất",
+  negotiation: "Đàm phán",
+  closed_won: "Chốt thành công",
+  closed_lost: "Chốt thất bại",
+};
+
 export default function DealsPage() {
   const [deals] = useState(mockDeals);
   const [searchQuery, setSearchQuery] = useState("");
@@ -33,12 +42,12 @@ export default function DealsPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="mt-1 text-gray-500">
-            Track and manage your sales pipeline
+            Theo dõi và quản lý toàn bộ phễu bán hàng
           </p>
         </div>
         <Button>
           <FiPlus className="w-5 h-5 mr-2" />
-          Add Deal
+          Thêm thương vụ
         </Button>
       </div>
 
@@ -46,7 +55,7 @@ export default function DealsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardContent>
-            <p className="text-sm text-gray-600">Total Deals</p>
+            <p className="text-sm text-gray-600">Tổng thương vụ</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">
               {deals.length}
             </p>
@@ -54,7 +63,7 @@ export default function DealsPage() {
         </Card>
         <Card>
           <CardContent>
-            <p className="text-sm text-gray-600">Total Value</p>
+            <p className="text-sm text-gray-600">Tổng giá trị</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">
               {formatCurrency(deals.reduce((sum, deal) => sum + deal.value, 0))}
             </p>
@@ -62,7 +71,7 @@ export default function DealsPage() {
         </Card>
         <Card>
           <CardContent>
-            <p className="text-sm text-gray-600">Avg. Deal Size</p>
+            <p className="text-sm text-gray-600">Giá trị trung bình</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">
               {formatCurrency(
                 deals.reduce((sum, deal) => sum + deal.value, 0) / deals.length,
@@ -72,7 +81,7 @@ export default function DealsPage() {
         </Card>
         <Card>
           <CardContent>
-            <p className="text-sm text-gray-600">Win Rate</p>
+            <p className="text-sm text-gray-600">Tỷ lệ chốt</p>
             <p className="mt-2 text-2xl font-bold text-green-600">0%</p>
           </CardContent>
         </Card>
@@ -85,13 +94,13 @@ export default function DealsPage() {
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search deals..."
+              placeholder="Tìm kiếm thương vụ..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Button variant="outline">Filter</Button>
+          <Button variant="outline">Lọc</Button>
         </CardContent>
       </Card>
 
@@ -108,14 +117,14 @@ export default function DealsPage() {
                     </h3>
                     <div className="mt-2 flex items-center space-x-4">
                       <Badge variant={stageColors[deal.stage] || "default"}>
-                        {deal.stage.replace("_", " ")}
+                        {stageLabels[deal.stage] ?? deal.stage.replace("_", " ")}
                       </Badge>
                       <span className="text-sm text-gray-600">
-                        Probability: {deal.probability}%
+                        Xác suất: {deal.probability}%
                       </span>
                       {deal.expectedCloseDate && (
                         <span className="text-sm text-gray-600">
-                          Expected close: {formatDate(deal.expectedCloseDate)}
+                          Dự kiến chốt: {formatDate(deal.expectedCloseDate)}
                         </span>
                       )}
                     </div>
@@ -146,7 +155,7 @@ export default function DealsPage() {
       {filteredDeals.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
-            <p className="text-gray-500">No deals found</p>
+            <p className="text-gray-500">Không tìm thấy thương vụ nào</p>
           </CardContent>
         </Card>
       )}

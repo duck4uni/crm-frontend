@@ -17,9 +17,9 @@ import { Notification, NotificationCategory } from "@/types/notification";
 function getCategoryConfig(category: NotificationCategory) {
     switch (category) {
         case NotificationCategory.DEAL:
-            return { icon: MdOutlineHandshake, bg: "bg-blue-100", color: "text-blue-600", label: "Deal" };
+            return { icon: MdOutlineHandshake, bg: "bg-blue-100", color: "text-blue-600", label: "Thương vụ" };
         case NotificationCategory.TASK:
-            return { icon: MdOutlineTask, bg: "bg-yellow-100", color: "text-yellow-600", label: "Task" };
+            return { icon: MdOutlineTask, bg: "bg-yellow-100", color: "text-yellow-600", label: "Công việc" };
         case NotificationCategory.CUSTOMER:
             return { icon: MdOutlinePeopleAlt, bg: "bg-green-100", color: "text-green-600", label: "Khách hàng" };
         case NotificationCategory.REMINDER:
@@ -147,8 +147,8 @@ export function NotificationDropdown() {
                                         key={notification.id}
                                         onClick={() => handleItemClick(notification)}
                                         className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors border-b border-gray-50 last:border-b-0 ${!notification.has_user_read
-                                                ? "bg-blue-50/50 hover:bg-blue-50"
-                                                : "hover:bg-gray-50"
+                                            ? "bg-blue-50/50 hover:bg-blue-50"
+                                            : "hover:bg-gray-50"
                                             }`}
                                     >
                                         {/* Category icon */}
@@ -160,8 +160,8 @@ export function NotificationDropdown() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5">
                                                 <p className={`text-sm leading-snug flex-1 min-w-0 ${!notification.has_user_read
-                                                        ? "font-semibold text-gray-900"
-                                                        : "font-medium text-gray-700"
+                                                    ? "font-semibold text-gray-900"
+                                                    : "font-medium text-gray-700"
                                                     }`}>
                                                     {notification.title}
                                                 </p>

@@ -27,6 +27,38 @@ interface CustomerDetailModalProps {
     onDelete?: (customer: Customer) => void;
 }
 
+const SALUTATION_LABELS: Record<string, string> = {
+    Mr: "Ông",
+    Mrs: "Bà",
+    Ms: "Cô",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+    Referral: "Giới thiệu",
+    "Google Ads": "Quảng cáo Google",
+    "Walk-in": "Khách đến trực tiếp",
+    Website: "Trang web",
+    Email: "Thư điện tử",
+};
+
+const CUSTOMER_SOURCE_LABELS: Record<string, string> = {
+    "Data Import": "Nhập dữ liệu",
+    "Google Ads": "Quảng cáo Google",
+    "Walk-in": "Khách đến trực tiếp",
+    "Email Marketing": "Tiếp thị email",
+    Website: "Trang web",
+    Email: "Thư điện tử",
+};
+
+const ASSIGNEE_LABELS: Record<string, string> = {
+    "Getfly Admin": "Quản trị viên Getfly",
+};
+
+const RELATIONSHIP_LABELS: Record<string, string> = {
+    Data2: "Dữ liệu nhóm 2",
+    Data3: "Dữ liệu nhóm 3",
+};
+
 export function CustomerDetailModal({
     isOpen,
     onClose,
@@ -55,6 +87,12 @@ export function CustomerDetailModal({
         });
     };
 
+    const salutation = SALUTATION_LABELS[customer.salutation] ?? customer.salutation;
+    const source = SOURCE_LABELS[customer.source] ?? customer.source;
+    const customerSource = CUSTOMER_SOURCE_LABELS[customer.customerSource || ""] ?? customer.customerSource;
+    const assignee = ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee;
+    const relationship = RELATIONSHIP_LABELS[customer.relationship || ""] ?? customer.relationship;
+
     const getStatusBadge = (status: string) => {
         const statusConfig: Record<
             string,
@@ -67,7 +105,7 @@ export function CustomerDetailModal({
             tested: { label: "Đã test đầu vào", variant: "info" },
             registered: { label: "Đã đăng ký", variant: "success" },
             considering: { label: "Đang cân nhắc", variant: "warning" },
-            upsell: { label: "Upsell", variant: "success" },
+            upsell: { label: "Bán thêm", variant: "success" },
             approached: { label: "Đã tiếp cận", variant: "info" },
             surveyed: { label: "Khảo sát", variant: "info" },
         };
@@ -118,7 +156,7 @@ export function CustomerDetailModal({
                         <div className="flex items-start justify-between">
                             <div>
                                 <h3 className="text-2xl font-semibold text-gray-900">
-                                    {customer.salutation} {customer.customerName}
+                                    {salutation} {customer.customerName}
                                 </h3>
                                 <p className="text-sm text-gray-500 mt-1">
                                     Mã KH: #{customer.id}
@@ -188,22 +226,22 @@ export function CustomerDetailModal({
                         <InfoItem
                             icon={<FiTarget className="w-5 h-5" />}
                             label="Nguồn"
-                            value={customer.source}
+                            value={source}
                         />
                         <InfoItem
                             icon={<FiTarget className="w-5 h-5" />}
                             label="Nguồn khách hàng"
-                            value={customer.customerSource || "Chưa cập nhật"}
+                            value={customerSource || "Chưa cập nhật"}
                         />
                         <InfoItem
                             icon={<FiUsers className="w-5 h-5" />}
                             label="Người phụ trách"
-                            value={customer.assignee}
+                            value={assignee}
                         />
                         <InfoItem
                             icon={<FiUsers className="w-5 h-5" />}
                             label="Mối quan hệ"
-                            value={customer.relationship || "Chưa cập nhật"}
+                            value={relationship || "Chưa cập nhật"}
                         />
                     </div>
                 </div>
