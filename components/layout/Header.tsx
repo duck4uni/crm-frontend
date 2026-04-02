@@ -1,10 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { FiSearch, FiMenu } from "react-icons/fi";
 import { Avatar } from "@/components/ui/Avatar";
 import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
+import {
+  getCurrentUserSession,
+  hasAuthSession,
+  setCurrentUserSession,
+} from "@/lib/auth-session";
+import { MyInfoResponseData } from "@/types/api";
+import { usersService } from "@/services/users";
 
 const moduleTitleMap: Record<string, string> = {
   "/": "Bảng điều khiển",
@@ -26,6 +33,43 @@ interface HeaderProps {
 
 export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
   const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState<MyInfoResponseData | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCurrentUser = async () => {
+      const cachedUser = getCurrentUserSession();
+
+      if (cachedUser) {
+        setCurrentUser(cachedUser);
+        return;
+      }
+
+      if (!hasAuthSession()) {
+        return;
+      }
+
+      try {
+        const response = await usersService.getMyInfo();
+
+        if (!isMounted || !response.responseData) {
+          return;
+        }
+
+        setCurrentUserSession(response.responseData);
+        setCurrentUser(response.responseData);
+      } catch (error) {
+        console.error("Load current user in header failed:", error);
+      }
+    };
+
+    loadCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const activeModule = useMemo(() => {
     if (!pathname || pathname === "/") {
@@ -68,10 +112,14 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
           <NotificationDropdown />
 
           <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
-            <Avatar name="Người dùng hệ thống" size="sm" />
+            <Avatar name={currentUser?.full_name || "Người dùng hệ thống"} size="sm" />
             <div>
-              <p className="text-sm font-medium text-gray-900">Người dùng hệ thống</p>
-              <p className="text-xs text-gray-500">Quản lý kinh doanh</p>
+              <p className="text-sm font-medium text-gray-900">
+                {currentUser?.full_name || "Người dùng hệ thống"}
+              </p>
+              <p className="text-xs text-gray-500">
+                {currentUser?.email || "Quản lý kinh doanh"}
+              </p>
             </div>
           </div>
         </div>

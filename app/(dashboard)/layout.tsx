@@ -1,20 +1,38 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { LoadingPage } from "@/components/ui/Spinner";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { hasAuthSession } from "@/lib/auth-session";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    if (!hasAuthSession()) {
+      router.replace("/login");
+      return;
+    }
+
+    setIsCheckingAuth(false);
+  }, [router]);
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
+
+  if (isCheckingAuth) {
+    return <LoadingPage />;
+  }
 
   return (
     <ToastProvider>

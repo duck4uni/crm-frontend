@@ -30,14 +30,14 @@ export interface SortParams {
 
 export type ApiResponse<T> =
   | {
-      success: true;
-      data: T;
-    }
+    success: true;
+    data: T;
+  }
   | {
-      success: false;
-      error: string;
-      message: string;
-    };
+    success: false;
+    error: string;
+    message: string;
+  };
 
 export interface ContactsFilters
   extends FilterParams, SortParams, PaginationParams {
@@ -65,3 +65,75 @@ export interface TasksFilters
   relatedToType?: string;
   relatedToId?: string;
 }
+
+export interface LoginPayload {
+  identifier: string;
+  password: string;
+}
+
+export interface AuthTokenResponse {
+  accessToken: string;
+  expiresIn: string;
+  refreshToken: string;
+}
+
+export interface RefreshAccessTokenPayload {
+  refreshToken: string;
+}
+
+export interface RefreshAccessTokenData {
+  accessToken: string;
+  expiresIn: string;
+}
+
+export interface RegisterPayload {
+  full_name: string;
+  email: string;
+  phone: string;
+  password: string;
+}
+
+export interface RegisterUserResponse {
+  id: string;
+  is_active: boolean;
+  is_delete: boolean;
+  full_name: string;
+  email: string;
+  phone: string;
+  created_at: string | null;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+  avatar: string | null;
+  birthday: string | null;
+}
+
+export interface MyInfoResponseData {
+  id: string;
+  email: string;
+  created_at: string | null;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+  full_name: string;
+  phone: string;
+  avatar: string | null;
+  is_active: boolean;
+  birthday: string | null;
+  is_delete: boolean;
+}
+
+export interface ApiEnvelope<T> {
+  message: string;
+  message_en: string;
+  responseData: T;
+  status: string;
+  timeStamp: string;
+  violations: Record<string, string[]> | null;
+}
+
+export type LoginResponse = ApiEnvelope<AuthTokenResponse>;
+export type RegisterResponse = ApiEnvelope<RegisterUserResponse>;
+export type LogoutResponse = ApiEnvelope<number>;
+export type RefreshAccessTokenResponse = ApiEnvelope<RefreshAccessTokenData>;
+export type GetMyInfoResponse = ApiEnvelope<MyInfoResponseData>;
