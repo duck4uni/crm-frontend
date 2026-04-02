@@ -101,7 +101,7 @@ cp .env.example .env
 4. Update environment variables in `.env`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
+NEXT_PUBLIC_API_URL=https://gateway.dev.meu-solutions.com/crm-backend
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 

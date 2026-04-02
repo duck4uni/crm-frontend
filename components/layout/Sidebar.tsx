@@ -1,7 +1,8 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   FiHome,
@@ -13,7 +14,11 @@ import {
   FiUser,
   FiBell,
   FiShield,
+  FiLogOut,
 } from "react-icons/fi";
+import { clearAuthSession } from "@/lib/auth-session";
+import { authService } from "@/services/auth";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const navigation = [
   { name: "Bảng điều khiển", href: "/", icon: FiHome },
@@ -34,6 +39,23 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const toast = useToast();
+  const [isLoggingOut, startLogoutTransition] = useTransition();
+
+  const handleLogout = () => {
+    startLogoutTransition(async () => {
+      try {
+        await authService.logout();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Đăng xuất thất bại";
+        toast.warning("Không thể xác nhận đăng xuất", message);
+      } finally {
+        clearAuthSession();
+        router.replace("/login");
+      }
+    });
+  };
 
   return (
     <aside
@@ -79,6 +101,28 @@ export function Sidebar({ isOpen }: SidebarProps) {
           );
         })}
       </nav>
+
+      <div className={cn("border-t border-gray-800 pb-6 pt-4", isOpen ? "px-4" : "px-1")}>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          title={!isOpen ? "Đăng xuất" : undefined}
+          aria-label="Đăng xuất"
+          className={cn(
+            "flex w-full items-center rounded-lg text-sm font-medium transition-colors",
+            isOpen ? "px-4 py-3" : "mx-auto h-10 w-10 justify-center p-0 rounded-xl",
+            "text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-60",
+          )}
+        >
+          <FiLogOut className={cn("h-5 w-5 shrink-0", isOpen ? "mr-3" : "mr-0")} />
+          {isOpen ? (
+            <span className="truncate">{isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</span>
+          ) : (
+            <span className="sr-only">Đăng xuất</span>
+          )}
+        </button>
+      </div>
     </aside>
   );
 }
