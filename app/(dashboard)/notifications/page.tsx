@@ -1,6 +1,5 @@
 "use client";
 
-import { mockNotifications } from "@/mock-data/notifications";
 import { NotificationListView } from "./components/list/NotificationListView";
 import { Suspense } from "react";
 

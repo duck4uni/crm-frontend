@@ -21,6 +21,7 @@ export enum NotificationCategory {
     DEAL = "deal",
     CUSTOMER = "customer",
     REMINDER = "reminder",
+    EXAM = "exam",
 }
 
 export enum NotificationStatus {

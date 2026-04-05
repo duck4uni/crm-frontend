@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { OneSignalInitializer } from "@/components/layout/OneSignalInitializer";
 import { LoadingPage } from "@/components/ui/Spinner";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { hasAuthSession } from "@/lib/auth-session";
@@ -36,6 +38,12 @@ export default function DashboardLayout({
 
   return (
     <ToastProvider>
+      <Script
+        src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+        strategy="afterInteractive"
+      />
+      <OneSignalInitializer />
+
       {/* Block access on screens smaller than lg */}
       <div className="flex lg:hidden h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-8">
         <div className="flex flex-col items-center text-center max-w-sm">

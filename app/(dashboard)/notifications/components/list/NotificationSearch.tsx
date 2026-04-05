@@ -1,31 +1,21 @@
 "use client";
 
-import { Search, Plus } from "lucide-react";
-import { NotificationCategory } from "@/types/notification";
+import { Search } from "lucide-react";
 
 interface NotificationSearchProps {
     searchQuery: string;
     onSearchChange: (query: string) => void;
-    selectedCategory: string;
-    onCategoryChange: (category: string) => void;
-    onAddNotification: () => void;
+    unreadCount: number;
+    isMarkAllPending: boolean;
+    onMarkAllAsRead: () => void;
 }
-
-const CATEGORY_OPTIONS = [
-    { value: "", label: "Tất cả danh mục" },
-    { value: NotificationCategory.SYSTEM, label: "Hệ thống" },
-    { value: NotificationCategory.TASK, label: "Công việc" },
-    { value: NotificationCategory.DEAL, label: "Thương vụ" },
-    { value: NotificationCategory.CUSTOMER, label: "Khách hàng" },
-    { value: NotificationCategory.REMINDER, label: "Nhắc nhở" },
-];
 
 export function NotificationSearch({
     searchQuery,
     onSearchChange,
-    selectedCategory,
-    onCategoryChange,
-    onAddNotification,
+    unreadCount,
+    isMarkAllPending,
+    onMarkAllAsRead,
 }: NotificationSearchProps) {
     return (
         <div className="flex items-center gap-3">
@@ -40,22 +30,13 @@ export function NotificationSearch({
                 />
             </div>
 
-            <select
-                value={selectedCategory}
-                onChange={(e) => onCategoryChange(e.target.value)}
-                className="h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-                {CATEGORY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-            </select>
-
             <button
-                onClick={onAddNotification}
-                className="h-10 px-4 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow"
+                type="button"
+                onClick={onMarkAllAsRead}
+                disabled={isMarkAllPending || unreadCount === 0}
+                className="h-10 px-4 flex items-center gap-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow disabled:opacity-60 disabled:cursor-not-allowed"
             >
-                <Plus className="w-4 h-4" />
-                Tạo thông báo
+                {isMarkAllPending ? "Đang xử lý..." : `Đánh dấu tất cả đã đọc (${unreadCount})`}
             </button>
         </div>
     );

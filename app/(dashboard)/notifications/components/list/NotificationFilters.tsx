@@ -1,6 +1,6 @@
 "use client";
 
-import { NotificationCategory, NotificationStatus } from "@/types/notification";
+import { NotificationStatus } from "@/types/notification";
 
 interface NotificationFiltersProps {
     activeFilter: NotificationStatus;
@@ -12,8 +12,6 @@ const NOTIFICATION_FILTERS = [
     { id: NotificationStatus.ALL, label: "Tất cả", bgColor: "bg-gray-100", textColor: "text-gray-700", activeBgColor: "bg-gray-700", activeTextColor: "text-white" },
     { id: NotificationStatus.UNREAD, label: "Chưa đọc", bgColor: "bg-red-100", textColor: "text-red-700", activeBgColor: "bg-red-600", activeTextColor: "text-white" },
     { id: NotificationStatus.READ, label: "Đã đọc", bgColor: "bg-green-100", textColor: "text-green-700", activeBgColor: "bg-green-600", activeTextColor: "text-white" },
-    { id: NotificationStatus.SENT, label: "Đã gửi", bgColor: "bg-blue-100", textColor: "text-blue-700", activeBgColor: "bg-blue-600", activeTextColor: "text-white" },
-    { id: NotificationStatus.UNSENT, label: "Chưa gửi", bgColor: "bg-yellow-100", textColor: "text-yellow-700", activeBgColor: "bg-yellow-600", activeTextColor: "text-white" },
 ];
 
 export function NotificationFilters({ activeFilter, onFilterChange, counts }: NotificationFiltersProps) {
@@ -28,8 +26,8 @@ export function NotificationFilters({ activeFilter, onFilterChange, counts }: No
                         key={filter.id}
                         onClick={() => onFilterChange(filter.id)}
                         className={`flex items-center space-x-2 px-3 py-1.5 rounded transition-all whitespace-nowrap ${isActive
-                                ? `${filter.activeBgColor} ${filter.activeTextColor} shadow-md`
-                                : `${filter.bgColor} ${filter.textColor} opacity-90 hover:opacity-100 hover:shadow`
+                            ? `${filter.activeBgColor} ${filter.activeTextColor} shadow-md`
+                            : `${filter.bgColor} ${filter.textColor} opacity-90 hover:opacity-100 hover:shadow`
                             }`}
                     >
                         <span className="text-sm font-medium">{filter.label}</span>

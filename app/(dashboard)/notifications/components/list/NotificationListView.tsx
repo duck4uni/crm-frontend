@@ -1,26 +1,60 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Notification, NotificationCategory, NotificationStatus } from "@/types/notification";
-import { mockNotifications } from "@/mock-data/notifications";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Notification, NotificationStatus } from "@/types/notification";
 import { NotificationFilters } from "./NotificationFilters";
 import { NotificationSearch } from "./NotificationSearch";
 import { NotificationTable } from "./NotificationTable";
 import { NotificationDetailModal } from "../forms/NotificationDetailModal";
-import { NotificationFormModal } from "../forms/NotificationFormModal";
 import { useToast } from "@/components/ui/ToastProvider";
+import {
+    addNotificationsRefreshListener,
+    emitNotificationsRefresh,
+} from "@/lib/notifications-realtime";
+import { notificationsService } from "@/services/notifications";
 
 export function NotificationListView() {
-    const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilter, setActiveFilter] = useState<NotificationStatus>(NotificationStatus.ALL);
-    const [selectedCategory, setSelectedCategory] = useState("");
+    const [isMarkAllPending, setIsMarkAllPending] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const toast = useToast();
 
     // Modal states
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+
+    const loadNotifications = useCallback(async () => {
+        setIsLoading(true);
+        setErrorMessage(null);
+
+        try {
+            const data = await notificationsService.getMyNotifications();
+            setNotifications(data);
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Không thể tải danh sách thông báo.";
+
+            setErrorMessage(message);
+            toast.error("Tải thông báo thất bại", message);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => {
+        loadNotifications();
+    }, [loadNotifications]);
+
+    useEffect(() => {
+        return addNotificationsRefreshListener(() => {
+            void loadNotifications();
+        });
+    }, [loadNotifications]);
 
     // Filter counts
     const filterCounts = useMemo(() => {
@@ -28,8 +62,6 @@ export function NotificationListView() {
             [NotificationStatus.ALL]: notifications.length,
             [NotificationStatus.UNREAD]: notifications.filter((n) => !n.has_user_read).length,
             [NotificationStatus.READ]: notifications.filter((n) => n.has_user_read).length,
-            [NotificationStatus.SENT]: notifications.filter((n) => n.has_noti_sent).length,
-            [NotificationStatus.UNSENT]: notifications.filter((n) => !n.has_noti_sent).length,
         };
     }, [notifications]);
 
@@ -42,15 +74,6 @@ export function NotificationListView() {
             filtered = filtered.filter((n) => !n.has_user_read);
         } else if (activeFilter === NotificationStatus.READ) {
             filtered = filtered.filter((n) => n.has_user_read);
-        } else if (activeFilter === NotificationStatus.SENT) {
-            filtered = filtered.filter((n) => n.has_noti_sent);
-        } else if (activeFilter === NotificationStatus.UNSENT) {
-            filtered = filtered.filter((n) => !n.has_noti_sent);
-        }
-
-        // Category filter
-        if (selectedCategory) {
-            filtered = filtered.filter((n) => n.category === selectedCategory);
         }
 
         // Search filter
@@ -64,48 +87,103 @@ export function NotificationListView() {
         }
 
         return filtered;
-    }, [notifications, activeFilter, selectedCategory, searchQuery]);
+    }, [notifications, activeFilter, searchQuery]);
 
-    const handleNotificationClick = (notification: Notification) => {
-        setSelectedNotification(notification);
+    const handleMarkAsRead = async (notification: Notification, shouldShowSuccessToast = true): Promise<Notification> => {
+        if (notification.has_user_read) {
+            return notification;
+        }
+
+        try {
+            const updatedNotification = await notificationsService.markAsRead(notification.id);
+
+            setNotifications((prev) =>
+                prev.map((n) =>
+                    n.id === notification.id ? updatedNotification : n
+                )
+            );
+            setSelectedNotification((prev) =>
+                prev?.id === notification.id ? updatedNotification : prev
+            );
+
+            if (shouldShowSuccessToast) {
+                toast.success("Đã đọc", `Thông báo "${notification.title}" đã được đánh dấu đã đọc.`);
+            }
+
+            emitNotificationsRefresh({ source: "manual" });
+
+            return updatedNotification;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Không thể cập nhật trạng thái đã đọc.";
+            toast.error("Cập nhật thất bại", message);
+
+            return notification;
+        }
+    };
+
+    const handleNotificationClick = async (notification: Notification) => {
+        const notificationToShow = notification.has_user_read
+            ? notification
+            : await handleMarkAsRead(notification);
+
+        setSelectedNotification(notificationToShow);
         setIsDetailModalOpen(true);
     };
 
-    const handleMarkAsRead = (notification: Notification) => {
-        setNotifications((prev) =>
-            prev.map((n) =>
-                n.id === notification.id ? { ...n, has_user_read: true, updated_at: new Date() } : n
-            )
-        );
-        toast.success("Đã đọc", `Thông báo "${notification.title}" đã được đánh dấu đã đọc.`);
+    const handleMarkAllAsRead = async () => {
+        if (isMarkAllPending || filterCounts[NotificationStatus.UNREAD] === 0) {
+            return;
+        }
+
+        setIsMarkAllPending(true);
+
+        try {
+            await notificationsService.markAllAsReadForCurrentUser();
+            setNotifications((prev) =>
+                prev.map((n) => (n.has_user_read ? n : { ...n, has_user_read: true, updated_at: new Date() }))
+            );
+            setSelectedNotification((prev) =>
+                prev ? { ...prev, has_user_read: true, updated_at: new Date() } : prev
+            );
+            toast.success("Thành công", "Đã đánh dấu tất cả thông báo là đã đọc.");
+            emitNotificationsRefresh({ source: "manual" });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Không thể đánh dấu tất cả thông báo là đã đọc.";
+            toast.error("Cập nhật thất bại", message);
+        } finally {
+            setIsMarkAllPending(false);
+        }
     };
 
     const handleDeleteNotification = (notification: Notification) => {
         setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
         setIsDetailModalOpen(false);
         toast.success("Xóa thành công", `Thông báo "${notification.title}" đã bị xóa.`);
+        emitNotificationsRefresh({ source: "manual" });
     };
 
-    const handleAddNotification = () => {
-        setIsFormModalOpen(true);
-    };
+    if (isLoading) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">
+                Đang tải danh sách thông báo...
+            </div>
+        );
+    }
 
-    const handleSaveNotification = (data: Partial<Notification>) => {
-        const newNotification: Notification = {
-            id: `n${Date.now()}`,
-            belongs_to_user_id: data.belongs_to_user_id || "u1",
-            title: data.title || "",
-            content: data.content || "",
-            category: data.category || NotificationCategory.SYSTEM,
-            sub_category: data.sub_category,
-            has_user_read: false,
-            has_noti_sent: false,
-            created_at: new Date(),
-            updated_at: new Date(),
-        };
-        setNotifications((prev) => [newNotification, ...prev]);
-        toast.success("Tạo thành công", `Thông báo "${data.title}" đã được tạo.`);
-    };
+    if (errorMessage) {
+        return (
+            <div className="bg-white border border-red-200 rounded-lg p-6 space-y-3">
+                <p className="text-sm text-red-600">{errorMessage}</p>
+                <button
+                    type="button"
+                    onClick={loadNotifications}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
+                >
+                    Tải lại
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -118,15 +196,14 @@ export function NotificationListView() {
             <NotificationSearch
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                onAddNotification={handleAddNotification}
+                unreadCount={filterCounts[NotificationStatus.UNREAD]}
+                isMarkAllPending={isMarkAllPending}
+                onMarkAllAsRead={handleMarkAllAsRead}
             />
 
             <NotificationTable
                 notifications={filteredNotifications}
                 onNotificationClick={handleNotificationClick}
-                onMarkAsRead={handleMarkAsRead}
             />
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -140,14 +217,7 @@ export function NotificationListView() {
                 isOpen={isDetailModalOpen}
                 onClose={() => setIsDetailModalOpen(false)}
                 notification={selectedNotification}
-                onMarkAsRead={handleMarkAsRead}
                 onDelete={handleDeleteNotification}
-            />
-
-            <NotificationFormModal
-                isOpen={isFormModalOpen}
-                onClose={() => setIsFormModalOpen(false)}
-                onSave={handleSaveNotification}
             />
         </div>
     );

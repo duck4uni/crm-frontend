@@ -3,13 +3,12 @@
 import { Notification, NotificationCategory } from "@/types/notification";
 import { Badge } from "@/components/ui/Badge";
 import { formatDateVN } from "@/lib/utils";
-import { FiEye, FiBell, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
+import { FiEye } from "react-icons/fi";
 import { useState } from "react";
 
 interface NotificationTableProps {
     notifications: Notification[];
     onNotificationClick?: (notification: Notification) => void;
-    onMarkAsRead?: (notification: Notification) => void;
 }
 
 type SortField = keyof Notification | null;
@@ -21,9 +20,10 @@ const CATEGORY_CONFIG: Record<string, { label: string; variant: "success" | "war
     [NotificationCategory.DEAL]: { label: "Thương vụ", variant: "success" },
     [NotificationCategory.CUSTOMER]: { label: "Khách hàng", variant: "info" },
     [NotificationCategory.REMINDER]: { label: "Nhắc nhở", variant: "danger" },
+    [NotificationCategory.EXAM]: { label: "Thi cử", variant: "warning" },
 };
 
-export function NotificationTable({ notifications, onNotificationClick, onMarkAsRead }: NotificationTableProps) {
+export function NotificationTable({ notifications, onNotificationClick }: NotificationTableProps) {
     const [sortField, setSortField] = useState<SortField>(null);
     const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -82,10 +82,8 @@ export function NotificationTable({ notifications, onNotificationClick, onMarkAs
                             <TableHeader label="Tiêu đề" field="title" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <TableHeader label="Danh mục" field="category" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <TableHeader label="Trạng thái" field="has_user_read" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Gửi" field="has_noti_sent" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Thời gian gửi" field="sent_time" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Ngày tạo" field="created_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Thao tác</th>
+                            <TableHeader label="Ngày nhận" field="created_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-24">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -128,21 +126,11 @@ export function NotificationTable({ notifications, onNotificationClick, onMarkAs
                                         <Badge variant="warning">Chưa đọc</Badge>
                                     )}
                                 </td>
-                                <td className="px-4 py-4">
-                                    {notification.has_noti_sent ? (
-                                        <Badge variant="success">Đã gửi</Badge>
-                                    ) : (
-                                        <Badge variant="danger">Chưa gửi</Badge>
-                                    )}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
-                                    {notification.sent_time ? formatDateVN(notification.sent_time) : "-"}
-                                </td>
                                 <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
                                     {formatDateVN(notification.created_at)}
                                 </td>
                                 <td className="px-4 py-4">
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center justify-center">
                                         <button
                                             onClick={() => onNotificationClick?.(notification)}
                                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -150,15 +138,6 @@ export function NotificationTable({ notifications, onNotificationClick, onMarkAs
                                         >
                                             <FiEye className="w-4 h-4" />
                                         </button>
-                                        {!notification.has_user_read && (
-                                            <button
-                                                onClick={() => onMarkAsRead?.(notification)}
-                                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                                                title="Đánh dấu đã đọc"
-                                            >
-                                                <FiCheckCircle className="w-4 h-4" />
-                                            </button>
-                                        )}
                                     </div>
                                 </td>
                             </tr>
