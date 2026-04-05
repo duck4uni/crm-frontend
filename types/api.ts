@@ -71,6 +71,10 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface UpdatePasswordPayload {
+  password: string;
+}
+
 export interface AuthTokenResponse {
   accessToken: string;
   expiresIn: string;
@@ -123,6 +127,28 @@ export interface MyInfoResponseData {
   is_delete: boolean;
 }
 
+export interface NotificationApiRow {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  sub_category: string | null;
+  belongs_to_user_id: string;
+  has_user_read: boolean;
+  sent_time: string | null;
+  has_noti_sent: boolean;
+  expired_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface NotificationsResponseData {
+  count: number;
+  rows: NotificationApiRow[];
+  totalPages: number;
+  currentPage: number;
+}
+
 export interface ApiEnvelope<T> {
   message: string;
   message_en: string;
@@ -137,3 +163,7 @@ export type RegisterResponse = ApiEnvelope<RegisterUserResponse>;
 export type LogoutResponse = ApiEnvelope<number>;
 export type RefreshAccessTokenResponse = ApiEnvelope<RefreshAccessTokenData>;
 export type GetMyInfoResponse = ApiEnvelope<MyInfoResponseData>;
+export type UpdatePasswordResponse = ApiEnvelope<Record<string, never>>;
+export type GetNotificationsResponse = ApiEnvelope<NotificationsResponseData>;
+export type MarkAllNotificationsAsReadResponse = ApiEnvelope<number[]>;
+export type MarkNotificationAsReadResponse = ApiEnvelope<NotificationApiRow>;

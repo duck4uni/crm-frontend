@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
@@ -20,25 +20,31 @@ export interface LoginFormBindings {
     form: LoginFormState;
     errors: Partial<LoginFormState>;
     isPending: boolean;
+    isRedirecting: boolean;
     canSubmit: boolean;
     handleInputChange: (key: keyof LoginFormState, value: string) => void;
-    handleSubmit: (event: FormEvent<HTMLFormElement>) => void;
+    handleSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }
+
+const LOGIN_REDIRECT_DELAY_MS = 900;
 
 export function useLoginForm(): LoginFormBindings {
     const router = useRouter();
     const toast = useToast();
-    const [isPending, startTransition] = useTransition();
     const [form, setForm] = useState<LoginFormState>({
         identifier: "",
         password: "",
     });
     const [errors, setErrors] = useState<Partial<LoginFormState>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isRedirecting, setIsRedirecting] = useState(false);
 
     useEffect(() => {
         if (hasAuthSession()) {
             router.replace("/");
         }
+
+        router.prefetch("/");
     }, [router]);
 
     const canSubmit = useMemo(() => {
@@ -67,50 +73,61 @@ export function useLoginForm(): LoginFormBindings {
         return Object.keys(nextErrors).length === 0;
     };
 
-    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         if (!validateForm()) {
             return;
         }
 
-        startTransition(async () => {
-            try {
-                const response = await authService.login({
-                    identifier: form.identifier.trim(),
-                    password: form.password,
-                });
+        setIsSubmitting(true);
+        setIsRedirecting(false);
 
-                if (!response.responseData?.accessToken) {
-                    throw new Error(response.message || "Đăng nhập thất bại");
-                }
+        try {
+            const response = await authService.login({
+                identifier: form.identifier.trim(),
+                password: form.password,
+            });
 
-                setAuthSession(response.responseData);
-
-                try {
-                    const myInfoResponse = await usersService.getMyInfo();
-
-                    if (myInfoResponse.responseData) {
-                        setCurrentUserSession(myInfoResponse.responseData);
-                    }
-                } catch (profileError) {
-                    console.error("Load current user profile failed:", profileError);
-                }
-
-                toast.success("Đăng nhập thành công", response.message_en || response.message);
-                router.replace("/");
-            } catch (error) {
-                const message =
-                    error instanceof Error ? error.message : "Không thể đăng nhập. Vui lòng thử lại.";
-                toast.error("Đăng nhập thất bại", message);
+            if (!response.responseData?.accessToken) {
+                throw new Error(response.message || "Đăng nhập thất bại");
             }
-        });
+
+            setAuthSession(response.responseData);
+
+            try {
+                const myInfoResponse = await usersService.getMyInfo();
+
+                if (myInfoResponse.responseData) {
+                    setCurrentUserSession(myInfoResponse.responseData);
+                }
+            } catch (profileError) {
+                console.error("Load current user profile failed:", profileError);
+            }
+
+            toast.success("Đăng nhập thành công", response.message_en || response.message);
+            setIsSubmitting(false);
+            setIsRedirecting(true);
+
+            await new Promise<void>((resolve) => {
+                window.setTimeout(() => resolve(), LOGIN_REDIRECT_DELAY_MS);
+            });
+
+            router.replace("/");
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : "Không thể đăng nhập. Vui lòng thử lại.";
+            toast.error("Đăng nhập thất bại", message);
+            setIsSubmitting(false);
+            setIsRedirecting(false);
+        }
     };
 
     return {
         form,
         errors,
-        isPending,
+        isPending: isSubmitting || isRedirecting,
+        isRedirecting,
         canSubmit,
         handleInputChange,
         handleSubmit,

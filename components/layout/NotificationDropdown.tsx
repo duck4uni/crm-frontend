@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiBell, FiCheck, FiCheckCircle } from "react-icons/fi";
 import {
@@ -8,11 +8,17 @@ import {
     MdOutlineTask,
     MdOutlineHandshake,
     MdOutlinePeopleAlt,
+    MdOutlineMenuBook,
     MdOutlineAlarm,
     MdOutlineSettings,
 } from "react-icons/md";
-import { mockNotifications } from "@/mock-data/notifications";
 import { Notification, NotificationCategory } from "@/types/notification";
+import { notificationsService } from "@/services/notifications";
+import { useToast } from "@/components/ui/ToastProvider";
+import {
+    addNotificationsRefreshListener,
+    emitNotificationsRefresh,
+} from "@/lib/notifications-realtime";
 
 function getCategoryConfig(category: NotificationCategory) {
     switch (category) {
@@ -22,6 +28,8 @@ function getCategoryConfig(category: NotificationCategory) {
             return { icon: MdOutlineTask, bg: "bg-yellow-100", color: "text-yellow-600", label: "Công việc" };
         case NotificationCategory.CUSTOMER:
             return { icon: MdOutlinePeopleAlt, bg: "bg-green-100", color: "text-green-600", label: "Khách hàng" };
+        case NotificationCategory.EXAM:
+            return { icon: MdOutlineMenuBook, bg: "bg-indigo-100", color: "text-indigo-600", label: "Thi cử" };
         case NotificationCategory.REMINDER:
             return { icon: MdOutlineAlarm, bg: "bg-purple-100", color: "text-purple-600", label: "Nhắc nhở" };
         case NotificationCategory.SYSTEM:
@@ -48,16 +56,24 @@ const PREVIEW_LIMIT = 6;
 
 export function NotificationDropdown() {
     const router = useRouter();
+    const toast = useToast();
     const [isOpen, setIsOpen] = useState(false);
-    const [notifications, setNotifications] = useState<Notification[]>(
-        [...mockNotifications].sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )
-    );
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isMarkAllPending, setIsMarkAllPending] = useState(false);
+    const [markingNotificationIds, setMarkingNotificationIds] = useState<Set<string>>(new Set());
     const containerRef = useRef<HTMLDivElement>(null);
 
     const unreadCount = notifications.filter((n) => !n.has_user_read).length;
     const previewList = notifications.slice(0, PREVIEW_LIMIT);
+
+    const loadNotifications = useCallback(async () => {
+        try {
+            const data = await notificationsService.getMyNotifications();
+            setNotifications(data);
+        } catch (error) {
+            console.error("Load notification dropdown failed:", error);
+        }
+    }, []);
 
     // Close on outside click
     useEffect(() => {
@@ -70,14 +86,65 @@ export function NotificationDropdown() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isOpen]);
 
-    function markAsRead(id: string) {
-        setNotifications((prev) =>
-            prev.map((n) => (n.id === id ? { ...n, has_user_read: true } : n))
-        );
+    useEffect(() => {
+        void loadNotifications();
+    }, [loadNotifications]);
+
+    useEffect(() => {
+        return addNotificationsRefreshListener(() => {
+            void loadNotifications();
+        });
+    }, [loadNotifications]);
+
+    async function markAsRead(notification: Notification) {
+        const id = notification.id;
+
+        if (markingNotificationIds.has(id)) {
+            return;
+        }
+
+        setMarkingNotificationIds((prev) => new Set(prev).add(id));
+
+        try {
+            const updatedNotification = await notificationsService.markAsRead(id);
+
+            setNotifications((prev) =>
+                prev.map((n) => (n.id === id ? updatedNotification : n))
+            );
+            toast.success("Đã xem thông báo", `Thông báo "${notification.title}" đã được đánh dấu đã xem.`);
+            emitNotificationsRefresh({ source: "manual" });
+        } catch (error) {
+            console.error("Mark notification as read failed:", error);
+            toast.error("Cập nhật thất bại", "Không thể đánh dấu thông báo là đã xem.");
+        } finally {
+            setMarkingNotificationIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+        }
     }
 
-    function markAllAsRead() {
-        setNotifications((prev) => prev.map((n) => ({ ...n, has_user_read: true })));
+    async function markAllAsRead() {
+        if (isMarkAllPending || unreadCount === 0) {
+            return;
+        }
+
+        setIsMarkAllPending(true);
+
+        try {
+            await notificationsService.markAllAsReadForCurrentUser();
+            setNotifications((prev) =>
+                prev.map((n) => (n.has_user_read ? n : { ...n, has_user_read: true, updated_at: new Date() }))
+            );
+            toast.success("Thành công", "Đã đánh dấu tất cả thông báo là đã xem.");
+            emitNotificationsRefresh({ source: "manual" });
+        } catch (error) {
+            console.error("Mark all notifications as read failed:", error);
+            toast.error("Cập nhật thất bại", "Không thể đánh dấu tất cả thông báo là đã xem.");
+        } finally {
+            setIsMarkAllPending(false);
+        }
     }
 
     function handleViewAll() {
@@ -86,7 +153,9 @@ export function NotificationDropdown() {
     }
 
     function handleItemClick(notification: Notification) {
-        if (!notification.has_user_read) markAsRead(notification.id);
+        if (!notification.has_user_read) {
+            void markAsRead(notification);
+        }
     }
 
     return (
@@ -122,11 +191,12 @@ export function NotificationDropdown() {
                             </div>
                             {unreadCount > 0 && (
                                 <button
-                                    onClick={markAllAsRead}
-                                    className="whitespace-nowrap flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium ml-3 flex-shrink-0"
+                                    onClick={() => void markAllAsRead()}
+                                    disabled={isMarkAllPending}
+                                    className="whitespace-nowrap flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium ml-3 flex-shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     <FiCheckCircle className="w-3.5 h-3.5" />
-                                    Đánh dấu tất cả đã đọc
+                                    {isMarkAllPending ? "Đang xử lý..." : "Đánh dấu tất cả đã đọc"}
                                 </button>
                             )}
                         </div>
@@ -172,9 +242,10 @@ export function NotificationDropdown() {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            markAsRead(notification.id);
+                                                            void markAsRead(notification);
                                                         }}
-                                                        className="flex-shrink-0 p-1 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                                        disabled={markingNotificationIds.has(notification.id)}
+                                                        className="flex-shrink-0 p-1 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                                                         title="Đánh dấu đã đọc"
                                                     >
                                                         <FiCheck className="w-3.5 h-3.5" />

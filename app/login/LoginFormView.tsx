@@ -12,6 +12,7 @@ export function LoginFormView({
     form,
     errors,
     isPending,
+    isRedirecting,
     canSubmit,
     handleInputChange,
     handleSubmit,
@@ -73,7 +74,11 @@ export function LoginFormView({
                                     ) : (
                                         <FiLogIn className="h-4 w-4" />
                                     )}
-                                    {isPending ? "Đang đăng nhập..." : "Đăng nhập"}
+                                    {isRedirecting
+                                        ? "Đang chuyển hướng..."
+                                        : isPending
+                                            ? "Đang đăng nhập..."
+                                            : "Đăng nhập"}
                                 </Button>
 
                                 <p className="text-center text-sm text-gray-600">
@@ -87,6 +92,18 @@ export function LoginFormView({
                     </Card>
                 </div>
             </div>
+
+            {isRedirecting ? (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+                    <div className="rounded-2xl border border-white/15 bg-white/10 px-8 py-7 text-center text-white shadow-2xl">
+                        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/25 bg-white/10">
+                            <Spinner size="sm" className="border-2 border-white/30 border-t-white" />
+                        </div>
+                        <p className="text-base font-semibold">Đăng nhập thành công</p>
+                        <p className="mt-1 text-sm text-slate-200">Đang chuyển vào hệ thống...</p>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

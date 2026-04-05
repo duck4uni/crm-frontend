@@ -9,7 +9,6 @@ import {
     FiBell,
     FiClock,
     FiCheckCircle,
-    FiSend,
     FiTag,
     FiTrash2,
 } from "react-icons/fi";
@@ -18,7 +17,6 @@ interface NotificationDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
     notification: Notification | null;
-    onMarkAsRead?: (notification: Notification) => void;
     onDelete?: (notification: Notification) => void;
 }
 
@@ -28,13 +26,13 @@ const CATEGORY_CONFIG: Record<string, { label: string; variant: "success" | "war
     [NotificationCategory.DEAL]: { label: "Thương vụ", variant: "success" },
     [NotificationCategory.CUSTOMER]: { label: "Khách hàng", variant: "info" },
     [NotificationCategory.REMINDER]: { label: "Nhắc nhở", variant: "danger" },
+    [NotificationCategory.EXAM]: { label: "Thi cử", variant: "warning" },
 };
 
 export function NotificationDetailModal({
     isOpen,
     onClose,
     notification,
-    onMarkAsRead,
     onDelete,
 }: NotificationDetailModalProps) {
     if (!notification) return null;
@@ -56,12 +54,6 @@ export function NotificationDetailModal({
                         </Button>
                     )}
                     <div className="flex-1" />
-                    {!notification.has_user_read && onMarkAsRead && (
-                        <Button variant="primary" onClick={() => onMarkAsRead(notification)}>
-                            <FiCheckCircle className="w-4 h-4 mr-2" />
-                            Đánh dấu đã đọc
-                        </Button>
-                    )}
                 </>
             }
         >
@@ -104,30 +96,6 @@ export function NotificationDetailModal({
                     </div>
 
                     <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                        <FiSend className="w-5 h-5 text-gray-400" />
-                        <div>
-                            <p className="text-xs text-gray-500">Trạng thái gửi</p>
-                            <div className="mt-0.5">
-                                {notification.has_noti_sent ? (
-                                    <Badge variant="success">Đã gửi</Badge>
-                                ) : (
-                                    <Badge variant="danger">Chưa gửi</Badge>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                        <FiClock className="w-5 h-5 text-gray-400" />
-                        <div>
-                            <p className="text-xs text-gray-500">Thời gian gửi</p>
-                            <p className="text-sm font-medium text-gray-900">
-                                {notification.sent_time ? formatDateVN(notification.sent_time) : "-"}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                         <FiClock className="w-5 h-5 text-gray-400" />
                         <div>
                             <p className="text-xs text-gray-500">Hết hạn</p>
@@ -140,7 +108,7 @@ export function NotificationDetailModal({
                     <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                         <FiClock className="w-5 h-5 text-gray-400" />
                         <div>
-                            <p className="text-xs text-gray-500">Ngày tạo</p>
+                            <p className="text-xs text-gray-500">Ngày nhận</p>
                             <p className="text-sm font-medium text-gray-900">{formatDateVN(notification.created_at)}</p>
                         </div>
                     </div>
