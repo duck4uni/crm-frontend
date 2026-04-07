@@ -1,10 +1,12 @@
 ﻿"use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import { UserPermission, PermissionGroup } from "@/types/permission";
-import { mockUserPermissions, mockPermissions } from "@/mock-data/permissions";
-import { mockUsers } from "@/mock-data/users";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { Permission, UserPermission, PermissionGroup } from "@/types/permission";
 import { UserProfile } from "@/types/user";
+import { UserApiRow, PermissionApiRow } from "@/types/api";
+import { usersService } from "@/services/users";
+import { permissionsService } from "@/services/permissions";
+import { userTagsService } from "@/services/user-tags";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -18,13 +20,57 @@ const GROUP_LABELS: Record<PermissionGroup, string> = {
     [PermissionGroup.SETTING]: "Cài đặt",
 };
 
+function mapApiRowToProfile(row: UserApiRow): UserProfile {
+    return {
+        id: row.id,
+        email: row.email,
+        full_name: row.full_name,
+        phone: row.phone || undefined,
+        avatar: row.avatar || undefined,
+        birthday: row.birthday ? new Date(row.birthday) : undefined,
+        is_active: row.is_active,
+        is_delete: row.is_delete,
+        created_at: row.created_at ? new Date(row.created_at) : new Date(),
+        updated_at: row.updated_at ? new Date(row.updated_at) : new Date(),
+    };
+}
+
+function mapApiRowToPermission(row: PermissionApiRow): Permission {
+    return {
+        id: row.id,
+        name: row.name,
+        code: row.code,
+        description: row.description,
+        group_code: (row.group_code as PermissionGroup) || PermissionGroup.USER,
+    };
+}
+
 export function AssignPermissionView() {
-    const [userPermissions, setUserPermissions] = useState<UserPermission[]>(mockUserPermissions);
+    const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
+    const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+    const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [showDropdown, setShowDropdown] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
     const toast = useToast();
+
+    const loadData = useCallback(async () => {
+        try {
+            const [usersRes, permsRes] = await Promise.all([
+                usersService.getUsers({ pageSize: "200" }),
+                permissionsService.getPermissions({ pageSize: "100" }),
+            ]);
+            setAllUsers((usersRes.responseData?.rows ?? []).map(mapApiRowToProfile));
+            setAllPermissions((permsRes.responseData?.rows ?? []).map(mapApiRowToPermission));
+        } catch {
+            // silently fail, UI will show empty
+        }
+    }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -39,7 +85,7 @@ export function AssignPermissionView() {
     const filteredUsers = useMemo(() => {
         if (!searchQuery.trim()) return [];
         const q = searchQuery.toLowerCase();
-        return mockUsers
+        return allUsers
             .filter((u) => !u.is_delete)
             .filter(
                 (u) =>
@@ -48,7 +94,7 @@ export function AssignPermissionView() {
                     (u.phone && u.phone.includes(q))
             )
             .slice(0, 8);
-    }, [searchQuery]);
+    }, [searchQuery, allUsers]);
 
     const selectedUserPermissions = useMemo(() => {
         if (!selectedUser) return new Set<string>();
@@ -60,13 +106,13 @@ export function AssignPermissionView() {
     }, [userPermissions, selectedUser]);
 
     const permissionsByGroup = useMemo(() => {
-        const groups: Record<string, typeof mockPermissions> = {};
-        mockPermissions.forEach((p) => {
+        const groups: Record<string, Permission[]> = {};
+        allPermissions.forEach((p) => {
             if (!groups[p.group_code]) groups[p.group_code] = [];
             groups[p.group_code].push(p);
         });
         return groups;
-    }, []);
+    }, [allPermissions]);
 
     const handleSelectUser = (user: UserProfile) => {
         setSelectedUser(user);
@@ -202,7 +248,7 @@ export function AssignPermissionView() {
                     <div className="px-5 py-4 border-b border-gray-200">
                         <h3 className="text-sm font-semibold text-gray-900">Danh sách quyền</h3>
                         <p className="text-xs text-gray-500 mt-0.5">
-                            {selectedUserPermissions.size} / {mockPermissions.length} quyền được gán
+                            {selectedUserPermissions.size} / {allPermissions.length} quyền được gán
                         </p>
                     </div>
                     <div className="divide-y divide-gray-100">

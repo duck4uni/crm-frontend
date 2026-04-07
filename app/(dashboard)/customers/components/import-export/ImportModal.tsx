@@ -8,7 +8,7 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download } from "luc
 interface ImportModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onImport: (data: any[]) => void;
+    onImport: (data: any[], file?: File) => void;
 }
 
 export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
@@ -61,27 +61,26 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
 
         setImporting(true);
 
-        // Simulate import process
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+            // Call onImport with the actual file for real API upload
+            onImport([], file);
 
-        // Mock result
-        const result = {
-            success: 145,
-            failed: 5,
-            errors: [
-                "Dòng 12: Thiếu số điện thoại",
-                "Dòng 34: Email không hợp lệ",
-                "Dòng 67: Trùng mã khách hàng",
-                "Dòng 89: Thiếu tên khách hàng",
-                "Dòng 123: Trạng thái không hợp lệ",
-            ],
-        };
+            const result = {
+                success: 0,
+                failed: 0,
+                errors: [] as string[],
+            };
 
-        setImportResult(result);
-        setImporting(false);
-
-        // Call onImport with mock data
-        onImport([]);
+            setImportResult(result);
+        } catch {
+            setImportResult({
+                success: 0,
+                failed: 1,
+                errors: ["Không thể nhập file. Vui lòng thử lại."],
+            });
+        } finally {
+            setImporting(false);
+        }
     };
 
     const handleReset = () => {

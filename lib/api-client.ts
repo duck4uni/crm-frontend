@@ -189,10 +189,51 @@ class ApiClient {
     });
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
+  async delete<T>(endpoint: string, data?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: "DELETE",
+      body: data ? JSON.stringify(data) : undefined,
     });
+  }
+
+  async upload<T>(endpoint: string, file: File, fieldName = "file"): Promise<T> {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+    const accessToken = getAccessToken();
+    const headers = new Headers();
+    if (accessToken) {
+      headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  }
+
+  async downloadBlob(endpoint: string, data?: any): Promise<Blob> {
+    const accessToken = getAccessToken();
+    const headers = new Headers();
+    headers.set("Content-Type", "application/json");
+    if (accessToken) {
+      headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+    });
+    if (!response.ok) {
+      throw new Error(`Export failed! status: ${response.status}`);
+    }
+    return await response.blob();
   }
 }
 

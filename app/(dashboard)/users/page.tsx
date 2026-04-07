@@ -1,7 +1,6 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { mockUsers } from "@/mock-data/users";
 import { Tabs } from "@/components/ui/Tabs";
 import { UserListView } from "./components/list/UserListView";
 import { UserSessionsView } from "./components/sessions/UserSessionsView";
@@ -20,7 +19,7 @@ function UsersPageContent() {
     };
 
     const tabs = [
-        { id: "list", label: "Danh sách người dùng", badge: mockUsers.length },
+        { id: "list", label: "Danh sách người dùng" },
         { id: "sessions", label: "Phiên đăng nhập" },
         { id: "history", label: "Lịch sử hoạt động" },
     ];

@@ -1,18 +1,67 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { UserHistory } from "@/types/user";
-import { mockUserHistories, mockUsers } from "@/mock-data/users";
+import { UserHistoryApiRow } from "@/types/api";
+import { userHistoryService } from "@/services/user-history";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDateVN } from "@/lib/utils";
 import { FiActivity, FiClock } from "react-icons/fi";
 
+function mapApiRowToHistory(row: UserHistoryApiRow): UserHistory {
+    return {
+        id: row.id,
+        user_id: row.user_id,
+        title: row.title,
+        note: row.note,
+        created_at: row.created_at ? new Date(row.created_at) : new Date(),
+        created_by: row.created_by || undefined,
+        updated_at: row.created_at ? new Date(row.created_at) : new Date(),
+    };
+}
+
 export function UserHistoryView() {
-    const histories = mockUserHistories;
+    const [histories, setHistories] = useState<UserHistory[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [userNames, setUserNames] = useState<Record<string, string>>({});
+
+    const loadHistories = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const response = await userHistoryService.getUserHistories({ pageSize: "50", sortField: "created_at", sortOrder: "DESC" });
+            const rows = response.responseData?.rows ?? [];
+            setHistories(rows.map(mapApiRowToHistory));
+
+            const names: Record<string, string> = {};
+            rows.forEach((r) => {
+                if (r.user?.full_name) {
+                    names[r.user_id] = r.user.full_name;
+                }
+            });
+            setUserNames(names);
+        } catch {
+            setHistories([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadHistories();
+    }, [loadHistories]);
 
     const getUserName = (userId: string) => {
-        return mockUsers.find((u) => u.id === userId)?.full_name || userId;
+        return userNames[userId] || userId;
     };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">
+                Đang tải lịch sử hoạt động...
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Customer, CustomerStatus } from "@/types/customer";
-import { mockCustomers } from "@/mock-data/customers";
+import { UserApiRow } from "@/types/api";
+import { usersService } from "@/services/users";
 import { CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
 import { CustomerTable } from "./CustomerTable";
@@ -12,13 +13,35 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { FilterValues } from "../filters/FilterModal";
 import { exportToCSV } from "../import-export/exportUtils";
 
+function mapApiRowToCustomer(row: UserApiRow, index: number): Customer {
+  return {
+    id: row.id,
+    orderNumber: index + 1,
+    customerName: row.full_name || row.email,
+    phone: row.phone || "",
+    address: "",
+    salutation: "",
+    mobilePhone: row.phone || "",
+    source: "",
+    assignee: "",
+    relationship: "",
+    lastContactDate: row.updated_at ? new Date(row.updated_at) : undefined,
+    createdDate: row.created_at ? new Date(row.created_at) : new Date(),
+    customerSource: "",
+    gender: "Other",
+    status: row.is_active ? CustomerStatus.REGISTERED : CustomerStatus.NEW,
+    avatar: row.avatar || undefined,
+  };
+}
+
 export function CustomerListView() {
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<CustomerStatus | "all">("all");
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedAssignee, setSelectedAssignee] = useState("");
   const [advancedFilters, setAdvancedFilters] = useState<FilterValues>({});
+  const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
 
   // Modal states
@@ -26,6 +49,24 @@ export function CustomerListView() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+
+  const loadCustomers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await usersService.getCustomers({ pageSize: "100" });
+      const rows = response.responseData?.rows ?? [];
+      setCustomers(rows.map((row, idx) => mapApiRowToCustomer(row, idx)));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Không thể tải danh sách khách hàng.";
+      toast.error("Tải dữ liệu thất bại", msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
 
   // Calculate filter counts
   const filterCounts = useMemo(() => {
@@ -155,15 +196,45 @@ export function CustomerListView() {
     toast.success("Áp dụng bộ lọc", "Bộ lọc đã được áp dụng thành công");
   };
 
-  const handleExport = () => {
-    exportToCSV(filteredCustomers, "danh-sach-khach-hang");
-    toast.success("Xuất file thành công", `Đã xuất ${filteredCustomers.length} khách hàng`);
+  const handleExport = async () => {
+    try {
+      const blob = await usersService.exportUsers();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `khach-hang-${Date.now()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Xuất file thành công", `Đã xuất danh sách khách hàng`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Không thể xuất file.";
+      toast.error("Xuất file thất bại", msg);
+    }
   };
 
-  const handleImport = (data: any[]) => {
-    // In real app, this would parse and validate the imported data
-    toast.success("Nhập dữ liệu thành công", `Đã nhập ${data.length} khách hàng mới`);
+  const handleImport = async (data: any[], file?: File) => {
+    if (file) {
+      try {
+        const response = await usersService.importUsers(file);
+        const result = response.responseData;
+        toast.success("Nhập dữ liệu thành công", `Đã tạo ${result?.created ?? 0}, cập nhật ${result?.updated ?? 0} khách hàng`);
+        loadCustomers();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Không thể nhập file.";
+        toast.error("Nhập dữ liệu thất bại", msg);
+      }
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">
+        Đang tải danh sách khách hàng...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

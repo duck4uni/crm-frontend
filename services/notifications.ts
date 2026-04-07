@@ -6,6 +6,8 @@ import {
     MarkAllNotificationsAsReadResponse,
     MarkNotificationAsReadResponse,
     NotificationApiRow,
+    CreateNotificationPayload,
+    CreateNotificationsResponse,
 } from "@/types/api";
 import { Notification, NotificationCategory } from "@/types/notification";
 
@@ -113,5 +115,15 @@ export const notificationsService = {
         }
 
         return mapNotificationRow(response.responseData);
+    },
+
+    async createNotifications(payload: CreateNotificationPayload[]): Promise<Notification[]> {
+        const response = await apiClient.post<CreateNotificationsResponse>(
+            NOTIFICATIONS_ENDPOINT,
+            payload,
+        );
+
+        const rows = response.responseData ?? [];
+        return rows.map(mapNotificationRow);
     },
 };

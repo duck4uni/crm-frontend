@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Permission, PermissionGroup } from "@/types/permission";
-import { mockPermissions } from "@/mock-data/permissions";
+import { PermissionApiRow } from "@/types/api";
+import { permissionsService } from "@/services/permissions";
 import { PermissionFilters } from "./PermissionFilters";
 import { PermissionSearch } from "./PermissionSearch";
 import { PermissionTable } from "./PermissionTable";
@@ -10,10 +11,21 @@ import { PermissionFormModal } from "../forms/PermissionFormModal";
 import { PermissionDetailModal } from "../forms/PermissionDetailModal";
 import { useToast } from "@/components/ui/ToastProvider";
 
+function mapApiRowToPermission(row: PermissionApiRow): Permission {
+    return {
+        id: row.id,
+        name: row.name,
+        code: row.code,
+        description: row.description,
+        group_code: (row.group_code as PermissionGroup) || PermissionGroup.USER,
+    };
+}
+
 export function PermissionListView() {
-    const [permissions, setPermissions] = useState<Permission[]>(mockPermissions);
+    const [permissions, setPermissions] = useState<Permission[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilter, setActiveFilter] = useState<string>("all");
+    const [isLoading, setIsLoading] = useState(true);
     const toast = useToast();
 
     // Modal states
@@ -21,6 +33,24 @@ export function PermissionListView() {
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null);
     const [editingPermission, setEditingPermission] = useState<Permission | null>(null);
+
+    const loadPermissions = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const response = await permissionsService.getPermissions({ pageSize: "100" });
+            const rows = response.responseData?.rows ?? [];
+            setPermissions(rows.map(mapApiRowToPermission));
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : "Không thể tải danh sách quyền.";
+            toast.error("Tải dữ liệu thất bại", msg);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => {
+        loadPermissions();
+    }, [loadPermissions]);
 
     // Filter counts
     const filterCounts = useMemo(() => {
@@ -68,22 +98,34 @@ export function PermissionListView() {
         setIsFormModalOpen(true);
     };
 
-    const handleSavePermission = (data: Partial<Permission>) => {
-        if (editingPermission) {
-            setPermissions((prev) =>
-                prev.map((p) => (p.id === editingPermission.id ? { ...p, ...data } : p))
-            );
-            toast.success("Cập nhật thành công", `Quyền "${data.name}" đã được cập nhật.`);
-        } else {
-            const newPermission: Permission = {
-                id: `p${Date.now()}`,
-                name: data.name || "",
-                code: data.code || "",
-                description: data.description || "",
-                group_code: data.group_code || PermissionGroup.USER,
-            };
-            setPermissions((prev) => [...prev, newPermission]);
-            toast.success("Thêm mới thành công", `Quyền "${data.name}" đã được thêm.`);
+    const handleSavePermission = async (data: Partial<Permission>) => {
+        try {
+            if (editingPermission) {
+                const response = await permissionsService.updatePermission(editingPermission.id, {
+                    name: data.name,
+                    code: data.code,
+                    description: data.description,
+                    group_code: data.group_code,
+                });
+                const updated = mapApiRowToPermission(response.responseData);
+                setPermissions((prev) =>
+                    prev.map((p) => (p.id === editingPermission.id ? updated : p))
+                );
+                toast.success("Cập nhật thành công", `Quyền "${data.name}" đã được cập nhật.`);
+            } else {
+                const response = await permissionsService.createPermissions([{
+                    name: data.name || "",
+                    code: data.code || "",
+                    description: data.description,
+                    group_code: data.group_code,
+                }]);
+                const created = (response.responseData ?? []).map(mapApiRowToPermission);
+                setPermissions((prev) => [...prev, ...created]);
+                toast.success("Thêm mới thành công", `Quyền "${data.name}" đã được thêm.`);
+            }
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : "Thao tác thất bại.";
+            toast.error("Lỗi", msg);
         }
     };
 
@@ -92,6 +134,14 @@ export function PermissionListView() {
         setIsDetailModalOpen(false);
         toast.success("Xóa thành công", `Quyền "${permission.name}" đã bị xóa.`);
     };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">
+                Đang tải danh sách quyền...
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

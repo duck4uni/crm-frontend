@@ -6,6 +6,7 @@ import { NotificationFilters } from "./NotificationFilters";
 import { NotificationSearch } from "./NotificationSearch";
 import { NotificationTable } from "./NotificationTable";
 import { NotificationDetailModal } from "../forms/NotificationDetailModal";
+import { NotificationFormModal } from "../forms/NotificationFormModal";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
     addNotificationsRefreshListener,
@@ -24,6 +25,7 @@ export function NotificationListView() {
 
     // Modal states
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
 
     const loadNotifications = useCallback(async () => {
@@ -162,6 +164,25 @@ export function NotificationListView() {
         emitNotificationsRefresh({ source: "manual" });
     };
 
+    const handleCreateNotification = async (data: Partial<Notification>) => {
+        try {
+            const created = await notificationsService.createNotifications([{
+                title: data.title || "",
+                content: data.content || "",
+                category: data.category,
+                sub_category: data.sub_category,
+                belongs_to_user_id: data.belongs_to_user_id || null,
+            }]);
+            setNotifications((prev) => [...created, ...prev]);
+            setIsFormModalOpen(false);
+            toast.success("Tạo thành công", `Thông báo "${data.title}" đã được tạo.`);
+            emitNotificationsRefresh({ source: "manual" });
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : "Không thể tạo thông báo.";
+            toast.error("Tạo thất bại", msg);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">
@@ -199,6 +220,7 @@ export function NotificationListView() {
                 unreadCount={filterCounts[NotificationStatus.UNREAD]}
                 isMarkAllPending={isMarkAllPending}
                 onMarkAllAsRead={handleMarkAllAsRead}
+                onCreateNotification={() => setIsFormModalOpen(true)}
             />
 
             <NotificationTable
@@ -218,6 +240,12 @@ export function NotificationListView() {
                 onClose={() => setIsDetailModalOpen(false)}
                 notification={selectedNotification}
                 onDelete={handleDeleteNotification}
+            />
+
+            <NotificationFormModal
+                isOpen={isFormModalOpen}
+                onClose={() => setIsFormModalOpen(false)}
+                onSave={handleCreateNotification}
             />
         </div>
     );

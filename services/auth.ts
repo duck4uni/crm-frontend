@@ -9,6 +9,12 @@ import {
     RegisterResponse,
     UpdatePasswordPayload,
     UpdatePasswordResponse,
+    VerifyOtpPayload,
+    VerifyOtpResponse,
+    ResendOtpPayload,
+    ResendOtpResponse,
+    ForgotPasswordPayload,
+    ForgotPasswordResponse,
 } from "@/types/api";
 
 const AUTH_LOGIN_ENDPOINT = "/api/v1.0/auth/login";
@@ -16,6 +22,9 @@ const AUTH_REGISTER_ENDPOINT = "/api/v1.0/auth/register";
 const AUTH_LOGOUT_ENDPOINT = "/api/v1.0/auth/logout";
 const AUTH_REFRESH_ENDPOINT = "/api/v1.0/auth/genNewAccessToken";
 const AUTH_UPDATE_PASSWORD_ENDPOINT = "/api/v1.0/auth/updatePassword";
+const AUTH_VERIFY_OTP_ENDPOINT = "/api/v1.0/auth/verifyOTP";
+const AUTH_RESEND_OTP_ENDPOINT = "/api/v1.0/auth/resendOTP";
+const AUTH_FORGOT_PASSWORD_ENDPOINT = "/api/v1.0/auth/forgotPassword";
 
 export const authService = {
     async login(payload: LoginPayload): Promise<LoginResponse> {
@@ -38,5 +47,17 @@ export const authService = {
 
     async updatePassword(payload: UpdatePasswordPayload): Promise<UpdatePasswordResponse> {
         return apiClient.put<UpdatePasswordResponse>(AUTH_UPDATE_PASSWORD_ENDPOINT, payload);
+    },
+
+    async verifyOtp(payload: VerifyOtpPayload): Promise<VerifyOtpResponse> {
+        return apiClient.post<VerifyOtpResponse>(AUTH_VERIFY_OTP_ENDPOINT, payload);
+    },
+
+    async resendOtp(payload: ResendOtpPayload): Promise<ResendOtpResponse> {
+        return apiClient.post<ResendOtpResponse>(AUTH_RESEND_OTP_ENDPOINT, payload);
+    },
+
+    async forgotPassword(payload: ForgotPasswordPayload): Promise<ForgotPasswordResponse> {
+        return apiClient.post<ForgotPasswordResponse>(AUTH_FORGOT_PASSWORD_ENDPOINT, payload);
     },
 };
