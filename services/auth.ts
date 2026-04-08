@@ -36,7 +36,7 @@ export const authService = {
     },
 
     async logout(): Promise<LogoutResponse> {
-        return apiClient.post<LogoutResponse>(AUTH_LOGOUT_ENDPOINT);
+        return apiClient.delete<LogoutResponse>(AUTH_LOGOUT_ENDPOINT);
     },
 
     async genNewAccessToken(

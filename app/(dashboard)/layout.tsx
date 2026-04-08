@@ -28,6 +28,19 @@ export default function DashboardLayout({
     setIsCheckingAuth(false);
   }, [router]);
 
+  useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
@@ -45,7 +58,7 @@ export default function DashboardLayout({
       <OneSignalInitializer />
 
       {/* Block access on screens smaller than lg */}
-      <div className="flex lg:hidden h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-8">
+      <div className="flex lg:hidden h-dvh items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-8">
         <div className="flex flex-col items-center text-center max-w-sm">
           {/* Icon container */}
           <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20 shadow-xl">
@@ -90,7 +103,7 @@ export default function DashboardLayout({
         </div>
       </div>
 
-      <div className="hidden lg:flex h-screen overflow-hidden">
+      <div className="hidden lg:flex h-dvh min-h-0 overflow-hidden">
         <Sidebar isOpen={isSidebarOpen} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header

@@ -44,7 +44,7 @@ export function RegisterFormView({
                             <form className="space-y-4" onSubmit={handleSubmit}>
                                 <Input
                                     label="Họ và tên"
-                                    placeholder="Ví dụ: Hồng Đức"
+                                    placeholder="Nhập họ và tên"
                                     value={form.full_name}
                                     onChange={(event) => handleInputChange("full_name", event.target.value)}
                                     error={errors.full_name}
@@ -64,7 +64,7 @@ export function RegisterFormView({
 
                                 <Input
                                     label="Số điện thoại"
-                                    placeholder="0396524810"
+                                    placeholder="Nhập số điện thoại"
                                     value={form.phone}
                                     onChange={(event) => handleInputChange("phone", event.target.value)}
                                     error={errors.phone}

@@ -7,14 +7,20 @@ import { cn } from "@/lib/utils";
 import {
   FiHome,
   FiUsers,
-  FiBriefcase,
-  FiDollarSign,
   FiCheckSquare,
   FiSettings,
   FiUser,
   FiBell,
   FiShield,
   FiLogOut,
+  FiTag,
+  FiFolder,
+  FiFileText,
+  FiLink,
+  FiMessageCircle,
+  FiSend,
+  FiZap,
+  FiBarChart2,
 } from "react-icons/fi";
 import { clearAuthSession } from "@/lib/auth-session";
 import { authService } from "@/services/auth";
@@ -23,13 +29,18 @@ import { useToast } from "@/components/ui/ToastProvider";
 const navigation = [
   { name: "Bảng điều khiển", href: "/", icon: FiHome },
   { name: "Khách hàng", href: "/customers", icon: FiUsers },
-  { name: "Liên hệ", href: "/contacts", icon: FiUsers },
-  { name: "Công ty", href: "/companies", icon: FiBriefcase },
-  { name: "Thương vụ", href: "/deals", icon: FiDollarSign },
-  { name: "Công việc", href: "/tasks", icon: FiCheckSquare },
   { name: "Người dùng", href: "/users", icon: FiUser },
-  { name: "Thông báo", href: "/notifications", icon: FiBell },
   { name: "Phân quyền", href: "/permissions", icon: FiShield },
+  { name: "Công việc", href: "/tasks", icon: FiCheckSquare },
+  { name: "Thông báo", href: "/notifications", icon: FiBell },
+  { name: "Quản lý Tags", href: "/tags", icon: FiTag },
+  { name: "Quản lý Files", href: "/files", icon: FiFolder },
+  { name: "Xem Logs", href: "/logs", icon: FiFileText },
+  { name: "Zalo OA", href: "/zalo-oa", icon: FiLink },
+  { name: "Chat", href: "/chat", icon: FiMessageCircle },
+  { name: "Marketing", href: "/marketing", icon: FiSend },
+  { name: "Automation", href: "/automation", icon: FiZap },
+  { name: "Reports", href: "/reports", icon: FiBarChart2 },
   { name: "Cài đặt", href: "/settings", icon: FiSettings },
 ];
 
@@ -61,7 +72,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     <aside
       aria-label="Thanh điều hướng"
       className={cn(
-        "flex h-screen flex-col overflow-hidden bg-gray-900 transition-[width] duration-300",
+        "flex h-full min-h-0 flex-col overflow-hidden bg-gray-900 transition-[width] duration-300",
         isOpen ? "w-64" : "w-16",
       )}
     >
@@ -76,7 +87,12 @@ export function Sidebar({ isOpen }: SidebarProps) {
         </h1>
       </div>
 
-      <nav className={cn("flex-1 py-6", isOpen ? "space-y-1 px-4" : "space-y-2 px-1")}>
+      <nav
+        className={cn(
+          "sidebar-scroll min-h-0 flex-1 overflow-y-auto py-6",
+          isOpen ? "space-y-1 px-4" : "space-y-2 px-1",
+        )}
+      >
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -102,7 +118,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
         })}
       </nav>
 
-      <div className={cn("border-t border-gray-800 pb-6 pt-4", isOpen ? "px-4" : "px-1")}>
+      <div className={cn("shrink-0 border-t border-gray-800 pb-6 pt-4", isOpen ? "px-4" : "px-1")}>
         <button
           type="button"
           onClick={handleLogout}

@@ -3,6 +3,7 @@ export interface Customer {
   id: string;
   orderNumber: number; // STT - Sequential number
   customerName: string; // Tên khách hàng
+  email?: string; // Email
   phone: string; // Điện thoại
   address: string; // Địa chỉ
   salutation: string; // Danh xưng (Mr, Mrs, Ms, Anh, Chị)

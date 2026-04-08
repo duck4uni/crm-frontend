@@ -179,6 +179,11 @@ export function CustomerDetailModal({
                             value={customer.phone || "Chưa cập nhật"}
                         />
                         <InfoItem
+                            icon={<FiMail className="w-5 h-5" />}
+                            label="Email"
+                            value={customer.email || "Chưa cập nhật"}
+                        />
+                        <InfoItem
                             icon={<FiPhone className="w-5 h-5" />}
                             label="Số di động"
                             value={customer.mobilePhone}
