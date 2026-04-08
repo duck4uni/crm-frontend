@@ -65,7 +65,7 @@ export function Modal({
             {/* Modal */}
             <div
                 className={cn(
-                    "relative bg-white rounded-lg shadow-xl w-full mx-4 max-h-[90vh] flex flex-col",
+                    "relative bg-white rounded-lg shadow-xl w-full mx-4 max-h-[90vh] flex flex-col overflow-hidden",
                     sizeClasses[size]
                 )}
             >

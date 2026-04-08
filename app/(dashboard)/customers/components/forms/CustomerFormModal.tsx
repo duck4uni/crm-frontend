@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/Spinner";
 interface CustomerFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (customer: Partial<Customer>) => void;
+    onSave: (customer: Partial<Customer>) => Promise<void>;
     customer?: Customer | null; // If provided, we're editing; otherwise, creating
 }
 
@@ -52,6 +52,7 @@ export function CustomerFormModal({
     // Form state
     const [formData, setFormData] = useState<Partial<Customer>>({
         customerName: "",
+        email: "",
         salutation: "Anh",
         phone: "",
         mobilePhone: "",
@@ -74,6 +75,7 @@ export function CustomerFormModal({
         if (customer) {
             setFormData({
                 ...customer,
+                email: customer.email || "",
                 source: SOURCE_LABELS[customer.source] ?? customer.source,
                 customerSource: CUSTOMER_SOURCE_LABELS[customer.customerSource || ""] ?? customer.customerSource,
                 assignee: ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee,
@@ -83,6 +85,7 @@ export function CustomerFormModal({
             // Reset form for new customer
             setFormData({
                 customerName: "",
+                email: "",
                 salutation: "Anh",
                 phone: "",
                 mobilePhone: "",
@@ -125,6 +128,12 @@ export function CustomerFormModal({
             newErrors.customerName = "Tên khách hàng là bắt buộc";
         }
 
+        if (!formData.email?.trim()) {
+            newErrors.email = "Email là bắt buộc";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+            newErrors.email = "Email không hợp lệ";
+        }
+
         if (!formData.mobilePhone?.trim()) {
             newErrors.mobilePhone = "Số di động là bắt buộc";
         } else if (!/^[0-9]{10,11}$/.test(formData.mobilePhone.trim())) {
@@ -151,19 +160,20 @@ export function CustomerFormModal({
         }
 
         setIsLoading(true);
+        try {
+            const customerData: Partial<Customer> = {
+                ...formData,
+                email: formData.email?.trim(),
+                ...(isEditing ? {} : { createdDate: new Date() }),
+            };
 
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
-        // Add timestamps
-        const customerData: Partial<Customer> = {
-            ...formData,
-            ...(isEditing ? {} : { createdDate: new Date() }),
-        };
-
-        onSave(customerData);
-        setIsLoading(false);
-        onClose();
+            await onSave(customerData);
+            onClose();
+        } catch {
+            // Parent handles toast/error display.
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const salutationOptions = [
@@ -234,6 +244,17 @@ export function CustomerFormModal({
                             onChange={handleChange}
                             options={salutationOptions}
                             variant="default"
+                            disabled={isLoading}
+                        />
+
+                        <Input
+                            label="Email *"
+                            name="email"
+                            type="email"
+                            value={formData.email || ""}
+                            onChange={handleChange}
+                            error={errors.email}
+                            placeholder="example@domain.com"
                             disabled={isLoading}
                         />
 

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Customer, CustomerStatus } from "@/types/customer";
-import { UserApiRow } from "@/types/api";
+import { UserApiRow, CreateUserPayload, UpdateUserPayload } from "@/types/api";
 import { usersService } from "@/services/users";
 import { CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
@@ -18,6 +18,7 @@ function mapApiRowToCustomer(row: UserApiRow, index: number): Customer {
     id: row.id,
     orderNumber: index + 1,
     customerName: row.full_name || row.email,
+    email: row.email,
     phone: row.phone || "",
     address: "",
     salutation: "",
@@ -31,6 +32,24 @@ function mapApiRowToCustomer(row: UserApiRow, index: number): Customer {
     gender: "Other",
     status: row.is_active ? CustomerStatus.REGISTERED : CustomerStatus.NEW,
     avatar: row.avatar || undefined,
+  };
+}
+
+function mapFormToCreatePayload(data: Partial<Customer>): CreateUserPayload {
+  return {
+    email: (data.email || "").trim(),
+    full_name: data.customerName?.trim() || undefined,
+    phone: (data.mobilePhone || data.phone || "").trim() || undefined,
+    is_active: data.status !== CustomerStatus.NOT_CONTACTED,
+  };
+}
+
+function mapFormToUpdatePayload(data: Partial<Customer>): UpdateUserPayload {
+  return {
+    email: data.email?.trim() || undefined,
+    full_name: data.customerName?.trim() || undefined,
+    phone: (data.mobilePhone || data.phone || "").trim() || undefined,
+    is_active: data.status !== CustomerStatus.NOT_CONTACTED,
   };
 }
 
@@ -151,44 +170,37 @@ export function CustomerListView() {
     setIsFormModalOpen(true);
   };
 
-  const handleSaveCustomer = (customerData: Partial<Customer>) => {
-    if (editingCustomer) {
-      // Update existing customer
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === editingCustomer.id ? { ...c, ...customerData } : c
-        )
-      );
-      toast.success("Cập nhật thành công", `Khách hàng "${customerData.customerName}" đã được cập nhật.`);
-    } else {
-      // Add new customer
-      const newCustomer: Customer = {
-        id: `CUST${Date.now()}`,
-        orderNumber: customers.length + 1,
-        customerName: customerData.customerName || "",
-        phone: customerData.phone || "",
-        address: customerData.address || "",
-        salutation: customerData.salutation || "Anh",
-        mobilePhone: customerData.mobilePhone || "",
-        source: customerData.source || "",
-        assignee: customerData.assignee || "",
-        relationship: customerData.relationship || "",
-        createdDate: new Date(),
-        customerSource: customerData.customerSource || "",
-        gender: customerData.gender || "Male",
-        sessionCount: customerData.sessionCount || 0,
-        remainingSessions: customerData.remainingSessions || 0,
-        status: customerData.status || CustomerStatus.NEW,
-      };
-      setCustomers((prev) => [newCustomer, ...prev]);
-      toast.success("Thêm mới thành công", `Khách hàng "${customerData.customerName}" đã được thêm vào danh sách.`);
+  const handleSaveCustomer = async (customerData: Partial<Customer>) => {
+    try {
+      if (editingCustomer) {
+        await usersService.updateUser(
+          editingCustomer.id,
+          mapFormToUpdatePayload(customerData),
+        );
+        toast.success("Cập nhật thành công", `Khách hàng "${customerData.customerName}" đã được cập nhật.`);
+      } else {
+        await usersService.createUsers([mapFormToCreatePayload(customerData)]);
+        toast.success("Thêm mới thành công", `Khách hàng "${customerData.customerName}" đã được thêm vào danh sách.`);
+      }
+
+      await loadCustomers();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Không thể lưu khách hàng.";
+      toast.error("Lưu thất bại", msg);
+      throw error;
     }
   };
 
-  const handleDeleteCustomer = (customer: Customer) => {
-    setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
-    setIsDetailModalOpen(false);
-    toast.success("Xóa thành công", `Khách hàng "${customer.customerName}" đã bị xóa.`);
+  const handleDeleteCustomer = async (customer: Customer) => {
+    try {
+      await usersService.deleteUser(customer.id);
+      setIsDetailModalOpen(false);
+      await loadCustomers();
+      toast.success("Xóa thành công", `Khách hàng "${customer.customerName}" đã bị xóa.`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Không thể xóa khách hàng.";
+      toast.error("Xóa thất bại", msg);
+    }
   };
 
   const handleApplyFilters = (filters: FilterValues) => {
@@ -289,7 +301,9 @@ export function CustomerListView() {
         onClose={() => setIsDetailModalOpen(false)}
         customer={selectedCustomer}
         onEdit={handleEditCustomer}
-        onDelete={handleDeleteCustomer}
+        onDelete={(customer) => {
+          void handleDeleteCustomer(customer);
+        }}
       />
     </div>
   );

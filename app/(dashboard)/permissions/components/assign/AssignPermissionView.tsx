@@ -3,10 +3,11 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Permission, UserPermission, PermissionGroup } from "@/types/permission";
 import { UserProfile } from "@/types/user";
-import { UserApiRow, PermissionApiRow } from "@/types/api";
+import { UserApiRow, PermissionApiRow, TagApiRow } from "@/types/api";
 import { usersService } from "@/services/users";
 import { permissionsService } from "@/services/permissions";
 import { userTagsService } from "@/services/user-tags";
+import { tagsService } from "@/services/tags";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -45,24 +46,67 @@ function mapApiRowToPermission(row: PermissionApiRow): Permission {
     };
 }
 
+function normalizeValue(value?: string | null): string {
+    return (value || "").trim().toLowerCase();
+}
+
+function buildPermissionTagMap(
+    permissions: Permission[],
+    tags: TagApiRow[],
+): Record<string, string> {
+    const tagByName = new Map<string, string>();
+
+    tags.forEach((tag) => {
+        const key = normalizeValue(tag.name);
+        if (key) {
+            tagByName.set(key, tag.id);
+        }
+    });
+
+    const mapping: Record<string, string> = {};
+
+    permissions.forEach((permission) => {
+        const byCode = tagByName.get(normalizeValue(permission.code));
+        const byName = tagByName.get(normalizeValue(permission.name));
+        const tagId = byCode || byName;
+
+        if (tagId) {
+            mapping[permission.id] = tagId;
+        }
+    });
+
+    return mapping;
+}
+
 export function AssignPermissionView() {
     const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
     const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
     const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
+    const [allTags, setAllTags] = useState<TagApiRow[]>([]);
+    const [permissionTagMap, setPermissionTagMap] = useState<Record<string, string>>({});
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [showDropdown, setShowDropdown] = useState(false);
+    const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
+    const [isMutatingAssignments, setIsMutatingAssignments] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
     const toast = useToast();
 
     const loadData = useCallback(async () => {
         try {
-            const [usersRes, permsRes] = await Promise.all([
+            const [usersRes, permsRes, tagsRes] = await Promise.all([
                 usersService.getUsers({ pageSize: "200" }),
                 permissionsService.getPermissions({ pageSize: "100" }),
+                tagsService.getTags({ pageSize: "500" }),
             ]);
-            setAllUsers((usersRes.responseData?.rows ?? []).map(mapApiRowToProfile));
-            setAllPermissions((permsRes.responseData?.rows ?? []).map(mapApiRowToPermission));
+            const users = (usersRes.responseData?.rows ?? []).map(mapApiRowToProfile);
+            const permissions = (permsRes.responseData?.rows ?? []).map(mapApiRowToPermission);
+            const tags = tagsRes.responseData?.rows ?? [];
+
+            setAllUsers(users);
+            setAllPermissions(permissions);
+            setAllTags(tags);
+            setPermissionTagMap(buildPermissionTagMap(permissions, tags));
         } catch {
             // silently fail, UI will show empty
         }
@@ -81,6 +125,55 @@ export function AssignPermissionView() {
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
     }, []);
+
+    const refreshSelectedUserPermissions = useCallback(async () => {
+        if (!selectedUser) {
+            setUserPermissions([]);
+            return;
+        }
+
+        setIsLoadingAssignments(true);
+        try {
+            const response = await userTagsService.getUserTags({
+                pageSize: "500",
+                filters: `user_id==${selectedUser.id}`,
+            });
+
+            const reversePermissionTagMap = new Map<string, string>();
+            Object.entries(permissionTagMap).forEach(([permissionId, tagId]) => {
+                reversePermissionTagMap.set(tagId, permissionId);
+            });
+
+            const mappedPermissions: UserPermission[] = (response.responseData?.rows ?? [])
+                .map((row) => {
+                    const permissionId = reversePermissionTagMap.get(row.tag_id);
+
+                    if (!permissionId) {
+                        return null;
+                    }
+
+                    return {
+                        id: row.id,
+                        user_id: row.user_id,
+                        permision_id: permissionId,
+                        updated_at: row.created_at ? new Date(row.created_at) : new Date(),
+                    };
+                })
+                .filter((item): item is UserPermission => item !== null);
+
+            setUserPermissions(mappedPermissions);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Không thể tải phân quyền người dùng.";
+            toast.error("Tải phân quyền thất bại", message);
+            setUserPermissions([]);
+        } finally {
+            setIsLoadingAssignments(false);
+        }
+    }, [permissionTagMap, selectedUser, toast]);
+
+    useEffect(() => {
+        void refreshSelectedUserPermissions();
+    }, [refreshSelectedUserPermissions]);
 
     const filteredUsers = useMemo(() => {
         if (!searchQuery.trim()) return [];
@@ -123,57 +216,135 @@ export function AssignPermissionView() {
     const handleClearUser = () => {
         setSelectedUser(null);
         setSearchQuery("");
+        setUserPermissions([]);
     };
 
-    const handleTogglePermission = (permissionId: string) => {
-        if (!selectedUser) return;
-        const hasPermission = selectedUserPermissions.has(permissionId);
-        if (hasPermission) {
-            setUserPermissions((prev) =>
-                prev.filter(
-                    (up) => !(up.user_id === selectedUser.id && up.permision_id === permissionId)
-                )
+    const ensurePermissionTagId = useCallback(
+        async (permissionId: string): Promise<string> => {
+            const existingTagId = permissionTagMap[permissionId];
+            if (existingTagId) {
+                return existingTagId;
+            }
+
+            const permission = allPermissions.find((item) => item.id === permissionId);
+            if (!permission) {
+                throw new Error("Không tìm thấy quyền cần gán.");
+            }
+
+            const keyByCode = normalizeValue(permission.code);
+            const keyByName = normalizeValue(permission.name);
+            const existedTag = allTags.find(
+                (tag) =>
+                    normalizeValue(tag.name) === keyByCode ||
+                    normalizeValue(tag.name) === keyByName,
             );
-            toast.success("Đã gỡ quyền", "Quyền đã được gỡ bỏ thành công");
-        } else {
-            setUserPermissions((prev) => [
-                ...prev,
-                {
-                    id: `up${Date.now()}`,
-                    user_id: selectedUser.id,
-                    permision_id: permissionId,
-                    updated_at: new Date(),
-                },
-            ]);
-            toast.success("Đã gán quyền", "Quyền đã được gán thành công");
+
+            if (existedTag) {
+                setPermissionTagMap((prev) => ({ ...prev, [permissionId]: existedTag.id }));
+                return existedTag.id;
+            }
+
+            const createResponse = await tagsService.createTag({
+                name: permission.code || permission.name,
+            });
+            const createdTag = createResponse.responseData;
+
+            setAllTags((prev) => [...prev, createdTag]);
+            setPermissionTagMap((prev) => ({ ...prev, [permissionId]: createdTag.id }));
+
+            return createdTag.id;
+        },
+        [allPermissions, allTags, permissionTagMap],
+    );
+
+    const handleTogglePermission = async (permissionId: string) => {
+        if (!selectedUser || isMutatingAssignments) {
+            return;
+        }
+
+        setIsMutatingAssignments(true);
+
+        try {
+            const hasPermission = selectedUserPermissions.has(permissionId);
+
+            if (hasPermission) {
+                const currentAssigned = userPermissions.find(
+                    (up) => up.user_id === selectedUser.id && up.permision_id === permissionId,
+                );
+
+                if (!currentAssigned) {
+                    throw new Error("Không tìm thấy liên kết quyền để gỡ.");
+                }
+
+                await userTagsService.deleteUserTag(currentAssigned.id);
+                toast.success("Đã gỡ quyền", "Quyền đã được gỡ bỏ thành công");
+            } else {
+                const tagId = await ensurePermissionTagId(permissionId);
+                await userTagsService.createUserTags([
+                    {
+                        user_id: selectedUser.id,
+                        tag_id: tagId,
+                    },
+                ]);
+                toast.success("Đã gán quyền", "Quyền đã được gán thành công");
+            }
+
+            await refreshSelectedUserPermissions();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Cập nhật phân quyền thất bại.";
+            toast.error("Cập nhật thất bại", message);
+        } finally {
+            setIsMutatingAssignments(false);
         }
     };
 
-    const handleToggleGroup = (groupCode: string) => {
-        if (!selectedUser) return;
+    const handleToggleGroup = async (groupCode: string) => {
+        if (!selectedUser || isMutatingAssignments) {
+            return;
+        }
+
         const groupPerms = permissionsByGroup[groupCode] ?? [];
         const allChecked = groupPerms.every((p) => selectedUserPermissions.has(p.id));
 
-        if (allChecked) {
-            setUserPermissions((prev) =>
-                prev.filter(
-                    (up) =>
-                        !(
+        setIsMutatingAssignments(true);
+
+        try {
+            if (allChecked) {
+                const removeIds = userPermissions
+                    .filter(
+                        (up) =>
                             up.user_id === selectedUser.id &&
-                            groupPerms.some((p) => p.id === up.permision_id)
-                        )
-                )
-            );
-        } else {
-            const toAdd = groupPerms
-                .filter((p) => !selectedUserPermissions.has(p.id))
-                .map((p) => ({
-                    id: `up${Date.now()}_${p.id}`,
-                    user_id: selectedUser.id,
-                    permision_id: p.id,
-                    updated_at: new Date(),
-                }));
-            setUserPermissions((prev) => [...prev, ...toAdd]);
+                            groupPerms.some((permission) => permission.id === up.permision_id),
+                    )
+                    .map((item) => item.id);
+
+                await Promise.all(removeIds.map((id) => userTagsService.deleteUserTag(id)));
+                toast.success("Đã gỡ nhóm quyền", "Tất cả quyền trong nhóm đã được gỡ.");
+            } else {
+                const permissionsToAdd = groupPerms.filter(
+                    (permission) => !selectedUserPermissions.has(permission.id),
+                );
+
+                const payload = [] as Array<{ user_id: string; tag_id: string }>;
+
+                for (const permission of permissionsToAdd) {
+                    const tagId = await ensurePermissionTagId(permission.id);
+                    payload.push({ user_id: selectedUser.id, tag_id: tagId });
+                }
+
+                if (payload.length > 0) {
+                    await userTagsService.createUserTags(payload);
+                }
+
+                toast.success("Đã gán nhóm quyền", "Các quyền trong nhóm đã được gán thành công.");
+            }
+
+            await refreshSelectedUserPermissions();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Cập nhật nhóm quyền thất bại.";
+            toast.error("Cập nhật thất bại", message);
+        } finally {
+            setIsMutatingAssignments(false);
         }
     };
 
@@ -215,6 +386,7 @@ export function AssignPermissionView() {
                                 onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); }}
                                 onFocus={() => searchQuery && setShowDropdown(true)}
                                 placeholder="Tìm tên, email hoặc số điện thoại..."
+                                disabled={isLoadingAssignments || isMutatingAssignments}
                                 className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                         </div>
@@ -262,7 +434,10 @@ export function AssignPermissionView() {
                                             type="checkbox"
                                             checked={allChecked}
                                             ref={(el) => { if (el) el.indeterminate = someChecked && !allChecked; }}
-                                            onChange={() => handleToggleGroup(groupCode)}
+                                            onChange={() => {
+                                                void handleToggleGroup(groupCode);
+                                            }}
+                                            disabled={isMutatingAssignments || isLoadingAssignments}
                                             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
                                         <span className="text-sm font-semibold text-gray-800">
@@ -280,7 +455,10 @@ export function AssignPermissionView() {
                                                     <input
                                                         type="checkbox"
                                                         checked={checked}
-                                                        onChange={() => handleTogglePermission(permission.id)}
+                                                        onChange={() => {
+                                                            void handleTogglePermission(permission.id);
+                                                        }}
+                                                        disabled={isMutatingAssignments || isLoadingAssignments}
                                                         className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                                     />
                                                     <div className="min-w-0">

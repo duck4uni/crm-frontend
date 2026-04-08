@@ -15,6 +15,7 @@ import {
 export default function DashboardPage() {
   const [userCount, setUserCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
+  const [customerTagGroupCount, setCustomerTagGroupCount] = useState(0);
   const [jobCount, setJobCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,14 +23,16 @@ export default function DashboardPage() {
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [usersRes, customersRes, jobsRes, notifs] = await Promise.all([
+      const [usersRes, customerCountRes, customerTagRes, jobsRes, notifs] = await Promise.all([
         usersService.getUsers({ pageSize: "1" }),
-        usersService.getCustomers({ pageSize: "1" }),
+        usersService.getCustomerCount(),
+        usersService.getCustomerTagStatistic(),
         jobsService.getJobs({ pageSize: "1" }),
         notificationsService.getMyNotifications(),
       ]);
       setUserCount(usersRes.responseData?.count ?? 0);
-      setCustomerCount(customersRes.responseData?.count ?? 0);
+      setCustomerCount(customerCountRes.responseData?.count ?? 0);
+      setCustomerTagGroupCount(customerTagRes.responseData?.length ?? 0);
       setJobCount(jobsRes.responseData?.count ?? 0);
       setNotificationCount(notifs.filter((n) => !n.has_user_read).length);
     } catch {
@@ -71,6 +74,13 @@ export default function DashboardPage() {
       icon: FiBell,
       color: "text-red-600",
       bgColor: "bg-red-100",
+    },
+    {
+      title: "Nhóm tag khách hàng",
+      value: customerTagGroupCount,
+      icon: FiUsers,
+      color: "text-amber-600",
+      bgColor: "bg-amber-100",
     },
   ];
 
@@ -121,6 +131,12 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div>
+                <p className="text-sm text-gray-600">Nhóm tag khách hàng</p>
+                <p className="text-2xl font-bold text-amber-600">
+                  {customerTagGroupCount}
+                </p>
+              </div>
+              <div>
                 <p className="text-sm text-gray-600">Tổng người dùng</p>
                 <p className="text-2xl font-bold text-green-600">
                   {userCount}
@@ -166,6 +182,12 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-600">Khách hàng</p>
               <p className="mt-2 text-2xl font-bold text-purple-600">
                 {customerCount}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Nhóm tag khách hàng</p>
+              <p className="mt-2 text-2xl font-bold text-amber-600">
+                {customerTagGroupCount}
               </p>
             </div>
             <div>
