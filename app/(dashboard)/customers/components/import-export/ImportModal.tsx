@@ -8,7 +8,15 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download } from "luc
 interface ImportModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onImport: (data: any[], file?: File) => void;
+    onImport: (data: any[], file?: File) => Promise<{
+        success: number;
+        failed: number;
+        errors: string[];
+    } | void> | {
+        success: number;
+        failed: number;
+        errors: string[];
+    } | void;
 }
 
 export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
@@ -62,13 +70,12 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
         setImporting(true);
 
         try {
-            // Call onImport with the actual file for real API upload
-            onImport([], file);
+            const feedback = await onImport([], file);
 
             const result = {
-                success: 0,
-                failed: 0,
-                errors: [] as string[],
+                success: feedback?.success ?? 0,
+                failed: feedback?.failed ?? 0,
+                errors: feedback?.errors ?? [],
             };
 
             setImportResult(result);
