@@ -1,70 +1,44 @@
 "use client";
 
 import { useState } from "react";
-import { Select } from "@/components/ui/Select";
+import { useRouter } from "next/navigation";
 import {
   Search,
-  Filter,
   Users,
-  Calendar,
-  Sparkles,
   Download,
   Upload,
   Plus
 } from "lucide-react";
-import { FiChevronDown } from "react-icons/fi";
-import { FilterModal, FilterValues } from "../filters/FilterModal";
-import { SavedFiltersDropdown } from "../filters/SavedFiltersDropdown";
-import { CustomerGroupModal } from "../groups/CustomerGroupModal";
 import { ImportModal } from "../import-export/ImportModal";
 
 interface CustomerSearchProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  selectedGroup?: string;
-  onGroupChange: (group: string) => void;
-  selectedAssignee?: string;
-  onAssigneeChange: (assignee: string) => void;
   onAddCustomer: () => void;
-  onApplyFilters: (filters: FilterValues) => void;
   onExport: () => void;
-  onImport: (data: any[]) => void;
+  onImport: (data: any[], file?: File) => Promise<{
+    success: number;
+    failed: number;
+    errors: string[];
+  } | void> | {
+    success: number;
+    failed: number;
+    errors: string[];
+  } | void;
 }
 
 export function CustomerSearch({
   searchQuery,
   onSearchChange,
-  selectedGroup,
-  onGroupChange,
-  selectedAssignee,
-  onAssigneeChange,
   onAddCustomer,
-  onApplyFilters,
   onExport,
   onImport,
 }: CustomerSearchProps) {
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const router = useRouter();
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [currentFilters, setCurrentFilters] = useState<FilterValues>({});
-
-  const handleApplyFilters = (filters: FilterValues) => {
-    setCurrentFilters(filters);
-    onApplyFilters(filters);
-  };
-
-  const handleSelectSavedFilter = (filters: FilterValues) => {
-    setCurrentFilters(filters);
-    onApplyFilters(filters);
-  };
-
-  const handleSelectGroup = (groupId: string) => {
-    onGroupChange(groupId);
-  };
 
   return (
     <div className="space-y-3">
-      {/* Row 1: Search + Main Actions */}
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -77,65 +51,16 @@ export function CustomerSearch({
           />
         </div>
 
-        <button
-          onClick={() => setIsFilterModalOpen(true)}
-          className="h-10 px-4 flex items-center gap-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm font-medium transition-colors shadow-sm"
-        >
-          <Filter className="w-4 h-4" />
-          Bộ lọc
-        </button>
-
-        <SavedFiltersDropdown
-          onSelectFilter={handleSelectSavedFilter}
-          currentFilters={currentFilters}
-        />
+        <div className="flex-1"></div>
 
         <button
-          onClick={() => setIsGroupModalOpen(true)}
+          onClick={() => router.push("/customers/groups")}
           className="h-10 px-4 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow"
+          title="Quản lý nhóm khách hàng"
         >
           <Users className="w-4 h-4" />
-          Chọn nhóm khách hàng
+          Quản lý nhóm khách hàng
         </button>
-      </div>
-
-      {/* Row 2: Filters + Quick Actions */}
-      <div className="flex items-center gap-3">
-        <div className="w-56">
-          <Select
-            value={selectedAssignee}
-            onChange={(e) => onAssigneeChange(e.target.value)}
-            options={[
-              { value: "getfly_admin", label: "Quản trị viên Getfly" },
-              { value: "nguyen_van_a", label: "Nguyễn Văn A" },
-              { value: "tran_thi_b", label: "Trần Thị B" },
-            ]}
-            variant="subtle"
-            placeholder="Chọn người phụ trách"
-          />
-        </div>
-
-        <button className="h-10 px-4 flex items-center gap-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm transition-colors shadow-sm">
-          <Calendar className="w-4 h-4 text-gray-500" />
-          <span className="text-gray-600">Thời gian:</span>
-          <span className="font-medium text-gray-900">Tất cả</span>
-          <FiChevronDown className="w-4 h-4 text-gray-400 ml-1" />
-        </button>
-
-        <button className="h-10 px-4 border border-blue-300 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
-          <Sparkles className="w-4 h-4" />
-          Mới cập nhật
-        </button>
-
-        <button className="h-10 px-4 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors shadow-sm">
-          Đừng quên
-        </button>
-
-        <button className="h-10 px-4 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors shadow-sm">
-          Sinh nhật
-        </button>
-
-        <div className="flex-1"></div>
 
         <button
           onClick={onExport}
@@ -161,20 +86,6 @@ export function CustomerSearch({
           Thêm khách hàng
         </button>
       </div>
-
-      {/* Modals */}
-      <FilterModal
-        isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        onApply={handleApplyFilters}
-        initialFilters={currentFilters}
-      />
-
-      <CustomerGroupModal
-        isOpen={isGroupModalOpen}
-        onClose={() => setIsGroupModalOpen(false)}
-        onSelectGroup={handleSelectGroup}
-      />
 
       <ImportModal
         isOpen={isImportModalOpen}

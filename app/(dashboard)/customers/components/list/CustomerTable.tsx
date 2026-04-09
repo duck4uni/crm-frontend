@@ -2,7 +2,6 @@
 
 import { Customer } from "@/types/customer";
 import { Avatar } from "@/components/ui/Avatar";
-import { Badge } from "@/components/ui/Badge";
 import { formatDateVN } from "@/lib/utils";
 import { FiEye, FiEdit2 } from "react-icons/fi";
 import { useState } from "react";
@@ -22,42 +21,17 @@ const GENDER_LABELS: Record<string, string> = {
   Other: "Khác",
 };
 
-const SALUTATION_LABELS: Record<string, string> = {
-  Mr: "Ông",
-  Mrs: "Bà",
-  Ms: "Cô",
-};
-
-const SOURCE_LABELS: Record<string, string> = {
-  Referral: "Giới thiệu",
-  "Google Ads": "Quảng cáo Google",
-  "Walk-in": "Khách đến trực tiếp",
-  Website: "Trang web",
-  Email: "Thư điện tử",
-};
-
-const CUSTOMER_SOURCE_LABELS: Record<string, string> = {
-  "Data Import": "Nhập dữ liệu",
-  "Google Ads": "Quảng cáo Google",
-  "Walk-in": "Khách đến trực tiếp",
-  "Email Marketing": "Tiếp thị email",
-  Website: "Trang web",
-  Email: "Thư điện tử",
-};
-
 const ASSIGNEE_LABELS: Record<string, string> = {
   "Getfly Admin": "Quản trị viên Getfly",
 };
 
-const RELATIONSHIP_LABELS: Record<string, string> = {
-  Data2: "Dữ liệu nhóm 2",
-  Data3: "Dữ liệu nhóm 3",
-};
-
-export function CustomerTable({ customers, onCustomerClick, onCustomerEdit }: CustomerTableProps) {
+export function CustomerTable({
+  customers,
+  onCustomerClick,
+  onCustomerEdit,
+}: CustomerTableProps) {
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -66,24 +40,6 @@ export function CustomerTable({ customers, onCustomerClick, onCustomerEdit }: Cu
       setSortField(field);
       setSortDirection("asc");
     }
-  };
-
-  const handleSelectAll = () => {
-    if (selectedRows.size === customers.length) {
-      setSelectedRows(new Set());
-    } else {
-      setSelectedRows(new Set(customers.map((c) => c.id)));
-    }
-  };
-
-  const handleSelectRow = (id: string) => {
-    const newSelected = new Set(selectedRows);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedRows(newSelected);
   };
 
   const sortedCustomers = [...customers].sort((a, b) => {
@@ -105,27 +61,11 @@ export function CustomerTable({ customers, onCustomerClick, onCustomerEdit }: Cu
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left w-12">
-                <input
-                  type="checkbox"
-                  checked={selectedRows.size === customers.length && customers.length > 0}
-                  onChange={handleSelectAll}
-                  className="rounded border-gray-300"
-                />
-              </th>
-              <TableHeader label="#" field="orderNumber" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <TableHeader label="Tên khách hàng" field="customerName" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Danh xưng" field="salutation" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Số di động" field="mobilePhone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Nguồn" field="source" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Người phụ trách" field="assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Mối quan hệ" field="relationship" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Liên hệ lần cuối" field="lastContactDate" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Ngày tạo" field="createdDate" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Nguồn khách hàng" field="customerSource" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <TableHeader label="Giới tính" field="gender" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Buổi học" field="sessionCount" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Số buổi còn lại" field="remainingSessions" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+              <TableHeader label="Số điện thoại" field="mobilePhone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+              <TableHeader label="Người phụ trách" field="assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+              <TableHeader label="Ngày tạo" field="createdDate" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Thao tác</th>
             </tr>
           </thead>
@@ -134,8 +74,6 @@ export function CustomerTable({ customers, onCustomerClick, onCustomerEdit }: Cu
               <CustomerTableRow
                 key={customer.id}
                 customer={customer}
-                isSelected={selectedRows.has(customer.id)}
-                onSelect={handleSelectRow}
                 onView={onCustomerClick}
                 onEdit={onCustomerEdit}
               />
@@ -195,55 +133,28 @@ function TableHeader({ label, field, onSort, sortField, sortDirection }: TableHe
 // Table Row Component
 interface CustomerTableRowProps {
   customer: Customer;
-  isSelected: boolean;
-  onSelect: (id: string) => void;
   onView?: (customer: Customer) => void;
   onEdit?: (customer: Customer) => void;
 }
 
-function CustomerTableRow({ customer, isSelected, onSelect, onView, onEdit }: CustomerTableRowProps) {
-  const salutation = SALUTATION_LABELS[customer.salutation] ?? customer.salutation;
-  const source = SOURCE_LABELS[customer.source] ?? customer.source;
-  const assignee = ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee;
-  const customerSource = CUSTOMER_SOURCE_LABELS[customer.customerSource] ?? customer.customerSource;
-  const relationship = RELATIONSHIP_LABELS[customer.relationship] ?? customer.relationship;
+function CustomerTableRow({ customer, onView, onEdit }: CustomerTableRowProps) {
   const gender = GENDER_LABELS[customer.gender] ?? customer.gender;
+  const assignee = ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee;
+  const phone = customer.mobilePhone || customer.phone || "-";
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
-      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onSelect(customer.id)}
-          className="rounded border-gray-300"
-        />
-      </td>
-      <td className="px-4 py-4 text-sm text-gray-900">{customer.orderNumber}</td>
       <td className="px-4 py-4">
         <div className="flex items-center space-x-3">
           <Avatar name={customer.customerName} src={customer.avatar} />
           <span className="text-sm font-medium text-gray-900">{customer.customerName}</span>
         </div>
       </td>
-      <td className="px-4 py-4 text-sm text-gray-600">{salutation}</td>
-      <td className="px-4 py-4 text-sm text-gray-900">{customer.mobilePhone}</td>
-      <td className="px-4 py-4 text-sm text-gray-600">{source || "-"}</td>
-      <td className="px-4 py-4 text-sm text-gray-600">{assignee}</td>
-      <td className="px-4 py-4 text-sm text-gray-600">{relationship}</td>
-      <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
-        {customer.lastContactDate ? formatDateVN(customer.lastContactDate) : "-"}
-      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">{gender}</td>
+      <td className="px-4 py-4 text-sm text-gray-900">{phone}</td>
+      <td className="px-4 py-4 text-sm text-gray-600">{assignee || "-"}</td>
       <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
         {formatDateVN(customer.createdDate)}
-      </td>
-      <td className="px-4 py-4 text-sm text-gray-600">{customerSource}</td>
-      <td className="px-4 py-4 text-sm text-gray-600">{gender}</td>
-      <td className="px-4 py-4 text-sm text-center text-gray-900">
-        {customer.sessionCount || 0}
-      </td>
-      <td className="px-4 py-4 text-sm text-center text-gray-900">
-        {customer.remainingSessions || 0}
       </td>
       <td className="px-4 py-4">
         <div className="flex items-center gap-2">

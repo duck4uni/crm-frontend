@@ -223,6 +223,111 @@ export interface UpdateUserPayload {
   is_active?: boolean;
 }
 
+export interface CustomerApiRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  company_name: string | null;
+  company_establish_date: string | null;
+  description: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  website: string | null;
+  gender: string | null;
+  day_of_birth: string | null;
+  major: string | null;
+  id_no: string | null;
+  id_issued_by: string | null;
+  id_issued_date: string | null;
+  id_issued_place: string | null;
+  type: string;
+  tax_code: string | null;
+  note: string | null;
+  full_name: string | null;
+  assigned_user_id: string | null;
+  created_at: string | null;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+  is_active: boolean;
+  is_delete: boolean;
+  tags?: string[];
+}
+
+export interface CreateCustomerPayload {
+  first_name: string;
+  last_name: string;
+  description: string;
+  type: string;
+  company_name?: string;
+  company_establish_date?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
+  gender?: string;
+  day_of_birth?: string;
+  major?: string;
+  id_no?: string;
+  id_issued_by?: string;
+  id_issued_date?: string;
+  id_issued_place?: string;
+  tax_code?: string;
+  note?: string;
+  full_name?: string;
+  assigned_user_id?: string;
+  is_active?: boolean;
+}
+
+export interface UpdateCustomerPayload {
+  first_name?: string;
+  last_name?: string;
+  description?: string;
+  type?: string;
+  company_name?: string;
+  company_establish_date?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
+  gender?: string;
+  day_of_birth?: string;
+  major?: string;
+  id_no?: string;
+  id_issued_by?: string;
+  id_issued_date?: string;
+  id_issued_place?: string;
+  tax_code?: string;
+  note?: string;
+  full_name?: string;
+  assigned_user_id?: string;
+  is_active?: boolean;
+}
+
+export interface ExportCustomersPayload {
+  start_date?: string;
+  end_date?: string;
+  assigned_user_id?: string;
+  type?: string;
+  is_active?: boolean;
+}
+
+export interface CustomerImportError {
+  row: number;
+  email?: string;
+  message: string;
+}
+
+export interface ImportCustomersResult {
+  totalRows: number;
+  successCount: number;
+  skippedCount: number;
+  errorCount: number;
+  errors: CustomerImportError[];
+  expectedColumns: string[];
+}
+
 export interface CustomerCountPayload {
   start_date?: string;
   end_date?: string;
@@ -270,6 +375,30 @@ export interface CreateTagPayload {
 
 export interface UpdateTagPayload {
   name?: string;
+  is_active?: boolean;
+}
+
+// ── Customer Tags ──────────────────────────────────────────────────
+export interface CustomerTagApiRow {
+  id: string;
+  customer_id: string;
+  tag_id: string;
+  is_active: boolean;
+  is_delete: boolean;
+  created_at: string | null;
+  created_by: string | null;
+  updated_at?: string | null;
+  updated_by?: string | null;
+}
+
+export interface CreateCustomerTagPayload {
+  customer_id: string;
+  tag_id: string;
+}
+
+export interface UpdateCustomerTagPayload {
+  customer_id?: string;
+  tag_id?: string;
   is_active?: boolean;
 }
 
@@ -415,6 +544,12 @@ export type CreateUsersResponse = ApiEnvelope<UserApiRow[]>;
 export type UpdateUserResponse = ApiEnvelope<UserApiRow>;
 export type DeleteUserResponse = ApiEnvelope<null>;
 export type GetCustomersResponse = ApiEnvelope<PaginatedRows<UserApiRow>>;
+export type GetCustomerListResponse = ApiEnvelope<PaginatedRows<CustomerApiRow>>;
+export type GetCustomerResponse = ApiEnvelope<CustomerApiRow>;
+export type CreateCustomerResponse = ApiEnvelope<CustomerApiRow>;
+export type UpdateCustomerResponse = ApiEnvelope<CustomerApiRow>;
+export type DeleteCustomerResponse = ApiEnvelope<unknown>;
+export type ImportCustomersResponse = ApiEnvelope<ImportCustomersResult>;
 export type CustomerCountResponse = ApiEnvelope<{ count: number }>;
 export type CustomerTagStatResponse = ApiEnvelope<CustomerTagStatItem[]>;
 export type ImportUsersResponse = ApiEnvelope<ImportUsersResult>;
@@ -423,6 +558,11 @@ export type GetTagResponse = ApiEnvelope<TagApiRow>;
 export type CreateTagResponse = ApiEnvelope<TagApiRow>;
 export type UpdateTagResponse = ApiEnvelope<TagApiRow>;
 export type DeleteTagResponse = ApiEnvelope<null>;
+export type GetCustomerTagsResponse = ApiEnvelope<PaginatedRows<CustomerTagApiRow>>;
+export type GetCustomerTagResponse = ApiEnvelope<CustomerTagApiRow>;
+export type CreateCustomerTagsResponse = ApiEnvelope<CustomerTagApiRow[]>;
+export type UpdateCustomerTagResponse = ApiEnvelope<CustomerTagApiRow>;
+export type DeleteCustomerTagResponse = ApiEnvelope<null>;
 export type GetUserTagsResponse = ApiEnvelope<PaginatedRows<UserTagApiRow>>;
 export type GetUserTagResponse = ApiEnvelope<UserTagApiRow>;
 export type CreateUserTagsResponse = ApiEnvelope<UserTagApiRow[]>;

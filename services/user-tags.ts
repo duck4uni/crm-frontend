@@ -12,9 +12,23 @@ import {
 
 const USER_TAGS_ENDPOINT = "/api/v1.0/user_tags";
 
+function buildEqualsFilter(field: string, value: string): string {
+    return `${field}==${value}`;
+}
+
 export const userTagsService = {
     async getUserTags(params?: PaginatedParams): Promise<GetUserTagsResponse> {
         return apiClient.get<GetUserTagsResponse>(USER_TAGS_ENDPOINT, params);
+    },
+
+    async getUserTagsByTagId(
+        tagId: string,
+        params?: Omit<PaginatedParams, "filters">,
+    ): Promise<GetUserTagsResponse> {
+        return apiClient.get<GetUserTagsResponse>(USER_TAGS_ENDPOINT, {
+            ...params,
+            filters: buildEqualsFilter("tag_id", tagId),
+        });
     },
 
     async getUserTag(id: string): Promise<GetUserTagResponse> {
