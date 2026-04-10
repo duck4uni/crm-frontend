@@ -7,14 +7,39 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 
+interface PermissionOption {
+    id: string;
+    name: string;
+    code: string;
+    group_code?: string;
+}
+
 interface UserFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (user: Partial<UserProfile>) => void;
+    onSave: (user: Partial<UserProfile>, permissionIds: string[]) => void | Promise<void>;
     user?: UserProfile | null;
+    permissions?: PermissionOption[];
+    initialPermissionIds?: string[];
 }
 
-export function UserFormModal({ isOpen, onClose, onSave, user }: UserFormModalProps) {
+const GROUP_LABELS: Record<string, string> = {
+    user: "Người dùng",
+    customer: "Khách hàng",
+    deal: "Thương vụ",
+    task: "Công việc",
+    report: "Báo cáo",
+    setting: "Cài đặt",
+};
+
+export function UserFormModal({
+    isOpen,
+    onClose,
+    onSave,
+    user,
+    permissions = [],
+    initialPermissionIds = [],
+}: UserFormModalProps) {
     const isEditing = !!user;
 
     const [formData, setFormData] = useState<Partial<UserProfile>>({
@@ -26,6 +51,8 @@ export function UserFormModal({ isOpen, onClose, onSave, user }: UserFormModalPr
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [selectedPermissionIds, setSelectedPermissionIds] = useState<string[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -46,8 +73,10 @@ export function UserFormModal({ isOpen, onClose, onSave, user }: UserFormModalPr
                 is_active: true,
             });
         }
+
+        setSelectedPermissionIds(initialPermissionIds);
         setErrors({});
-    }, [user, isOpen]);
+    }, [user, isOpen, initialPermissionIds]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -82,11 +111,36 @@ export function UserFormModal({ isOpen, onClose, onSave, user }: UserFormModalPr
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = () => {
-        if (!validate()) return;
-        onSave(formData);
-        onClose();
+    const togglePermission = (permissionId: string) => {
+        setSelectedPermissionIds((prev) =>
+            prev.includes(permissionId)
+                ? prev.filter((id) => id !== permissionId)
+                : [...prev, permissionId],
+        );
     };
+
+    const handleSubmit = async () => {
+        if (!validate() || isSubmitting) {
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            await onSave(formData, selectedPermissionIds);
+            onClose();
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const permissionGroups = permissions.reduce<Record<string, PermissionOption[]>>((acc, permission) => {
+        const groupCode = permission.group_code || "other";
+        if (!acc[groupCode]) {
+            acc[groupCode] = [];
+        }
+        acc[groupCode].push(permission);
+        return acc;
+    }, {});
 
     return (
         <Modal
@@ -96,9 +150,9 @@ export function UserFormModal({ isOpen, onClose, onSave, user }: UserFormModalPr
             size="lg"
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose}>Hủy</Button>
-                    <Button variant="primary" onClick={handleSubmit}>
-                        {isEditing ? "Cập nhật" : "Thêm mới"}
+                    <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>Hủy</Button>
+                    <Button variant="primary" onClick={() => void handleSubmit()} disabled={isSubmitting}>
+                        {isSubmitting ? "Đang lưu..." : isEditing ? "Cập nhật" : "Thêm mới"}
                     </Button>
                 </>
             }
@@ -172,6 +226,58 @@ export function UserFormModal({ isOpen, onClose, onSave, user }: UserFormModalPr
                             placeholder="URL ảnh đại diện"
                         />
                     </div>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-800">Phân quyền người dùng</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Chọn nhiều quyền trực tiếp khi tạo/sửa người dùng.</p>
+                        </div>
+                        <span className="text-xs text-gray-500">Đã chọn {selectedPermissionIds.length}</span>
+                    </div>
+
+                    {permissions.length === 0 && (
+                        <p className="text-sm text-gray-500">Chưa có dữ liệu quyền để gán.</p>
+                    )}
+
+                    {permissions.length > 0 && (
+                        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                            {Object.entries(permissionGroups).map(([groupCode, groupedPermissions]) => (
+                                <div key={groupCode} className="space-y-2">
+                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        {GROUP_LABELS[groupCode] || groupCode}
+                                    </p>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {groupedPermissions.map((permission) => {
+                                            const checked = selectedPermissionIds.includes(permission.id);
+                                            return (
+                                                <label
+                                                    key={permission.id}
+                                                    className={`
+                                                        flex items-start gap-2.5 rounded-md border px-3 py-2 cursor-pointer transition-colors
+                                                        ${checked ? "border-blue-300 bg-blue-50" : "border-gray-200 hover:bg-gray-50"}
+                                                    `}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => togglePermission(permission.id)}
+                                                        className="mt-0.5 rounded border-gray-300"
+                                                        disabled={isSubmitting}
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium text-gray-900 leading-tight">{permission.name}</p>
+                                                        <p className="text-xs text-gray-500 font-mono mt-0.5">{permission.code}</p>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </Modal>

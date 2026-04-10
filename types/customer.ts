@@ -19,6 +19,7 @@ export interface Customer {
   remainingSessions?: number; // Số buổi còn lại
   status: CustomerStatus; // Trạng thái
   avatar?: string;
+  groups?: string[];
 }
 
 export enum CustomerStatus {

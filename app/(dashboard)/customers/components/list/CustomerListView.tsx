@@ -5,11 +5,15 @@ import { Customer, CustomerStatus } from "@/types/customer";
 import {
   CreateCustomerPayload,
   CustomerApiRow,
+  CustomerTagApiRow,
+  TagApiRow,
   UpdateCustomerPayload,
 } from "@/types/api";
+import { customerTagsService } from "@/services/customer-tags";
 import { customersService } from "@/services/customers";
+import { tagsService } from "@/services/tags";
 import { usersService } from "@/services/users";
-import { CustomerFilters } from "./CustomerFilters";
+import { CustomerFilterOption, CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
 import { CustomerTable } from "./CustomerTable";
 import { CustomerFormModal } from "../forms/CustomerFormModal";
@@ -28,6 +32,67 @@ interface CustomerListViewProps {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GROUP_FILTER_PAGE_SIZE = "5000";
+
+const DEFAULT_ALL_GROUP_FILTER: CustomerFilterOption = {
+  id: "all",
+  label: "Tất cả",
+  bgColor: "bg-blue-500",
+  textColor: "text-white",
+  activeBgColor: "bg-blue-600",
+  activeTextColor: "text-white",
+};
+
+const GROUP_FILTER_STYLES: Omit<CustomerFilterOption, "id" | "label">[] = [
+  {
+    bgColor: "bg-emerald-500",
+    textColor: "text-white",
+    activeBgColor: "bg-emerald-600",
+    activeTextColor: "text-white",
+  },
+  {
+    bgColor: "bg-orange-500",
+    textColor: "text-white",
+    activeBgColor: "bg-orange-600",
+    activeTextColor: "text-white",
+  },
+  {
+    bgColor: "bg-cyan-500",
+    textColor: "text-white",
+    activeBgColor: "bg-cyan-600",
+    activeTextColor: "text-white",
+  },
+  {
+    bgColor: "bg-rose-500",
+    textColor: "text-white",
+    activeBgColor: "bg-rose-600",
+    activeTextColor: "text-white",
+  },
+  {
+    bgColor: "bg-indigo-500",
+    textColor: "text-white",
+    activeBgColor: "bg-indigo-600",
+    activeTextColor: "text-white",
+  },
+  {
+    bgColor: "bg-amber-500",
+    textColor: "text-white",
+    activeBgColor: "bg-amber-600",
+    activeTextColor: "text-white",
+  },
+  {
+    bgColor: "bg-teal-500",
+    textColor: "text-white",
+    activeBgColor: "bg-teal-600",
+    activeTextColor: "text-white",
+  },
+  {
+    bgColor: "bg-slate-500",
+    textColor: "text-white",
+    activeBgColor: "bg-slate-600",
+    activeTextColor: "text-white",
+  },
+];
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -99,13 +164,14 @@ function detectCustomerType(data: Partial<Customer>): "individual" | "company" {
 }
 
 function mapApiRowToCustomer(row: CustomerApiRow, index: number): Customer {
-  return mapApiRowToCustomerWithAssignee(row, index, {});
+  return mapApiRowToCustomerWithAssignee(row, index, {}, {});
 }
 
 function mapApiRowToCustomerWithAssignee(
   row: CustomerApiRow,
   index: number,
   assigneeNameMap: Record<string, string>,
+  groupNamesByCustomerId: Record<string, string[]>,
 ): Customer {
   const customerName =
     row.full_name ||
@@ -133,7 +199,57 @@ function mapApiRowToCustomerWithAssignee(
     gender: mapApiGenderToCustomer(row.gender),
     status: mapIsActiveToStatus(row.is_active),
     avatar: undefined,
+    groups: groupNamesByCustomerId[row.id] || [],
   };
+}
+
+function mapTagRowsToFilters(tags: TagApiRow[]): CustomerFilterOption[] {
+  const sortedTags = [...tags].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+
+  return [
+    DEFAULT_ALL_GROUP_FILTER,
+    ...sortedTags.map((tag, index) => {
+      const style = GROUP_FILTER_STYLES[index % GROUP_FILTER_STYLES.length];
+      return {
+        id: tag.id,
+        label: tag.name,
+        ...style,
+      };
+    }),
+  ];
+}
+
+function mapCustomerTagRows(rows: CustomerTagApiRow[]): Record<string, Set<string>> {
+  return rows.reduce<Record<string, Set<string>>>((acc, row) => {
+    if (!acc[row.tag_id]) {
+      acc[row.tag_id] = new Set<string>();
+    }
+
+    acc[row.tag_id].add(row.customer_id);
+    return acc;
+  }, {});
+}
+
+function mapCustomerGroupNamesByCustomerId(
+  rows: CustomerTagApiRow[],
+  tagNameById: Record<string, string>,
+): Record<string, string[]> {
+  return rows.reduce<Record<string, string[]>>((acc, row) => {
+    const groupName = tagNameById[row.tag_id];
+    if (!groupName) {
+      return acc;
+    }
+
+    if (!acc[row.customer_id]) {
+      acc[row.customer_id] = [];
+    }
+
+    if (!acc[row.customer_id].includes(groupName)) {
+      acc[row.customer_id].push(groupName);
+    }
+
+    return acc;
+  }, {});
 }
 
 function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload {
@@ -184,10 +300,41 @@ function mapFormToUpdatePayload(data: Partial<Customer>): UpdateCustomerPayload 
   };
 }
 
+async function syncCustomerGroups(customerId: string, nextGroupIds: string[]): Promise<void> {
+  const normalizedNextGroupIds = Array.from(new Set(nextGroupIds.filter(Boolean)));
+  const existingLinksResponse = await customerTagsService.getCustomerTagsByCustomerId(customerId, {
+    currentPage: "1",
+    pageSize: GROUP_FILTER_PAGE_SIZE,
+  });
+
+  const existingLinks = existingLinksResponse.responseData?.rows || [];
+  const existingGroupIdSet = new Set(existingLinks.map((link) => link.tag_id));
+  const nextGroupIdSet = new Set(normalizedNextGroupIds);
+
+  const groupsToAdd = normalizedNextGroupIds.filter((groupId) => !existingGroupIdSet.has(groupId));
+  const linksToDelete = existingLinks.filter((link) => !nextGroupIdSet.has(link.tag_id));
+
+  if (groupsToAdd.length > 0) {
+    await customerTagsService.createCustomerTags(
+      groupsToAdd.map((groupId) => ({
+        customer_id: customerId,
+        tag_id: groupId,
+      })),
+    );
+  }
+
+  if (linksToDelete.length > 0) {
+    await Promise.all(linksToDelete.map((link) => customerTagsService.deleteCustomerTag(link.id)));
+  }
+}
+
 export function CustomerListView({ onCountChange }: CustomerListViewProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<CustomerStatus | "all">("all");
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [groupFilters, setGroupFilters] = useState<CustomerFilterOption[]>([DEFAULT_ALL_GROUP_FILTER]);
+  const [customerIdsByGroup, setCustomerIdsByGroup] = useState<Record<string, Set<string>>>({});
+  const [groupNamesByCustomerId, setGroupNamesByCustomerId] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
 
@@ -237,19 +384,47 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
   const loadCustomers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await customersService.getCustomers({
-        currentPage: "1",
-        pageSize: "200",
-      });
+      const [customersResponse, tagsResponse, customerTagsResponse] = await Promise.all([
+        customersService.getCustomers({
+          currentPage: "1",
+          pageSize: "200",
+        }),
+        tagsService.getTags({
+          currentPage: "1",
+          pageSize: GROUP_FILTER_PAGE_SIZE,
+        }),
+        customerTagsService.getCustomerTags({
+          currentPage: "1",
+          pageSize: GROUP_FILTER_PAGE_SIZE,
+        }),
+      ]);
 
-      const data = response.responseData;
+      const data = customersResponse.responseData;
       const rows = data?.rows ?? [];
+      const tagRows = tagsResponse.responseData?.rows || [];
+      const customerTagRows = customerTagsResponse.responseData?.rows || [];
       const assigneeNameMap = await resolveAssigneeNameMap(rows);
-      const mappedCustomers = rows.map((row, idx) =>
-        mapApiRowToCustomerWithAssignee(row, idx, assigneeNameMap),
+      const tagNameById = tagRows.reduce<Record<string, string>>((acc, tag) => {
+        acc[tag.id] = tag.name;
+        return acc;
+      }, {});
+      const mappedGroupNamesByCustomerId = mapCustomerGroupNamesByCustomerId(
+        customerTagRows,
+        tagNameById,
       );
+      const mappedCustomers = rows.map((row, idx) =>
+        mapApiRowToCustomerWithAssignee(row, idx, assigneeNameMap, mappedGroupNamesByCustomerId),
+      );
+      const mappedGroupFilters = mapTagRowsToFilters(tagRows);
+      const mappedCustomerIdsByGroup = mapCustomerTagRows(customerTagRows);
 
       setCustomers(mappedCustomers);
+      setGroupFilters(mappedGroupFilters);
+      setCustomerIdsByGroup(mappedCustomerIdsByGroup);
+      setGroupNamesByCustomerId(mappedGroupNamesByCustomerId);
+      setActiveFilter((prev) =>
+        prev === "all" || mappedGroupFilters.some((filter) => filter.id === prev) ? prev : "all",
+      );
       onCountChange?.(data?.count ?? rows.length);
     } catch (error) {
       const msg =
@@ -269,18 +444,33 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
       all: customers.length,
     };
 
-    Object.values(CustomerStatus).forEach((status) => {
-      counts[status] = customers.filter((c) => c.status === status).length;
+    groupFilters.forEach((filter) => {
+      if (filter.id === "all") {
+        return;
+      }
+
+      const customerIds = customerIdsByGroup[filter.id];
+      if (!customerIds) {
+        counts[filter.id] = 0;
+        return;
+      }
+
+      counts[filter.id] = customers.filter((customer) => customerIds.has(customer.id)).length;
     });
 
     return counts;
-  }, [customers]);
+  }, [customerIdsByGroup, customers, groupFilters]);
 
   const filteredCustomers = useMemo(() => {
     let filtered = customers;
 
     if (activeFilter !== "all") {
-      filtered = filtered.filter((customer) => customer.status === activeFilter);
+      const customerIds = customerIdsByGroup[activeFilter];
+      if (!customerIds) {
+        return [];
+      }
+
+      filtered = filtered.filter((customer) => customerIds.has(customer.id));
     }
 
     if (!searchQuery.trim()) {
@@ -295,7 +485,7 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
         customer.mobilePhone.includes(query) ||
         customer.id.toLowerCase().includes(query),
     );
-  }, [customers, activeFilter, searchQuery]);
+  }, [activeFilter, customerIdsByGroup, customers, searchQuery]);
 
   const handleCustomerClick = async (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -311,6 +501,7 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
             detail,
             Math.max(customer.orderNumber - 1, 0),
             assigneeNameMap,
+            groupNamesByCustomerId,
           ),
         );
       }
@@ -330,23 +521,31 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
     setIsFormModalOpen(true);
   };
 
-  const handleSaveCustomer = async (customerData: Partial<Customer>) => {
+  const handleSaveCustomer = async (customerData: Partial<Customer>, groupIds: string[]) => {
     try {
+      let customerId: string | undefined;
+
       if (editingCustomer) {
         await customersService.updateCustomer(
           editingCustomer.id,
           mapFormToUpdatePayload(customerData),
         );
+        customerId = editingCustomer.id;
         toast.success(
           "Cập nhật thành công",
           `Khách hàng "${customerData.customerName}" đã được cập nhật.`,
         );
       } else {
-        await customersService.createCustomer(mapFormToCreatePayload(customerData));
+        const createResponse = await customersService.createCustomer(mapFormToCreatePayload(customerData));
+        customerId = createResponse.responseData?.id;
         toast.success(
           "Thêm mới thành công",
           `Khách hàng "${customerData.customerName}" đã được thêm vào danh sách.`,
         );
+      }
+
+      if (customerId) {
+        await syncCustomerGroups(customerId, groupIds);
       }
 
       await loadCustomers();
@@ -442,6 +641,7 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
         counts={filterCounts}
+        filters={groupFilters}
       />
 
       <CustomerSearch

@@ -4,11 +4,11 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
-import { CustomerStatus } from "@/types/customer";
-import { useState } from "react";
+import { tagsService } from "@/services/tags";
+import { useEffect, useState } from "react";
 
 export interface FilterValues {
-    status?: CustomerStatus;
+    groupId?: string;
     assignee?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -27,6 +27,30 @@ interface FilterModalProps {
 
 export function FilterModal({ isOpen, onClose, onApply, initialFilters = {} }: FilterModalProps) {
     const [filters, setFilters] = useState<FilterValues>(initialFilters);
+    const [groupOptions, setGroupOptions] = useState<Array<{ value: string; label: string }>>([
+        { value: "", label: "Tất cả nhóm" },
+    ]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        const loadGroups = async () => {
+            try {
+                const response = await tagsService.getTags({ currentPage: "1", pageSize: "5000" });
+                const options = (response.responseData?.rows || [])
+                    .map((tag) => ({ value: tag.id, label: tag.name }))
+                    .sort((a, b) => a.label.localeCompare(b.label, "vi"));
+
+                setGroupOptions([{ value: "", label: "Tất cả nhóm" }, ...options]);
+            } catch {
+                setGroupOptions([{ value: "", label: "Tất cả nhóm" }]);
+            }
+        };
+
+        void loadGroups();
+    }, [isOpen]);
 
     const handleApply = () => {
         onApply(filters);
@@ -60,19 +84,10 @@ export function FilterModal({ isOpen, onClose, onApply, initialFilters = {} }: F
             <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <Select
-                        label="Trạng thái khách hàng"
-                        value={filters.status || ""}
-                        onChange={(e) => setFilters({ ...filters, status: e.target.value as CustomerStatus })}
-                        options={[
-                            { value: "", label: "Tất cả trạng thái" },
-                            { value: CustomerStatus.NEW, label: "Mới" },
-                            { value: CustomerStatus.CONTACTED, label: "Đã liên hệ" },
-                            { value: CustomerStatus.QUOTED, label: "Dự báo giá" },
-                            { value: CustomerStatus.TESTED, label: "Đã test đầu vào" },
-                            { value: CustomerStatus.REGISTERED, label: "Đã đăng ký" },
-                            { value: CustomerStatus.CONSIDERING, label: "Đang cân nhắc" },
-                            { value: CustomerStatus.APPROACHED, label: "Đã tiếp cận" },
-                        ]}
+                        label="Nhóm khách hàng"
+                        value={filters.groupId || ""}
+                        onChange={(e) => setFilters({ ...filters, groupId: e.target.value })}
+                        options={groupOptions}
                     />
 
                     <Select

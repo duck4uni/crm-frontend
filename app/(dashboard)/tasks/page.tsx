@@ -10,7 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/ToastProvider";
 import { jobsService } from "@/services/jobs";
 import { usersService } from "@/services/users";
-import { JobApiRow, CreateJobPayload, UpdateJobPayload, UserApiRow } from "@/types/api";
+import { JobApiRow, JobTimeRange, CreateJobPayload, UpdateJobPayload, UserApiRow } from "@/types/api";
 import {
   FiPlus,
   FiSearch,
@@ -95,6 +95,22 @@ export default function TasksPage() {
     return user ? user.full_name || user.email : uuid.slice(0, 8) + "...";
   };
 
+  const getFormTimeFromApi = (jobTime: JobApiRow["job_time"]): { start: string; end: string } => {
+    if (Array.isArray(jobTime)) {
+      const firstRange = jobTime[0];
+      return {
+        start: firstRange?.start ?? "",
+        end: firstRange?.end ?? "",
+      };
+    }
+
+    const singleRange = jobTime ?? {};
+    return {
+      start: singleRange.start ?? "",
+      end: singleRange.end ?? "",
+    };
+  };
+
   const openCreateForm = () => {
     setEditingJob(null);
     setFormData(emptyFormData);
@@ -103,11 +119,11 @@ export default function TasksPage() {
 
   const openEditForm = (job: JobApiRow) => {
     setEditingJob(job);
-    const jt = (job.job_time ?? {}) as { start?: string; end?: string };
+    const jt = getFormTimeFromApi(job.job_time);
     setFormData({
       job_name: job.job_name,
       content: job.content,
-      job_time: { start: jt.start ?? "", end: jt.end ?? "" },
+      job_time: { start: jt.start, end: jt.end },
       performer_uuid: job.performer_uuid ?? "",
       customer_uuid: job.customer_uuid ?? "",
       status_id: job.status_id ?? "",
@@ -120,11 +136,11 @@ export default function TasksPage() {
     setIsDetailOpen(true);
   };
 
-  const buildPayloadTime = (): Record<string, unknown> => {
-    const time: Record<string, unknown> = {};
+  const buildPayloadTime = (): JobTimeRange[] => {
+    const time: JobTimeRange = {};
     if (formData.job_time.start) time.start = formData.job_time.start;
     if (formData.job_time.end) time.end = formData.job_time.end;
-    return time;
+    return Object.keys(time).length ? [time] : [];
   };
 
   const handleSaveJob = async () => {
@@ -287,7 +303,7 @@ export default function TasksPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredJobs.map((job) => {
-                const jt = (job.job_time ?? {}) as { start?: string; end?: string };
+                const jt = getFormTimeFromApi(job.job_time);
                 return (
                   <tr
                     key={job.id}
@@ -409,7 +425,7 @@ export default function TasksPage() {
         }
       >
         {selectedJob && (() => {
-          const jt = (selectedJob.job_time ?? {}) as { start?: string; end?: string };
+          const jt = getFormTimeFromApi(selectedJob.job_time);
           return (
             <div className="space-y-4">
               <div>

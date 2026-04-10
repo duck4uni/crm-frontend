@@ -21,6 +21,16 @@ export const customerTagsService = {
     return apiClient.get<GetCustomerTagsResponse>(CUSTOMER_TAGS_ENDPOINT, params);
   },
 
+  async getCustomerTagsByCustomerId(
+    customerId: string,
+    params?: Omit<PaginatedParams, "filters">,
+  ): Promise<GetCustomerTagsResponse> {
+    return apiClient.get<GetCustomerTagsResponse>(CUSTOMER_TAGS_ENDPOINT, {
+      ...params,
+      filters: buildEqualsFilter("customer_id", customerId),
+    });
+  },
+
   async getCustomerTagsByTagId(
     tagId: string,
     params?: Omit<PaginatedParams, "filters">,

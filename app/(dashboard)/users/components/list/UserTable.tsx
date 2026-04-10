@@ -9,6 +9,7 @@ import { useState } from "react";
 
 interface UserTableProps {
     users: UserProfile[];
+    userRolesByUser?: Record<string, string[]>;
     onUserClick?: (user: UserProfile) => void;
     onUserEdit?: (user: UserProfile) => void;
 }
@@ -16,7 +17,7 @@ interface UserTableProps {
 type SortField = keyof UserProfile | null;
 type SortDirection = "asc" | "desc";
 
-export function UserTable({ users, onUserClick, onUserEdit }: UserTableProps) {
+export function UserTable({ users, userRolesByUser = {}, onUserClick, onUserEdit }: UserTableProps) {
     const [sortField, setSortField] = useState<SortField>(null);
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -64,6 +65,26 @@ export function UserTable({ users, onUserClick, onUserEdit }: UserTableProps) {
         return <Badge variant="warning">Ngưng hoạt động</Badge>;
     };
 
+    const renderRoleBadges = (userId: string) => {
+        const roles = userRolesByUser[userId] || [];
+
+        if (roles.length === 0) {
+            return <span className="text-sm text-gray-400">Chưa gán quyền</span>;
+        }
+
+        const primaryRoles = roles.slice(0, 2);
+        const remaining = roles.length - primaryRoles.length;
+
+        return (
+            <div className="flex flex-wrap items-center gap-1.5">
+                {primaryRoles.map((role) => (
+                    <Badge key={role} variant="info">{role}</Badge>
+                ))}
+                {remaining > 0 && <span className="text-xs text-gray-500">+{remaining}</span>}
+            </div>
+        );
+    };
+
     return (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
@@ -81,10 +102,9 @@ export function UserTable({ users, onUserClick, onUserEdit }: UserTableProps) {
                             <TableHeader label="Họ tên" field="full_name" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <TableHeader label="Email" field="email" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <TableHeader label="Số điện thoại" field="phone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Ngày sinh" field="birthday" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vai trò</th>
                             <TableHeader label="Trạng thái" field="is_active" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <TableHeader label="Ngày tạo" field="created_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Cập nhật" field="updated_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Thao tác</th>
                         </tr>
                     </thead>
@@ -107,15 +127,10 @@ export function UserTable({ users, onUserClick, onUserEdit }: UserTableProps) {
                                 </td>
                                 <td className="px-4 py-4 text-sm text-gray-600">{user.email}</td>
                                 <td className="px-4 py-4 text-sm text-gray-900">{user.phone || "-"}</td>
-                                <td className="px-4 py-4 text-sm text-gray-600">
-                                    {user.birthday ? formatDateVN(user.birthday) : "-"}
-                                </td>
+                                <td className="px-4 py-4">{renderRoleBadges(user.id)}</td>
                                 <td className="px-4 py-4">{getStatusBadge(user)}</td>
                                 <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
                                     {formatDateVN(user.created_at)}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
-                                    {formatDateVN(user.updated_at)}
                                 </td>
                                 <td className="px-4 py-4">
                                     <div className="flex items-center space-x-2">
