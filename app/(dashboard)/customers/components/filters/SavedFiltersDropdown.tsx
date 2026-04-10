@@ -22,13 +22,13 @@ const MOCK_SAVED_FILTERS: SavedFilter[] = [
     {
         id: "1",
         name: "KH tiềm năng tháng này",
-        filters: { status: "qualified" as any, dateFrom: "2026-03-01", dateTo: "2026-03-31" },
+        filters: { groupId: "", dateFrom: "2026-03-01", dateTo: "2026-03-31" },
         createdAt: "2026-03-15",
     },
     {
         id: "2",
         name: "KH đã liên hệ chưa xử lý",
-        filters: { status: "contacted" as any },
+        filters: { groupId: "" },
         createdAt: "2026-03-10",
     },
     {

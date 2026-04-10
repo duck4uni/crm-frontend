@@ -7,12 +7,19 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { tagsService } from "@/services/tags";
+import { customerTagsService } from "@/services/customer-tags";
 
 interface CustomerFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (customer: Partial<Customer>) => Promise<void>;
+    onSave: (customer: Partial<Customer>, groupIds: string[]) => Promise<void>;
     customer?: Customer | null; // If provided, we're editing; otherwise, creating
+}
+
+interface GroupOption {
+    id: string;
+    name: string;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -69,9 +76,16 @@ export function CustomerFormModal({
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
+    const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+    const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+    const [isLoadingGroups, setIsLoadingGroups] = useState(false);
 
     // Initialize form with customer data if editing
     useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
         if (customer) {
             setFormData({
                 ...customer,
@@ -101,6 +115,56 @@ export function CustomerFormModal({
             });
         }
         setErrors({});
+
+        let isDisposed = false;
+
+        const loadGroups = async () => {
+            setIsLoadingGroups(true);
+
+            try {
+                const [tagsResponse, customerTagsResponse] = await Promise.all([
+                    tagsService.getTags({ currentPage: "1", pageSize: "5000" }),
+                    customer?.id
+                        ? customerTagsService.getCustomerTagsByCustomerId(customer.id, {
+                            currentPage: "1",
+                            pageSize: "5000",
+                        })
+                        : Promise.resolve(null),
+                ]);
+
+                if (isDisposed) {
+                    return;
+                }
+
+                const groups = (tagsResponse.responseData?.rows || [])
+                    .map((tag) => ({ id: tag.id, name: tag.name }))
+                    .sort((a, b) => a.name.localeCompare(b.name, "vi"));
+
+                const nextSelectedIds = customerTagsResponse?.responseData?.rows
+                    ? Array.from(new Set(customerTagsResponse.responseData.rows.map((row) => row.tag_id)))
+                    : [];
+
+                setGroupOptions(groups);
+                setSelectedGroupIds(nextSelectedIds);
+            } catch {
+                if (isDisposed) {
+                    return;
+                }
+
+                setGroupOptions([]);
+                setSelectedGroupIds([]);
+            } finally {
+                if (!isDisposed) {
+                    setIsLoadingGroups(false);
+                }
+            }
+        };
+
+        void loadGroups();
+
+        return () => {
+            isDisposed = true;
+        };
     }, [customer, isOpen]);
 
     const handleChange = (
@@ -167,13 +231,21 @@ export function CustomerFormModal({
                 ...(isEditing ? {} : { createdDate: new Date() }),
             };
 
-            await onSave(customerData);
+            await onSave(customerData, selectedGroupIds);
             onClose();
         } catch {
             // Parent handles toast/error display.
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const toggleGroupSelection = (groupId: string) => {
+        setSelectedGroupIds((prev) =>
+            prev.includes(groupId)
+                ? prev.filter((id) => id !== groupId)
+                : [...prev, groupId],
+        );
     };
 
     const salutationOptions = [
@@ -342,6 +414,57 @@ export function CustomerFormModal({
                             placeholder="VD: Khách hàng mới, Khách cũ..."
                             disabled={isLoading}
                         />
+                    </div>
+                </div>
+
+                <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Nhóm khách hàng</h3>
+
+                    <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+                        <p className="text-sm text-gray-600">
+                            Có thể chọn 1 hoặc nhiều nhóm cho mỗi khách hàng.
+                        </p>
+
+                        {isLoadingGroups && (
+                            <p className="text-sm text-gray-500">Đang tải danh sách nhóm...</p>
+                        )}
+
+                        {!isLoadingGroups && groupOptions.length === 0 && (
+                            <p className="text-sm text-gray-500">
+                                Chưa có nhóm khách hàng. Vui lòng tạo nhóm trong mục Quản lý nhóm khách hàng.
+                            </p>
+                        )}
+
+                        {!isLoadingGroups && groupOptions.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {groupOptions.map((group) => {
+                                    const isChecked = selectedGroupIds.includes(group.id);
+
+                                    return (
+                                        <label
+                                            key={group.id}
+                                            className={`
+                                                flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer transition-colors
+                                                ${isChecked ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"}
+                                            `}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => toggleGroupSelection(group.id)}
+                                                disabled={isLoading}
+                                                className="rounded border-gray-300"
+                                            />
+                                            <span className="text-sm text-gray-900">{group.name}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <p className="text-xs text-gray-500">
+                            Đã chọn {selectedGroupIds.length} nhóm.
+                        </p>
                     </div>
                 </div>
 

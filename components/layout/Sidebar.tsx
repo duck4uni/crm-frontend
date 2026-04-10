@@ -30,7 +30,7 @@ const navigation = [
   { name: "Bảng điều khiển", href: "/", icon: FiHome },
   { name: "Khách hàng", href: "/customers", icon: FiUsers },
   { name: "Người dùng", href: "/users", icon: FiUser },
-  { name: "Phân quyền", href: "/permissions", icon: FiShield },
+  // { name: "Phân quyền", href: "/permissions", icon: FiShield },
   { name: "Công việc", href: "/tasks", icon: FiCheckSquare },
   { name: "Thông báo", href: "/notifications", icon: FiBell },
   // { name: "Quản lý Tags", href: "/tags", icon: FiTag },

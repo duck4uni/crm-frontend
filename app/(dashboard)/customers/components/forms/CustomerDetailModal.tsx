@@ -251,6 +251,23 @@ export function CustomerDetailModal({
                     </div>
                 </div>
 
+                <div>
+                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
+                        Nhóm khách hàng
+                    </h4>
+                    {customer.groups && customer.groups.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {customer.groups.map((groupName) => (
+                                <Badge key={groupName} variant="info">
+                                    {groupName}
+                                </Badge>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-500">Khách hàng chưa thuộc nhóm nào</p>
+                    )}
+                </div>
+
                 {/* Sessions Information */}
                 {(customer.sessionCount !== undefined ||
                     customer.remainingSessions !== undefined) && (

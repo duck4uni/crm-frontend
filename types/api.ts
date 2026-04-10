@@ -432,6 +432,11 @@ export interface PermissionApiRow {
   group_code: string;
 }
 
+export interface JobTimeRange {
+  start?: string;
+  end?: string;
+}
+
 export interface CreatePermissionPayload {
   name: string;
   code: string;
@@ -450,7 +455,7 @@ export interface UpdatePermissionPayload {
 export interface JobApiRow {
   id: string;
   job_name: string;
-  job_time: Record<string, unknown>;
+  job_time: JobTimeRange[] | JobTimeRange | null;
   content: string;
   performer_uuid: string | null;
   customer_uuid: string | null;
@@ -462,7 +467,7 @@ export interface JobApiRow {
 
 export interface CreateJobPayload {
   job_name: string;
-  job_time: Record<string, unknown>;
+  job_time: JobTimeRange[];
   content: string;
   performer_uuid?: string;
   customer_uuid?: string;
@@ -471,7 +476,7 @@ export interface CreateJobPayload {
 
 export interface UpdateJobPayload {
   job_name?: string;
-  job_time?: Record<string, unknown>;
+  job_time?: JobTimeRange[];
   content?: string;
   performer_uuid?: string;
   customer_uuid?: string;

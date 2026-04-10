@@ -21,6 +21,16 @@ export const userTagsService = {
         return apiClient.get<GetUserTagsResponse>(USER_TAGS_ENDPOINT, params);
     },
 
+    async getUserTagsByUserId(
+        userId: string,
+        params?: Omit<PaginatedParams, "filters">,
+    ): Promise<GetUserTagsResponse> {
+        return apiClient.get<GetUserTagsResponse>(USER_TAGS_ENDPOINT, {
+            ...params,
+            filters: buildEqualsFilter("user_id", userId),
+        });
+    },
+
     async getUserTagsByTagId(
         tagId: string,
         params?: Omit<PaginatedParams, "filters">,
