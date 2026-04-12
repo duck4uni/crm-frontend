@@ -6,7 +6,7 @@ export interface JourneyStage {
   description?: string;
   count: number;
   percentage: number;
-  color: string; // Border color for the stage card
+  color: string;
   category: JourneyCategory;
   order: number;
 }

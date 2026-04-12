@@ -2,7 +2,7 @@ export interface ConversionMetricItem {
   label: string;
   value: number;
   percentage?: number;
-  indent?: number; // 0, 1, 2 for different levels
+  indent?: number;
 }
 
 export interface ConversionStage {
@@ -11,7 +11,7 @@ export interface ConversionStage {
   title: string;
   total: number;
   items: ConversionMetricItem[];
-  isRevenue?: boolean; // Special styling for revenue stage
+  isRevenue?: boolean;
 }
 
 export interface ConversionRateData {
