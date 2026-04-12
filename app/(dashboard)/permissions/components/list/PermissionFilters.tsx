@@ -10,7 +10,7 @@ interface PermissionFiltersProps {
 
 const PERMISSION_FILTERS = [
     { id: "all", label: "Tất cả", bgColor: "bg-gray-100", textColor: "text-gray-700", activeBgColor: "bg-gray-700", activeTextColor: "text-white" },
-    { id: PermissionGroup.USER, label: "Người dùng", bgColor: "bg-blue-100", textColor: "text-blue-700", activeBgColor: "bg-blue-600", activeTextColor: "text-white" },
+    { id: PermissionGroup.USER, label: "Người dùng", bgColor: "bg-primary-100", textColor: "text-primary-700", activeBgColor: "bg-primary-600", activeTextColor: "text-white" },
     { id: PermissionGroup.CUSTOMER, label: "Khách hàng", bgColor: "bg-green-100", textColor: "text-green-700", activeBgColor: "bg-green-600", activeTextColor: "text-white" },
     { id: PermissionGroup.DEAL, label: "Thương vụ", bgColor: "bg-purple-100", textColor: "text-purple-700", activeBgColor: "bg-purple-600", activeTextColor: "text-white" },
     { id: PermissionGroup.TASK, label: "Công việc", bgColor: "bg-yellow-100", textColor: "text-yellow-700", activeBgColor: "bg-yellow-600", activeTextColor: "text-white" },

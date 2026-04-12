@@ -3,13 +3,14 @@
 import { Customer } from "@/types/customer";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDateVN } from "@/lib/utils";
-import { FiEye, FiEdit2 } from "react-icons/fi";
+import { FiEye, FiEdit2, FiTrash2 } from "react-icons/fi";
 import { useState } from "react";
 
 interface CustomerTableProps {
   customers: Customer[];
   onCustomerClick?: (customer: Customer) => void;
   onCustomerEdit?: (customer: Customer) => void;
+  onCustomerDelete?: (customer: Customer) => void;
 }
 
 type SortField = keyof Customer | null;
@@ -29,6 +30,7 @@ export function CustomerTable({
   customers,
   onCustomerClick,
   onCustomerEdit,
+  onCustomerDelete,
 }: CustomerTableProps) {
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -56,9 +58,8 @@ export function CustomerTable({
   });
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
+    <div className="overflow-x-auto">
+      <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <TableHeader label="Tên khách hàng" field="customerName" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
@@ -76,27 +77,11 @@ export function CustomerTable({
                 customer={customer}
                 onView={onCustomerClick}
                 onEdit={onCustomerEdit}
+                onDelete={onCustomerDelete}
               />
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-        <div className="flex items-center space-x-2">
-          <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">
-            &lt;
-          </button>
-          <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">
-            &gt;
-          </button>
-        </div>
-        <div className="text-sm text-gray-600">
-          <span className="mr-2">Tùy chỉnh</span>
-          <span>Hiển thị 20 kết quả/trang</span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -121,7 +106,7 @@ function TableHeader({ label, field, onSort, sortField, sortDirection }: TableHe
       <div className="flex items-center space-x-1">
         <span>{label}</span>
         {isSorted && (
-          <span className="text-blue-600">
+          <span className="text-primary-600">
             {sortDirection === "asc" ? "↑" : "↓"}
           </span>
         )}
@@ -135,9 +120,10 @@ interface CustomerTableRowProps {
   customer: Customer;
   onView?: (customer: Customer) => void;
   onEdit?: (customer: Customer) => void;
+  onDelete?: (customer: Customer) => void;
 }
 
-function CustomerTableRow({ customer, onView, onEdit }: CustomerTableRowProps) {
+function CustomerTableRow({ customer, onView, onEdit, onDelete }: CustomerTableRowProps) {
   const gender = GENDER_LABELS[customer.gender] ?? customer.gender;
   const assignee = ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee;
   const phone = customer.mobilePhone || customer.phone || "-";
@@ -160,7 +146,7 @@ function CustomerTableRow({ customer, onView, onEdit }: CustomerTableRowProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => onView?.(customer)}
-            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            className="p-1.5 text-primary-600 hover:bg-primary-50 rounded transition-colors"
             title="Xem chi tiết"
           >
             <FiEye className="w-4 h-4" />
@@ -171,6 +157,13 @@ function CustomerTableRow({ customer, onView, onEdit }: CustomerTableRowProps) {
             title="Chỉnh sửa"
           >
             <FiEdit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onDelete?.(customer)}
+            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+            title="Xóa"
+          >
+            <FiTrash2 className="w-4 h-4" />
           </button>
         </div>
       </td>

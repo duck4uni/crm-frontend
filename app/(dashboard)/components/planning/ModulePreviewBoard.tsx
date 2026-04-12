@@ -55,10 +55,10 @@ export function ModulePreviewBoard({ moduleName, moduleDescription, items }: Mod
 
   return (
     <div className="space-y-6">
-      <Card className="border border-blue-100 bg-blue-50/60">
-        <CardContent className="py-4 text-sm text-blue-900">
+      <Card className="border border-primary-100 bg-primary-50/60">
+        <CardContent className="py-4 text-sm text-primary-900">
           <strong>{moduleName}</strong>: {moduleDescription}
-          <p className="mt-1 text-blue-800">
+          <p className="mt-1 text-primary-800">
             Bản dựng UI trước để chốt luồng nghiệp vụ. Những mục chưa có API sẽ được nối dữ liệu ở sprint backend tiếp theo.
           </p>
         </CardContent>

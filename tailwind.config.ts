@@ -8,7 +8,7 @@ const config: Config = {
   ],
   safelist: [
     // Background colors
-    'bg-blue-500', 'bg-blue-600',
+    'bg-primary-500', 'bg-primary-600',
     'bg-green-500', 'bg-green-600',
     'bg-orange-500', 'bg-orange-600', 'bg-orange-700',
     'bg-yellow-500', 'bg-yellow-600',
@@ -30,18 +30,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Primary: Indigo — matches mobile theme PRIMARY #4F46E5
         primary: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
-          950: "#172554",
+          50:  "#eef2ff",
+          100: "#e0e7ff",
+          200: "#c7d2fe",
+          300: "#a5b4fc",
+          400: "#818cf8",
+          500: "#6366f1", // PRIMARY_LIGHT
+          600: "#4f46e5", // PRIMARY (main)
+          700: "#4338ca", // PRIMARY_DARK
+          800: "#3730a3",
+          900: "#312e81",
+          950: "#1e1b4b",
+        },
+        // Secondary: Cyan — matches mobile theme SECONDARY #06B6D4
+        secondary: {
+          400: "#22d3ee",
+          500: "#06b6d4",
+          600: "#0891b2",
         },
       },
     },

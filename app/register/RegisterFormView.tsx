@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FiUserPlus } from "react-icons/fi";
-import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
+import Image from "next/image";
+import { useState } from "react";
+import { FiUserPlus, FiUser, FiMail, FiPhone, FiLock, FiEye, FiEyeOff } from "react-icons/fi";
 import { Spinner } from "@/components/ui/Spinner";
 import { RegisterFormBindings } from "./useRegisterForm";
 
@@ -16,77 +15,136 @@ export function RegisterFormView({
     handleInputChange,
     handleSubmit,
 }: RegisterFormBindings) {
+    const [showPassword, setShowPassword] = useState(false);
+
+    const fields = [
+        {
+            key: "full_name" as const,
+            label: "Họ và tên",
+            type: "text",
+            placeholder: "Nguyễn Văn A",
+            autoComplete: "name",
+            icon: FiUser,
+        },
+        {
+            key: "email" as const,
+            label: "Email",
+            type: "email",
+            placeholder: "example@domain.com",
+            autoComplete: "email",
+            icon: FiMail,
+        },
+        {
+            key: "phone" as const,
+            label: "Số điện thoại",
+            type: "tel",
+            placeholder: "0123 456 789",
+            autoComplete: "tel",
+            icon: FiPhone,
+        },
+    ];
+
     return (
-        <div className="relative min-h-screen overflow-hidden bg-slate-950">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.22),_transparent_44%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.16),_transparent_45%)]" />
+        <div className="relative min-h-screen overflow-hidden bg-indigo-950">
+            {/* background blobs */}
+            <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-indigo-700/20 blur-3xl" />
+                <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-teal-600/15 blur-3xl" />
+            </div>
+
             <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
-                <div className="grid w-full items-center gap-8 lg:grid-cols-[1.2fr_460px]">
-                    <section className="hidden lg:block text-white">
-                        <span className="inline-flex items-center rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-200">
-                            CRM Registration
-                        </span>
-                        <h1 className="mt-5 text-4xl font-bold leading-tight text-balance">
-                            Tạo tài khoản CRM cho đội ngũ của bạn
-                        </h1>
-                        <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-300">
-                            Bắt đầu quản lý khách hàng, thương vụ và quy trình vận hành ngay hôm nay.
-                        </p>
+                <div className="grid w-full items-center gap-12 lg:grid-cols-[1fr_460px]">
+                    {/* Hero section */}
+                    <section className="hidden lg:flex lg:flex-col">
+                        <div className="mt-0">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-300">
+                                <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
+                                Tạo tài khoản mới
+                            </span>
+                            <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-white">
+                                Bắt đầu hành trình<br />
+                                <span className="text-indigo-300">quản lý</span> chuyên nghiệp.
+                            </h1>
+                            <p className="mt-4 max-w-md text-base leading-relaxed text-indigo-200/70">
+                                Tạo tài khoản và trải nghiệm hệ thống CRM toàn diện ngay hôm nay.
+                            </p>
+                        </div>
+                        <div className="mt-12 flex flex-col gap-3">
+                            {[
+                                "Miễn phí trong 30 ngày đầu",
+                                "Hỗ trợ nhập liệu hàng loạt từ Excel",
+                                "Báo cáo & thống kê tức thì",
+                            ].map((text) => (
+                                <div key={text} className="flex items-center gap-3 text-sm text-indigo-200/80">
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-400">
+                                        <svg viewBox="0 0 12 12" fill="currentColor" className="h-3 w-3">
+                                            <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </span>
+                                    {text}
+                                </div>
+                            ))}
+                        </div>
                     </section>
 
-                    <Card className="border border-white/15 bg-white/95 shadow-2xl backdrop-blur-sm">
-                        <CardHeader className="space-y-2 border-b border-gray-100">
-                            <CardTitle className="text-2xl">Đăng ký tài khoản</CardTitle>
-                            <p className="text-sm text-gray-600">
-                                Nhập đầy đủ thông tin để tạo tài khoản mới.
-                            </p>
-                        </CardHeader>
-                        <CardContent>
-                            <form className="space-y-4" onSubmit={handleSubmit}>
-                                <Input
-                                    label="Họ và tên"
-                                    placeholder="Nhập họ và tên"
-                                    value={form.full_name}
-                                    onChange={(event) => handleInputChange("full_name", event.target.value)}
-                                    error={errors.full_name}
-                                    disabled={isPending}
-                                />
+                    {/* Form card */}
+                    <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-1 shadow-2xl backdrop-blur-xl">
+                        <div className="rounded-xl bg-white px-8 py-10">
+                            {/* Logo */}
+                            <div className="mb-6 flex justify-center">
+                                <Image src="/logo.png" alt="CRM Logo" width={130} height={40} className="object-contain" priority />
+                            </div>
 
-                                <Input
-                                    label="Email"
-                                    type="email"
-                                    placeholder="example@domain.com"
-                                    value={form.email}
-                                    onChange={(event) => handleInputChange("email", event.target.value)}
-                                    error={errors.email}
-                                    autoComplete="email"
-                                    disabled={isPending}
-                                />
+                            <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+                                {fields.map(({ key, label, type, placeholder, autoComplete, icon: Icon }) => (
+                                    <div key={key}>
+                                        <label className="mb-1.5 block text-sm font-medium text-gray-700">{label}</label>
+                                        <div className="relative">
+                                            <Icon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                            <input
+                                                type={type}
+                                                placeholder={placeholder}
+                                                value={form[key]}
+                                                onChange={(e) => handleInputChange(key, e.target.value)}
+                                                autoComplete={autoComplete}
+                                                disabled={isPending}
+                                                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 transition"
+                                            />
+                                        </div>
+                                        {errors[key] && <p className="mt-1 text-xs text-red-500">{errors[key]}</p>}
+                                    </div>
+                                ))}
 
-                                <Input
-                                    label="Số điện thoại"
-                                    placeholder="Nhập số điện thoại"
-                                    value={form.phone}
-                                    onChange={(event) => handleInputChange("phone", event.target.value)}
-                                    error={errors.phone}
-                                    autoComplete="tel"
-                                    disabled={isPending}
-                                />
+                                {/* Password */}
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-medium text-gray-700">Mật khẩu</label>
+                                    <div className="relative">
+                                        <FiLock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Tối thiểu 8 ký tự"
+                                            value={form.password}
+                                            onChange={(e) => handleInputChange("password", e.target.value)}
+                                            autoComplete="new-password"
+                                            disabled={isPending}
+                                            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-11 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 transition"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword((p) => !p)}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            tabIndex={-1}
+                                        >
+                                            {showPassword ? <FiEyeOff className="h-4 w-4" /> : <FiEye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                    {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password}</p>}
+                                </div>
 
-                                <Input
-                                    label="Mật khẩu"
-                                    type="password"
-                                    placeholder="Tối thiểu 8 ký tự"
-                                    value={form.password}
-                                    onChange={(event) => handleInputChange("password", event.target.value)}
-                                    error={errors.password}
-                                    autoComplete="new-password"
-                                    disabled={isPending}
-                                />
-
-                                <Button
+                                <button
                                     type="submit"
-                                    className="w-full gap-2"
                                     disabled={isPending || !canSubmit}
+                                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 transition mt-2"
                                 >
                                     {isPending ? (
                                         <Spinner size="sm" className="border-2 border-white/40 border-t-white" />
@@ -94,17 +152,17 @@ export function RegisterFormView({
                                         <FiUserPlus className="h-4 w-4" />
                                     )}
                                     {isPending ? "Đang tạo tài khoản..." : "Đăng ký"}
-                                </Button>
+                                </button>
 
-                                <p className="text-center text-sm text-gray-600">
+                                <p className="text-center text-sm text-gray-500">
                                     Đã có tài khoản?{" "}
-                                    <Link href="/login" className="font-medium text-primary-600 hover:text-primary-700">
+                                    <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
                                         Đăng nhập
                                     </Link>
                                 </p>
                             </form>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

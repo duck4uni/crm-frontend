@@ -77,11 +77,11 @@ class ApiClient {
       const nextAccessToken = data.responseData?.accessToken;
       const nextExpiresIn = data.responseData?.expiresIn;
 
-      if (!nextAccessToken || !nextExpiresIn) {
+      if (!nextAccessToken) {
         return null;
       }
 
-      setAccessTokenSession(nextAccessToken, nextExpiresIn);
+      setAccessTokenSession(nextAccessToken, nextExpiresIn ?? "");
       return nextAccessToken;
     } catch (error) {
       console.error("Refresh access token failed:", error);
@@ -138,6 +138,7 @@ class ApiClient {
 
         clearAuthSession();
         this.redirectToLoginIfNeeded(endpoint);
+        throw new Error("Session expired. Please login again.");
       }
 
       if (!response.ok) {

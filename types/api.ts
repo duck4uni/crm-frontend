@@ -112,6 +112,23 @@ export interface RegisterUserResponse {
   birthday: string | null;
 }
 
+export interface PermissionInfo {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  group_code: string;
+}
+
+export interface UserPermissionData {
+  id: string;
+  user_id: string;
+  permision_id: string;
+  updated_at: string | null;
+  updated_by: string | null;
+  permision: PermissionInfo;
+}
+
 export interface MyInfoResponseData {
   id: string;
   email: string;
@@ -125,6 +142,7 @@ export interface MyInfoResponseData {
   is_active: boolean;
   birthday: string | null;
   is_delete: boolean;
+  user_permisions?: UserPermissionData[];
 }
 
 export interface NotificationApiRow {
@@ -205,6 +223,18 @@ export interface UserApiRow {
   tags?: string[];
 }
 
+export interface AdminUserPermissionApiRow {
+  id: string;
+  permision: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface AdminUserApiRow extends UserApiRow {
+  user_permisions: AdminUserPermissionApiRow[];
+}
+
 export interface CreateUserPayload {
   email: string;
   full_name?: string;
@@ -252,6 +282,7 @@ export interface CustomerApiRow {
   updated_by: string | null;
   is_active: boolean;
   is_delete: boolean;
+  customer_source_id: string | null;
   tags?: string[];
 }
 
@@ -358,6 +389,16 @@ export interface CreateAdminPayload {
   phone?: string;
   password: string;
 }
+
+export interface CreateAdminUserRow {
+  id: string;
+  user_id: string;
+  permision_id: string;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export type CreateAdminUsersResponse = ApiEnvelope<CreateAdminUserRow[]>;
 
 // ── Tags ───────────────────────────────────────────────────────────
 export interface TagApiRow {
@@ -544,6 +585,7 @@ export type RefreshAccessTokenResponse = ApiEnvelope<RefreshAccessTokenData>;
 export type GetMyInfoResponse = ApiEnvelope<MyInfoResponseData>;
 export type UpdatePasswordResponse = ApiEnvelope<Record<string, never>>;
 export type GetUsersResponse = ApiEnvelope<PaginatedRows<UserApiRow>>;
+export type GetAdminUsersResponse = ApiEnvelope<PaginatedRows<AdminUserApiRow>>;
 export type GetUserResponse = ApiEnvelope<UserApiRow>;
 export type CreateUsersResponse = ApiEnvelope<UserApiRow[]>;
 export type UpdateUserResponse = ApiEnvelope<UserApiRow>;

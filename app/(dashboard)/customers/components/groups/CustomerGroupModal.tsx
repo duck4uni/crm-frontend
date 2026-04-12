@@ -429,7 +429,7 @@ export function CustomerGroupModal({
           {!isCreating ? (
             <button
               onClick={() => setIsCreating(true)}
-              className="w-full flex items-center justify-center gap-2 py-2 text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 text-primary-600 hover:text-primary-700 font-medium text-sm transition-colors"
               disabled={isSaving}
             >
               <Plus className="w-4 h-4" />
@@ -488,13 +488,13 @@ export function CustomerGroupModal({
                   p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md group
                   ${
                     selectedGroupId === group.id
-                      ? "border-blue-500 bg-blue-50"
+                      ? "border-primary-500 bg-primary-50"
                       : "border-gray-200 hover:border-gray-300 bg-white"
                   }
                 `}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+                  <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
                     <Users className="w-5 h-5" />
                   </div>
 
@@ -529,7 +529,7 @@ export function CustomerGroupModal({
                       <>
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold text-gray-900">{group.name}</h4>
-                          {selectedGroupId === group.id && <Check className="w-5 h-5 text-blue-600" />}
+                          {selectedGroupId === group.id && <Check className="w-5 h-5 text-primary-600" />}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{group.customerCount} khách hàng</p>
                       </>

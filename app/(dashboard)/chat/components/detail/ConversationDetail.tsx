@@ -55,12 +55,12 @@ export function ConversationDetail({
                   key={message.id}
                   className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                     message.isMine
-                      ? "ml-auto bg-blue-600 text-white"
+                      ? "ml-auto bg-primary-600 text-white"
                       : "mr-auto bg-white text-gray-800"
                   }`}
                 >
                   <p>{message.content}</p>
-                  <p className={`mt-1 text-xs ${message.isMine ? "text-blue-100" : "text-gray-500"}`}>
+                  <p className={`mt-1 text-xs ${message.isMine ? "text-primary-100" : "text-gray-500"}`}>
                     {message.senderName} - {message.sentAt}
                   </p>
                 </div>

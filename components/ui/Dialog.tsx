@@ -42,14 +42,14 @@ export function Dialog({
     if (!isOpen) return null;
 
     const icons = {
-        info: <FiInfo className="w-6 h-6 text-blue-600" />,
+        info: <FiInfo className="w-6 h-6 text-primary-600" />,
         warning: <FiAlertTriangle className="w-6 h-6 text-yellow-600" />,
         success: <FiCheckCircle className="w-6 h-6 text-green-600" />,
         danger: <FiAlertTriangle className="w-6 h-6 text-red-600" />,
     };
 
     const bgColors = {
-        info: "bg-blue-100",
+        info: "bg-primary-100",
         warning: "bg-yellow-100",
         success: "bg-green-100",
         danger: "bg-red-100",
@@ -113,7 +113,6 @@ export function Dialog({
     );
 }
 
-// Hook để sử dụng Dialog dễ dàng hơn
 export function useDialog() {
     const [isOpen, setIsOpen] = React.useState(false);
     const [config, setConfig] = React.useState<Omit<DialogProps, "isOpen" | "onClose">>({

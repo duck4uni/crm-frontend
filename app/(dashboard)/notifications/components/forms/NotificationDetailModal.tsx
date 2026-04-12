@@ -61,7 +61,7 @@ export function NotificationDetailModal({
                 {/* Title and Category */}
                 <div>
                     <div className="flex items-center space-x-3 mb-2">
-                        <FiBell className="w-5 h-5 text-blue-600" />
+                        <FiBell className="w-5 h-5 text-primary-600" />
                         <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
                     </div>
                     <div className="flex items-center space-x-2">

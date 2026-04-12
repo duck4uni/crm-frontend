@@ -47,7 +47,7 @@ export function ConversationList({
                 onClick={() => onSelectConversation(conversation.id)}
                 className={`w-full rounded-lg border p-3 text-left transition ${
                   isActive
-                    ? "border-blue-300 bg-blue-50"
+                    ? "border-primary-300 bg-primary-50"
                     : "border-gray-200 bg-white hover:border-gray-300"
                 }`}
               >

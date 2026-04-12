@@ -19,6 +19,21 @@ export interface Customer {
   status: CustomerStatus;
   avatar?: string;
   groups?: string[];
+  // API-matched fields
+  type?: string;
+  company_name?: string;
+  company_establish_date?: Date;
+  description?: string;
+  day_of_birth?: Date;
+  major?: string;
+  id_no?: string;
+  id_issued_by?: string;
+  id_issued_date?: Date;
+  id_issued_place?: string;
+  tax_code?: string;
+  note?: string;
+  website?: string;
+  is_active?: boolean;
 }
 
 export enum CustomerStatus {

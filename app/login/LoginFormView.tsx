@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
-import { FiLogIn } from "react-icons/fi";
-import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
+import { FiLogIn, FiEye, FiEyeOff, FiUser, FiLock } from "react-icons/fi";
 import { Spinner } from "@/components/ui/Spinner";
 import { LoginFormBindings } from "./useLoginForm";
-import { ForgotPasswordModal } from "./ForgotPasswordModal";
 
 export function LoginFormView({
     form,
@@ -19,113 +16,156 @@ export function LoginFormView({
     handleInputChange,
     handleSubmit,
 }: LoginFormBindings) {
-    const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     return (
         <>
-            <div className="relative min-h-screen overflow-hidden bg-slate-950">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.24),_transparent_42%),radial-gradient(circle_at_bottom_left,_rgba(14,165,233,0.18),_transparent_45%)]" />
+            {/* Redirect overlay */}
+            {isRedirecting && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-indigo-950/90 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-10 py-8 text-center text-white shadow-2xl">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600/30 ring-2 ring-indigo-400/40">
+                            <Spinner size="sm" className="border-2 border-indigo-300/40 border-t-indigo-200" />
+                        </div>
+                        <div>
+                            <p className="text-base font-semibold">Đăng nhập thành công!</p>
+                            <p className="mt-1 text-sm text-indigo-200">Đang chuyển vào hệ thống...</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="relative min-h-screen overflow-hidden bg-indigo-950">
+                {/* background blobs */}
+                <div className="pointer-events-none absolute inset-0">
+                    <div className="absolute -top-40 -right-40 h-[600px] w-[600px] rounded-full bg-indigo-700/20 blur-3xl" />
+                    <div className="absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-teal-600/15 blur-3xl" />
+                    <div className="absolute top-1/2 left-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/10 blur-2xl" />
+                </div>
+
                 <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
-                    <div className="grid w-full items-center gap-8 lg:grid-cols-[1.2fr_420px]">
-                        <section className="hidden lg:block text-white">
-                            <span className="inline-flex items-center rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-200">
-                                CRM Authentication
-                            </span>
-                            <h1 className="mt-5 text-4xl font-bold leading-tight text-balance">
-                                Đăng nhập vào hệ thống CRM doanh nghiệp
-                            </h1>
-                            <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-300">
-                                Quản lý khách hàng, thương vụ và vận hành đội ngũ trên một nền tảng thống nhất.
-                            </p>
+                    <div className="grid w-full items-center gap-12 lg:grid-cols-[1fr_440px]">
+                        {/* Hero section */}
+                        <section className="hidden lg:flex lg:flex-col">
+                            <div className="mt-0">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-300">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
+                                    Hệ thống CRM Doanh nghiệp
+                                </span>
+                                <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-white">
+                                    Chào mừng trở lại!<br />
+                                    <span className="text-indigo-300">Đăng nhập</span> để tiếp tục.
+                                </h1>
+                                <p className="mt-4 max-w-md text-base leading-relaxed text-indigo-200/70">
+                                    Quản lý khách hàng, thương vụ và vận hành đội ngũ trên một nền tảng thống nhất.
+                                </p>
+                            </div>
+                            <div className="mt-12 flex flex-col gap-3">
+                                {[
+                                    "Quản lý khách hàng & liên hệ toàn diện",
+                                    "Theo dõi thương vụ theo thời gian thực",
+                                    "Tích hợp Zalo OA & chatbot tự động",
+                                ].map((text) => (
+                                    <div key={text} className="flex items-center gap-3 text-sm text-indigo-200/80">
+                                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-400">
+                                            <svg viewBox="0 0 12 12" fill="currentColor" className="h-3 w-3">
+                                                <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </span>
+                                        {text}
+                                    </div>
+                                ))}
+                            </div>
                         </section>
 
-                        <Card className="border border-white/15 bg-white/95 shadow-2xl backdrop-blur-sm">
-                            <CardHeader className="space-y-2 border-b border-gray-100">
-                                <CardTitle className="text-2xl">Đăng nhập</CardTitle>
-                                <p className="text-sm text-gray-600">
-                                    Sử dụng email, số điện thoại hoặc tên Zalo và mật khẩu của bạn.
-                                </p>
-                            </CardHeader>
-                            <CardContent>
-                                <form className="space-y-4" onSubmit={handleSubmit}>
-                                    <Input
-                                        label="Định danh"
-                                        placeholder="Email / số điện thoại / tên Zalo"
-                                        value={form.identifier}
-                                        onChange={(event) => handleInputChange("identifier", event.target.value)}
-                                        error={errors.identifier}
-                                        autoComplete="username"
-                                        disabled={isPending}
-                                    />
+                        {/* Form card */}
+                        <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-1 shadow-2xl backdrop-blur-xl">
+                            <div className="rounded-xl bg-white px-8 py-10">
+                                {/* Logo */}
+                                <div className="mb-6 flex justify-center">
+                                    <Image src="/logo.png" alt="CRM Logo" width={130} height={40} className="object-contain" priority />
+                                </div>
 
-                                    <Input
-                                        label="Mật khẩu"
-                                        type="password"
-                                        placeholder="Nhập mật khẩu"
-                                        value={form.password}
-                                        onChange={(event) => handleInputChange("password", event.target.value)}
-                                        error={errors.password}
-                                        autoComplete="current-password"
-                                        disabled={isPending}
-                                    />
-
-                                    <div className="flex justify-end">
-                                        <button
-                                            type="button"
-                                            className="text-sm font-medium text-primary-600 hover:text-primary-700"
-                                            onClick={() => setIsForgotPasswordOpen(true)}
-                                            disabled={isPending}
-                                        >
-                                            Quên mật khẩu?
-                                        </button>
+                                <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+                                    {/* Identifier */}
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-medium text-gray-700">Định danh</label>
+                                        <div className="relative">
+                                            <FiUser className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Email / số điện thoại / tên Zalo"
+                                                value={form.identifier}
+                                                onChange={(e) => handleInputChange("identifier", e.target.value)}
+                                                autoComplete="username"
+                                                disabled={isPending}
+                                                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 transition"
+                                            />
+                                        </div>
+                                        {errors.identifier && <p className="mt-1 text-xs text-red-500">{errors.identifier}</p>}
                                     </div>
 
-                                    <Button
+                                    {/* Password */}
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-medium text-gray-700">Mật khẩu</label>
+                                        <div className="relative">
+                                            <FiLock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Nhập mật khẩu"
+                                                value={form.password}
+                                                onChange={(e) => handleInputChange("password", e.target.value)}
+                                                autoComplete="current-password"
+                                                disabled={isPending}
+                                                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-11 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 transition"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword((p) => !p)}
+                                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                tabIndex={-1}
+                                            >
+                                                {showPassword ? <FiEyeOff className="h-4 w-4" /> : <FiEye className="h-4 w-4" />}
+                                            </button>
+                                        </div>
+                                        {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password}</p>}
+                                    </div>
+
+                                    <div className="flex justify-end">
+                                        <Link
+                                            href="/forgot-password"
+                                            className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                                        >
+                                            Quên mật khẩu?
+                                        </Link>
+                                    </div>
+
+                                    <button
                                         type="submit"
-                                        className="w-full gap-2"
                                         disabled={isPending || !canSubmit}
+                                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 transition"
                                     >
                                         {isPending ? (
                                             <Spinner size="sm" className="border-2 border-white/40 border-t-white" />
                                         ) : (
                                             <FiLogIn className="h-4 w-4" />
                                         )}
-                                        {isRedirecting
-                                            ? "Đang chuyển hướng..."
-                                            : isPending
-                                                ? "Đang đăng nhập..."
-                                                : "Đăng nhập"}
-                                    </Button>
+                                        {isRedirecting ? "Đang chuyển hướng..." : isPending ? "Đang đăng nhập..." : "Đăng nhập"}
+                                    </button>
 
-                                    <p className="text-center text-sm text-gray-600">
+                                    <p className="text-center text-sm text-gray-500">
                                         Chưa có tài khoản?{" "}
-                                        <Link href="/register" className="font-medium text-primary-600 hover:text-primary-700">
+                                        <Link href="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
                                             Đăng ký ngay
                                         </Link>
                                     </p>
                                 </form>
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-                {isRedirecting ? (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-                        <div className="rounded-2xl border border-white/15 bg-white/10 px-8 py-7 text-center text-white shadow-2xl">
-                            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/25 bg-white/10">
-                                <Spinner size="sm" className="border-2 border-white/30 border-t-white" />
-                            </div>
-                            <p className="text-base font-semibold">Đăng nhập thành công</p>
-                            <p className="mt-1 text-sm text-slate-200">Đang chuyển vào hệ thống...</p>
-                        </div>
-                    </div>
-                ) : null}
-
-            <ForgotPasswordModal
-                isOpen={isForgotPasswordOpen}
-                onClose={() => setIsForgotPasswordOpen(false)}
-            />
         </>
     );
 }

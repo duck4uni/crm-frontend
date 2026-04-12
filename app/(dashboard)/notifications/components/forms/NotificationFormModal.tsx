@@ -109,7 +109,7 @@ export function NotificationFormModal({ isOpen, onClose, onSave, notification }:
                         onChange={handleChange}
                         placeholder="Nhập nội dung thông báo"
                         rows={4}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.content ? "border-red-500" : "border-gray-300"
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.content ? "border-red-500" : "border-gray-300"
                             }`}
                     />
                     {errors.content && <p className="text-xs text-red-500 mt-1">{errors.content}</p>}

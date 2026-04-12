@@ -106,7 +106,7 @@ export const JOURNEY_STAGES = {
     name: "Đợi tác",
     description: "Là khách hàng có quỹ lẩ sử dụng dịch vụ tẩn 2 lẩ. Hẹn đều dựợi 5 lần quay lạ",
     category: JourneyCategory.POST_SALES_ADVANCED,
-    color: "border-blue-600",
+    color: "border-primary-600",
   },
   HEN_THAT_BAI: {
     id: "hen_that_bai",

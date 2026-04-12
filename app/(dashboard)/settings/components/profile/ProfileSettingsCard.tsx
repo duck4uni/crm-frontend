@@ -26,6 +26,20 @@ function formatDateTime(value: string | null): string {
     return parsedDate.toLocaleString("vi-VN");
 }
 
+function formatDate(value: string | null): string {
+    if (!value) {
+        return "Chưa cập nhật";
+    }
+
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return value;
+    }
+
+    return parsedDate.toLocaleDateString("vi-VN");
+}
+
 export function ProfileSettingsCard({
     profile,
     isLoading,
@@ -93,13 +107,22 @@ export function ProfileSettingsCard({
                             </div>
 
                             <div className="rounded-lg border border-gray-200 p-4">
+                                <p className="text-xs uppercase tracking-wide text-gray-500">Vai trò</p>
+                                <p className="mt-1 text-sm font-medium text-gray-900">
+                                    {profile.user_permisions && profile.user_permisions.length > 0
+                                        ? profile.user_permisions[0].permision.name
+                                        : "Chưa gán vai trò"}
+                                </p>
+                            </div>
+
+                            <div className="rounded-lg border border-gray-200 p-4">
                                 <p className="text-xs uppercase tracking-wide text-gray-500">Số điện thoại</p>
                                 <p className="mt-1 text-sm font-medium text-gray-900">{profile.phone || "Chưa cập nhật"}</p>
                             </div>
 
                             <div className="rounded-lg border border-gray-200 p-4">
                                 <p className="text-xs uppercase tracking-wide text-gray-500">Sinh nhật</p>
-                                <p className="mt-1 text-sm font-medium text-gray-900">{formatDateTime(profile.birthday)}</p>
+                                <p className="mt-1 text-sm font-medium text-gray-900">{formatDate(profile.birthday)}</p>
                             </div>
 
                             <div className="rounded-lg border border-gray-200 p-4">
@@ -110,13 +133,6 @@ export function ProfileSettingsCard({
                             <div className="rounded-lg border border-gray-200 p-4">
                                 <p className="text-xs uppercase tracking-wide text-gray-500">Ngày cập nhật</p>
                                 <p className="mt-1 text-sm font-medium text-gray-900">{formatDateTime(profile.updated_at)}</p>
-                            </div>
-
-                            <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
-                                <p className="text-xs uppercase tracking-wide text-gray-500">Avatar</p>
-                                <p className="mt-1 break-all text-sm font-medium text-gray-900">
-                                    {profile.avatar || "Chưa có ảnh đại diện"}
-                                </p>
                             </div>
                         </div>
                     </>

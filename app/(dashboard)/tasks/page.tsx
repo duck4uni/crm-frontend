@@ -2,15 +2,15 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent } from "@/components/ui/Card";
+import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
-import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/ToastProvider";
 import { jobsService } from "@/services/jobs";
 import { usersService } from "@/services/users";
-import { JobApiRow, JobTimeRange, CreateJobPayload, UpdateJobPayload, UserApiRow } from "@/types/api";
+import { customersService } from "@/services/customers";
+import { JobApiRow, JobTimeRange, CreateJobPayload, UpdateJobPayload, UserApiRow, CustomerApiRow } from "@/types/api";
 import {
   FiPlus,
   FiSearch,
@@ -43,7 +43,7 @@ const emptyFormData: JobFormData = {
 export default function TasksPage() {
   const [jobs, setJobs] = useState<JobApiRow[]>([]);
   const [users, setUsers] = useState<UserApiRow[]>([]);
-  const [customers, setCustomers] = useState<UserApiRow[]>([]);
+  const [customers, setCustomers] = useState<CustomerApiRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -69,15 +69,16 @@ export default function TasksPage() {
   const loadUsers = useCallback(async () => {
     try {
       const [usersRes, customersRes] = await Promise.all([
-        usersService.getUsers({ pageSize: "200" }),
-        usersService.getCustomers({ pageSize: "200" }),
+        usersService.getUsers({ pageSize: "500" }),
+        customersService.getCustomers({ pageSize: "500" }),
       ]);
       setUsers(usersRes.responseData?.rows ?? []);
       setCustomers(customersRes.responseData?.rows ?? []);
-    } catch {
-      // Users/customers are optional for display; silently handle
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Không thể tải danh sách người dùng/khách hàng.";
+      toast.error("Tải dữ liệu thất bại", msg);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadJobs();
@@ -91,8 +92,11 @@ export default function TasksPage() {
 
   const getUserName = (uuid: string | null) => {
     if (!uuid) return null;
-    const user = users.find((u) => u.id === uuid) ?? customers.find((u) => u.id === uuid);
-    return user ? user.full_name || user.email : uuid.slice(0, 8) + "...";
+    const user = users.find((u) => u.id === uuid);
+    if (user) return user.full_name || user.email;
+    const customer = customers.find((c) => c.id === uuid);
+    if (customer) return customer.full_name || `${customer.last_name} ${customer.first_name}`.trim() || customer.email || uuid.slice(0, 8) + "...";
+    return uuid.slice(0, 8) + "...";
   };
 
   const getFormTimeFromApi = (jobTime: JobApiRow["job_time"]): { start: string; end: string } => {
@@ -200,7 +204,10 @@ export default function TasksPage() {
   };
 
   const userOptions = users.map((u) => ({ value: u.id, label: u.full_name || u.email }));
-  const customerOptions = customers.map((u) => ({ value: u.id, label: u.full_name || u.email }));
+  const customerOptions = customers.map((c) => ({
+    value: c.id,
+    label: c.full_name || `${c.last_name} ${c.first_name}`.trim() || c.email || c.id,
+  }));
 
   if (isLoading) {
     return (
@@ -214,64 +221,31 @@ export default function TasksPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Công việc</h1>
-          <p className="mt-1 text-gray-500">Quản lý và theo dõi công việc hằng ngày</p>
+      {/* Search + Action Bar */}
+      <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3">
+        <div className="flex-1 relative">
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Tìm kiếm theo tên hoặc nội dung..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
         </div>
+        <span className="text-sm text-gray-500 whitespace-nowrap">{filteredJobs.length} kết quả</span>
         <Button onClick={openCreateForm}>
-          <FiPlus className="w-5 h-5 mr-2" />
+          <FiPlus className="w-4 h-4 mr-1.5" />
           Thêm công việc
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent>
-            <p className="text-sm text-gray-600">Tổng công việc</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">{jobs.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <p className="text-sm text-gray-600">Có người thực hiện</p>
-            <p className="mt-2 text-2xl font-bold text-blue-600">
-              {jobs.filter((j) => j.performer_uuid).length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <p className="text-sm text-gray-600">Có khách hàng liên quan</p>
-            <p className="mt-2 text-2xl font-bold text-green-600">
-              {jobs.filter((j) => j.customer_uuid).length}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search */}
-      <Card>
-        <CardContent className="flex items-center space-x-4">
-          <div className="flex-1 relative">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Tìm kiếm theo tên hoặc nội dung..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <span className="text-sm text-gray-500">{filteredJobs.length} kết quả</span>
-        </CardContent>
-      </Card>
-
       {/* Jobs Table */}
-      <Card>
-        <div className="overflow-x-auto">
+      <ListPageLayout
+        items={filteredJobs}
+        resetPageKey={searchQuery}
+        renderTable={(paged) => (
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -302,7 +276,7 @@ export default function TasksPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredJobs.map((job) => {
+              {paged.map((job) => {
                 const jt = getFormTimeFromApi(job.job_time);
                 return (
                   <tr
@@ -312,7 +286,7 @@ export default function TasksPage() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <FiBriefcase className="w-4 h-4 text-blue-500 mr-2 flex-shrink-0" />
+                        <FiBriefcase className="w-4 h-4 text-primary-500 mr-2 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
                           {job.job_name}
                         </span>
@@ -367,18 +341,18 @@ export default function TasksPage() {
                         ? new Date(job.created_at).toLocaleDateString("vi-VN")
                         : "—"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => openEditForm(job)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                          className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
                           title="Chỉnh sửa"
                         >
                           <FiEdit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteJob(job)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                           title="Xóa"
                         >
                           <FiTrash2 className="w-4 h-4" />
@@ -391,14 +365,8 @@ export default function TasksPage() {
             </tbody>
           </table>
         </div>
-
-        {filteredJobs.length === 0 && (
-          <div className="text-center py-12">
-            <FiBriefcase className="mx-auto h-12 w-12 text-gray-300" />
-            <p className="mt-4 text-gray-500">Không tìm thấy công việc nào</p>
-          </div>
         )}
-      </Card>
+      />
 
       {/* Detail Modal */}
       <Modal
@@ -523,7 +491,7 @@ export default function TasksPage() {
               onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))}
               placeholder="Nhập nội dung công việc"
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
             />
           </div>
 
@@ -558,22 +526,34 @@ export default function TasksPage() {
           </div>
 
           {/* performer_uuid */}
-          <Select
-            label="Người thực hiện"
-            placeholder="Chọn người thực hiện"
-            value={formData.performer_uuid}
-            onChange={(e) => setFormData((prev) => ({ ...prev, performer_uuid: e.target.value }))}
-            options={[{ value: "", label: "Không chọn" }, ...userOptions]}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Người thực hiện</label>
+            <select
+              value={formData.performer_uuid}
+              onChange={(e) => setFormData((prev) => ({ ...prev, performer_uuid: e.target.value }))}
+              className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+            >
+              <option value="">Không chọn</option>
+              {userOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
 
           {/* customer_uuid */}
-          <Select
-            label="Khách hàng"
-            placeholder="Chọn khách hàng"
-            value={formData.customer_uuid}
-            onChange={(e) => setFormData((prev) => ({ ...prev, customer_uuid: e.target.value }))}
-            options={[{ value: "", label: "Không chọn" }, ...customerOptions]}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng</label>
+            <select
+              value={formData.customer_uuid}
+              onChange={(e) => setFormData((prev) => ({ ...prev, customer_uuid: e.target.value }))}
+              className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+            >
+              <option value="">Không chọn</option>
+              {customerOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
 
           {/* status_id */}
           <div>

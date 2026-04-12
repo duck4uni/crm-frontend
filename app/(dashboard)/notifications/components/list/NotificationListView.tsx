@@ -5,6 +5,7 @@ import { Notification, NotificationStatus } from "@/types/notification";
 import { NotificationFilters } from "./NotificationFilters";
 import { NotificationSearch } from "./NotificationSearch";
 import { NotificationTable } from "./NotificationTable";
+import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { NotificationDetailModal } from "../forms/NotificationDetailModal";
 import { NotificationFormModal } from "../forms/NotificationFormModal";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -183,57 +184,49 @@ export function NotificationListView() {
         }
     };
 
-    if (isLoading) {
-        return (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">
-                Đang tải danh sách thông báo...
-            </div>
-        );
-    }
-
-    if (errorMessage) {
-        return (
-            <div className="bg-white border border-red-200 rounded-lg p-6 space-y-3">
-                <p className="text-sm text-red-600">{errorMessage}</p>
-                <button
-                    type="button"
-                    onClick={loadNotifications}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
-                >
-                    Tải lại
-                </button>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-6">
-            <NotificationFilters
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-                counts={filterCounts}
+        <>
+            <ListPageLayout
+                items={filteredNotifications}
+                isLoading={isLoading}
+                loadingText="Đang tải danh sách thông báo..."
+                errorNode={errorMessage ? (
+                    <div className="bg-white border border-red-200 rounded-lg p-6 space-y-3">
+                        <p className="text-sm text-red-600">{errorMessage}</p>
+                        <button
+                            type="button"
+                            onClick={loadNotifications}
+                            className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
+                        >
+                            Tải lại
+                        </button>
+                    </div>
+                ) : undefined}
+                resetPageKey={`${activeFilter}|${searchQuery}`}
+                renderFilters={
+                    <NotificationFilters
+                        activeFilter={activeFilter}
+                        onFilterChange={setActiveFilter}
+                        counts={filterCounts}
+                    />
+                }
+                renderSearch={
+                    <NotificationSearch
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        unreadCount={filterCounts[NotificationStatus.UNREAD]}
+                        isMarkAllPending={isMarkAllPending}
+                        onMarkAllAsRead={handleMarkAllAsRead}
+                        onCreateNotification={() => setIsFormModalOpen(true)}
+                    />
+                }
+                renderTable={(paged) => (
+                    <NotificationTable
+                        notifications={paged}
+                        onNotificationClick={handleNotificationClick}
+                    />
+                )}
             />
-
-            <NotificationSearch
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                unreadCount={filterCounts[NotificationStatus.UNREAD]}
-                isMarkAllPending={isMarkAllPending}
-                onMarkAllAsRead={handleMarkAllAsRead}
-                onCreateNotification={() => setIsFormModalOpen(true)}
-            />
-
-            <NotificationTable
-                notifications={filteredNotifications}
-                onNotificationClick={handleNotificationClick}
-            />
-
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                    <span>Tổng số: {filteredNotifications.length} thông báo</span>
-                    <span>Chưa đọc: {filterCounts[NotificationStatus.UNREAD]}</span>
-                </div>
-            </div>
 
             <NotificationDetailModal
                 isOpen={isDetailModalOpen}
@@ -247,6 +240,6 @@ export function NotificationListView() {
                 onClose={() => setIsFormModalOpen(false)}
                 onSave={handleCreateNotification}
             />
-        </div>
+        </>
     );
 }

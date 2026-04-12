@@ -7,6 +7,7 @@ import { permissionsService } from "@/services/permissions";
 import { PermissionFilters } from "./PermissionFilters";
 import { PermissionSearch } from "./PermissionSearch";
 import { PermissionTable } from "./PermissionTable";
+import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { PermissionFormModal } from "../forms/PermissionFormModal";
 import { PermissionDetailModal } from "../forms/PermissionDetailModal";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -135,41 +136,36 @@ export function PermissionListView() {
         toast.success("Xóa thành công", `Quyền "${permission.name}" đã bị xóa.`);
     };
 
-    if (isLoading) {
-        return (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">
-                Đang tải danh sách quyền...
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-6">
-            <PermissionFilters
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-                counts={filterCounts}
+        <>
+            <ListPageLayout
+                items={filteredPermissions}
+                isLoading={isLoading}
+                loadingText="Đang tải danh sách quyền..."
+                resetPageKey={`${activeFilter}|${searchQuery}`}
+                renderFilters={
+                    <PermissionFilters
+                        activeFilter={activeFilter}
+                        onFilterChange={setActiveFilter}
+                        counts={filterCounts}
+                    />
+                }
+                renderSearch={
+                    <PermissionSearch
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        onAddPermission={handleAddPermission}
+                    />
+                }
+                renderTable={(paged) => (
+                    <PermissionTable
+                        permissions={paged}
+                        onPermissionClick={handlePermissionClick}
+                        onPermissionEdit={handleEditPermission}
+                        onPermissionDelete={handleDeletePermission}
+                    />
+                )}
             />
-
-            <PermissionSearch
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                onAddPermission={handleAddPermission}
-            />
-
-            <PermissionTable
-                permissions={filteredPermissions}
-                onPermissionClick={handlePermissionClick}
-                onPermissionEdit={handleEditPermission}
-                onPermissionDelete={handleDeletePermission}
-            />
-
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                    <span>Tổng số: {filteredPermissions.length} quyền</span>
-                    <span>{Object.values(PermissionGroup).length} nhóm quyền</span>
-                </div>
-            </div>
 
             <PermissionFormModal
                 isOpen={isFormModalOpen}
@@ -185,6 +181,6 @@ export function PermissionListView() {
                 onEdit={handleEditPermission}
                 onDelete={handleDeletePermission}
             />
-        </div>
+        </>
     );
 }

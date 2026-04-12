@@ -15,6 +15,29 @@ export interface OaConnectionFormState {
   owner: string;
 }
 
+export interface ZaloConversation {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastMessage: string;
+  timestamp: string;
+  unreadCount: number;
+}
+
+export interface AutoConfig {
+  id: string;
+  oaName: string;
+  createdBy: string;
+  createdByRole: string;
+  createdAt: string;
+}
+
+export interface AutoConfigFormState {
+  oaId: string;
+  showCrmUsername: boolean;
+  autoCreateOpportunity: boolean;
+}
+
 export const leaderOptions = [
   { value: "leader-a", label: "Leader A" },
   { value: "leader-b", label: "Leader B" },
