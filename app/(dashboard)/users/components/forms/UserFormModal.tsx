@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { formatDateForInput } from "@/lib/utils";
 
 interface PermissionOption {
     id: string;
@@ -17,20 +18,12 @@ interface PermissionOption {
 interface UserFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (user: Partial<UserProfile>, permissionIds: string[]) => void | Promise<void>;
+    onSave: (user: Partial<UserProfile> & { password?: string }, roleCode: string | null) => void | Promise<void>;
     user?: UserProfile | null;
     permissions?: PermissionOption[];
-    initialPermissionIds?: string[];
 }
 
-const GROUP_LABELS: Record<string, string> = {
-    user: "Người dùng",
-    customer: "Khách hàng",
-    deal: "Thương vụ",
-    task: "Công việc",
-    report: "Báo cáo",
-    setting: "Cài đặt",
-};
+const ALLOWED_ROLE_CODES = ["SITE_WORKER", "SITE_LEADER", "SITE_OWNER"];
 
 export function UserFormModal({
     isOpen,
@@ -38,7 +31,6 @@ export function UserFormModal({
     onSave,
     user,
     permissions = [],
-    initialPermissionIds = [],
 }: UserFormModalProps) {
     const isEditing = !!user;
 
@@ -51,7 +43,8 @@ export function UserFormModal({
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [selectedPermissionIds, setSelectedPermissionIds] = useState<string[]>([]);
+    const [password, setPassword] = useState("");
+    const [selectedRoleCode, setSelectedRoleCode] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
@@ -69,14 +62,13 @@ export function UserFormModal({
                 full_name: "",
                 email: "",
                 phone: "",
-                avatar: "",
-                is_active: true,
             });
         }
 
-        setSelectedPermissionIds(initialPermissionIds);
+        setPassword("");
+        setSelectedRoleCode("");
         setErrors({});
-    }, [user, isOpen, initialPermissionIds]);
+    }, [user, isOpen]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -107,16 +99,19 @@ export function UserFormModal({
             newErrors.phone = "Số điện thoại không hợp lệ (10-11 chữ số)";
         }
 
+        if (!isEditing) {
+            if (!password.trim()) {
+                newErrors.password = "Mật khẩu là bắt buộc";
+            } else if (password.length < 8) {
+                newErrors.password = "Mật khẩu ít nhất 8 ký tự";
+            }
+            if (!selectedRoleCode) {
+                newErrors.roleCode = "Vui lòng chọn vai trò";
+            }
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    };
-
-    const togglePermission = (permissionId: string) => {
-        setSelectedPermissionIds((prev) =>
-            prev.includes(permissionId)
-                ? prev.filter((id) => id !== permissionId)
-                : [...prev, permissionId],
-        );
     };
 
     const handleSubmit = async () => {
@@ -126,21 +121,17 @@ export function UserFormModal({
 
         setIsSubmitting(true);
         try {
-            await onSave(formData, selectedPermissionIds);
+            await onSave(
+                { ...formData, ...(isEditing ? {} : { password }) },
+                isEditing ? null : selectedRoleCode,
+            );
             onClose();
+        } catch (error) {
+            console.error("UserFormModal submit error:", error);
         } finally {
             setIsSubmitting(false);
         }
     };
-
-    const permissionGroups = permissions.reduce<Record<string, PermissionOption[]>>((acc, permission) => {
-        const groupCode = permission.group_code || "other";
-        if (!acc[groupCode]) {
-            acc[groupCode] = [];
-        }
-        acc[groupCode].push(permission);
-        return acc;
-    }, {});
 
     return (
         <Modal
@@ -193,92 +184,85 @@ export function UserFormModal({
                             error={errors.phone}
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
-                        <Input
-                            name="birthday"
-                            type="date"
-                            value={formData.birthday ? new Date(formData.birthday).toISOString().split("T")[0] : ""}
-                            onChange={(e) => setFormData((prev) => ({ ...prev, birthday: e.target.value ? new Date(e.target.value) : undefined }))}
-                        />
-                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-                        <Select
-                            name="is_active"
-                            value={formData.is_active ? "true" : "false"}
-                            onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.value === "true" }))}
-                            options={[
-                                { value: "true", label: "Hoạt động" },
-                                { value: "false", label: "Ngưng hoạt động" },
-                            ]}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL</label>
-                        <Input
-                            name="avatar"
-                            value={formData.avatar || ""}
-                            onChange={handleChange}
-                            placeholder="URL ảnh đại diện"
-                        />
-                    </div>
-                </div>
-
-                <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
+                {isEditing && (
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-sm font-medium text-gray-800">Phân quyền người dùng</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Chọn nhiều quyền trực tiếp khi tạo/sửa người dùng.</p>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
+                            <Input
+                                name="birthday"
+                                type="date"
+                                value={formatDateForInput(formData.birthday)}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, birthday: e.target.value ? new Date(e.target.value) : undefined }))}
+                            />
                         </div>
-                        <span className="text-xs text-gray-500">Đã chọn {selectedPermissionIds.length}</span>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                            <Select
+                                name="is_active"
+                                value={formData.is_active ? "true" : "false"}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.value === "true" }))}
+                                options={[
+                                    { value: "true", label: "Hoạt động" },
+                                    { value: "false", label: "Ngưng hoạt động" },
+                                ]}
+                            />
+                        </div>
                     </div>
+                )}
 
-                    {permissions.length === 0 && (
-                        <p className="text-sm text-gray-500">Chưa có dữ liệu quyền để gán.</p>
-                    )}
-
-                    {permissions.length > 0 && (
-                        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                            {Object.entries(permissionGroups).map(([groupCode, groupedPermissions]) => (
-                                <div key={groupCode} className="space-y-2">
-                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                                        {GROUP_LABELS[groupCode] || groupCode}
-                                    </p>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {groupedPermissions.map((permission) => {
-                                            const checked = selectedPermissionIds.includes(permission.id);
-                                            return (
-                                                <label
-                                                    key={permission.id}
-                                                    className={`
-                                                        flex items-start gap-2.5 rounded-md border px-3 py-2 cursor-pointer transition-colors
-                                                        ${checked ? "border-blue-300 bg-blue-50" : "border-gray-200 hover:bg-gray-50"}
-                                                    `}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={checked}
-                                                        onChange={() => togglePermission(permission.id)}
-                                                        className="mt-0.5 rounded border-gray-300"
-                                                        disabled={isSubmitting}
-                                                    />
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-gray-900 leading-tight">{permission.name}</p>
-                                                        <p className="text-xs text-gray-500 font-mono mt-0.5">{permission.code}</p>
-                                                    </div>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
+                {isEditing && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL</label>
+                            <Input
+                                name="avatar"
+                                value={formData.avatar || ""}
+                                onChange={handleChange}
+                                placeholder="URL ảnh đại diện"
+                            />
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
+
+                {!isEditing && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu *</label>
+                            <Input
+                                name="password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    if (errors.password) setErrors((prev) => { const n = { ...prev }; delete n.password; return n; });
+                                }}
+                                placeholder="Nhập mật khẩu (ít nhất 8 ký tự)"
+                                error={errors.password}
+                                disabled={isSubmitting}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò *</label>
+                            <Select
+                                name="roleCode"
+                                value={selectedRoleCode}
+                                onChange={(e) => {
+                                    setSelectedRoleCode(e.target.value);
+                                    if (errors.roleCode) setErrors((prev) => { const n = { ...prev }; delete n.roleCode; return n; });
+                                }}
+                                options={[
+                                    ...permissions
+                                        .filter((p) => ALLOWED_ROLE_CODES.includes(p.code))
+                                        .map((p) => ({ value: p.code, label: p.name })),
+                                ]}
+                                disabled={isSubmitting}
+                            />
+                            {errors.roleCode && <p className="mt-1 text-xs text-red-500">{errors.roleCode}</p>}
+                        </div>
+                    </div>
+                )}
             </div>
         </Modal>
     );

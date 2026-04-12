@@ -24,7 +24,7 @@ export function Tabs({ tabs, activeTab, onChange }: TabsProps) {
               py-3 px-6 font-semibold text-sm transition-colors border-b-2
               ${
                 activeTab === tab.id
-                  ? "border-blue-600 text-blue-600"
+                  ? "border-primary-600 text-primary-600"
                   : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
               }
             `}
@@ -37,7 +37,7 @@ export function Tabs({ tabs, activeTab, onChange }: TabsProps) {
                     py-0.5 px-2 rounded-full text-xs font-semibold
                     ${
                       activeTab === tab.id
-                        ? "bg-blue-100 text-blue-700"
+                        ? "bg-primary-100 text-primary-700"
                         : "bg-gray-100 text-gray-600"
                     }
                   `}

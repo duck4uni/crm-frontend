@@ -14,6 +14,7 @@ import { MyInfoResponseData } from "@/types/api";
 import { AccountSecurityCard } from "../account/AccountSecurityCard";
 import { ChangePasswordModal } from "../account/ChangePasswordModal";
 import { ProfileSettingsCard } from "../profile/ProfileSettingsCard";
+import { EditProfileModal } from "../profile/EditProfileModal";
 
 export function SettingsView() {
     const router = useRouter();
@@ -22,6 +23,8 @@ export function SettingsView() {
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -65,10 +68,39 @@ export function SettingsView() {
     }, [loadMyProfile]);
 
     const handleEditProfile = () => {
-        toast.info(
-            "Tính năng đang phát triển",
-            "Nút chỉnh sửa đã sẵn sàng, API cập nhật hồ sơ sẽ được gắn ở bước tiếp theo.",
-        );
+        setIsEditProfileOpen(true);
+    };
+
+    const handleSaveProfile = async (data: { full_name: string; phone: string; birthday: string; avatar?: string }) => {
+        if (!profile?.id) return;
+
+        setIsSavingProfile(true);
+        try {
+            const response = await usersService.updateUser(profile.id, {
+                full_name: data.full_name,
+                phone: data.phone || undefined,
+                birthday: data.birthday || undefined,
+                avatar: data.avatar || undefined,
+            });
+
+            const updated: typeof profile = {
+                ...profile,
+                full_name: data.full_name,
+                phone: data.phone,
+                birthday: data.birthday || null,
+                avatar: data.avatar ?? profile.avatar,
+            };
+
+            setProfile(updated);
+            setCurrentUserSession(updated);
+            setIsEditProfileOpen(false);
+            toast.success("Cập nhật thành công", "Thông tin hồ sơ đã được lưu.");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Không thể cập nhật thông tin";
+            toast.error("Cập nhật thất bại", message);
+        } finally {
+            setIsSavingProfile(false);
+        }
     };
 
     const handleOpenChangePassword = () => {
@@ -202,6 +234,14 @@ export function SettingsView() {
                 onSubmit={handleUpdatePassword}
                 onChangeNewPassword={handleChangeNewPassword}
                 onChangeConfirmPassword={handleChangeConfirmPassword}
+            />
+
+            <EditProfileModal
+                isOpen={isEditProfileOpen}
+                profile={profile}
+                isSaving={isSavingProfile}
+                onClose={() => { if (!isSavingProfile) setIsEditProfileOpen(false); }}
+                onSave={handleSaveProfile}
             />
         </div>
     );

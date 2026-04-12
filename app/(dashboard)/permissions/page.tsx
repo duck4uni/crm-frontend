@@ -24,7 +24,7 @@ function PermissionsPageContent() {
     ];
 
     return (
-        <div className="px-6 space-y-3">
+        <div className="p-6 space-y-3">
             <Tabs tabs={tabs} activeTab={activeTab} onChange={handleTabChange} />
 
             <div className="mt-0">

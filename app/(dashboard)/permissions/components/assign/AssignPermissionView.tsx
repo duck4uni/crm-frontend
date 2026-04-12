@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Permission, UserPermission, PermissionGroup } from "@/types/permission";
@@ -356,7 +356,7 @@ export function AssignPermissionView() {
                 </h3>
 
                 {selectedUser ? (
-                    <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between p-3 bg-primary-50 border border-primary-200 rounded-lg">
                         <div className="flex items-center gap-3">
                             <Avatar name={selectedUser.full_name} size="sm" />
                             <div>
@@ -369,7 +369,7 @@ export function AssignPermissionView() {
                         </div>
                         <button
                             onClick={handleClearUser}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors"
+                            className="text-xs text-primary-600 hover:text-primary-800 font-medium px-3 py-1.5 rounded-md hover:bg-primary-100 transition-colors"
                         >
                             Đổi người dùng
                         </button>
@@ -387,7 +387,7 @@ export function AssignPermissionView() {
                                 onFocus={() => searchQuery && setShowDropdown(true)}
                                 placeholder="Tìm tên, email hoặc số điện thoại..."
                                 disabled={isLoadingAssignments || isMutatingAssignments}
-                                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             />
                         </div>
                         {showDropdown && filteredUsers.length > 0 && (
@@ -438,7 +438,7 @@ export function AssignPermissionView() {
                                                 void handleToggleGroup(groupCode);
                                             }}
                                             disabled={isMutatingAssignments || isLoadingAssignments}
-                                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
                                         />
                                         <span className="text-sm font-semibold text-gray-800">
                                             {GROUP_LABELS[groupCode as PermissionGroup] ?? groupCode}
@@ -451,7 +451,7 @@ export function AssignPermissionView() {
                                         {perms.map((permission) => {
                                             const checked = selectedUserPermissions.has(permission.id);
                                             return (
-                                                <label key={permission.id} className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${checked ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200 hover:bg-gray-100"}`}>
+                                                <label key={permission.id} className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${checked ? "bg-primary-50 border-primary-200" : "bg-gray-50 border-gray-200 hover:bg-gray-100"}`}>
                                                     <input
                                                         type="checkbox"
                                                         checked={checked}
@@ -459,7 +459,7 @@ export function AssignPermissionView() {
                                                             void handleTogglePermission(permission.id);
                                                         }}
                                                         disabled={isMutatingAssignments || isLoadingAssignments}
-                                                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
                                                     />
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-medium text-gray-800 leading-tight">{permission.name}</p>

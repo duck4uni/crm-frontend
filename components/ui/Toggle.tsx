@@ -21,7 +21,7 @@ export function Toggle({ label, checked, onChange, disabled = false }: TogglePro
         <div
           className={`
             w-11 h-6 rounded-full transition-colors
-            ${checked ? 'bg-blue-600' : 'bg-gray-300'}
+            ${checked ? 'bg-primary-600' : 'bg-gray-300'}
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'group-hover:opacity-90'}
           `}
         />

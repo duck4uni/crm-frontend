@@ -51,8 +51,8 @@ export function SaveFilterModal({ isOpen, onClose, onSave }: SaveFilterModalProp
             }
         >
             <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800">
+                <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+                    <p className="text-sm text-primary-800">
                         Bộ lọc sẽ lưu các điều kiện bạn đã chọn để sử dụng lại sau này
                     </p>
                 </div>

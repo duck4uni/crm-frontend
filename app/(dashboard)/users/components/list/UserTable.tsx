@@ -4,7 +4,7 @@ import { UserProfile } from "@/types/user";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { formatDateVN } from "@/lib/utils";
-import { FiEye, FiEdit2 } from "react-icons/fi";
+import { FiEye, FiEdit2, FiTrash2 } from "react-icons/fi";
 import { useState } from "react";
 
 interface UserTableProps {
@@ -12,15 +12,15 @@ interface UserTableProps {
     userRolesByUser?: Record<string, string[]>;
     onUserClick?: (user: UserProfile) => void;
     onUserEdit?: (user: UserProfile) => void;
+    onUserDelete?: (user: UserProfile) => void;
 }
 
 type SortField = keyof UserProfile | null;
 type SortDirection = "asc" | "desc";
 
-export function UserTable({ users, userRolesByUser = {}, onUserClick, onUserEdit }: UserTableProps) {
+export function UserTable({ users, userRolesByUser = {}, onUserClick, onUserEdit, onUserDelete }: UserTableProps) {
     const [sortField, setSortField] = useState<SortField>(null);
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-    const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -29,24 +29,6 @@ export function UserTable({ users, userRolesByUser = {}, onUserClick, onUserEdit
             setSortField(field);
             setSortDirection("asc");
         }
-    };
-
-    const handleSelectAll = () => {
-        if (selectedRows.size === users.length) {
-            setSelectedRows(new Set());
-        } else {
-            setSelectedRows(new Set(users.map((u) => u.id)));
-        }
-    };
-
-    const handleSelectRow = (id: string) => {
-        const newSelected = new Set(selectedRows);
-        if (newSelected.has(id)) {
-            newSelected.delete(id);
-        } else {
-            newSelected.add(id);
-        }
-        setSelectedRows(newSelected);
     };
 
     const sortedUsers = [...users].sort((a, b) => {
@@ -86,20 +68,11 @@ export function UserTable({ users, userRolesByUser = {}, onUserClick, onUserEdit
     };
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th className="px-4 py-3 text-left w-12">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedRows.size === users.length && users.length > 0}
-                                    onChange={handleSelectAll}
-                                    className="rounded border-gray-300"
-                                />
-                            </th>
-                            <TableHeader label="Họ tên" field="full_name" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+        <div className="overflow-x-auto">
+            <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <TableHeader label="Họ tên" field="full_name" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <TableHeader label="Email" field="email" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <TableHeader label="Số điện thoại" field="phone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vai trò</th>
@@ -108,64 +81,51 @@ export function UserTable({ users, userRolesByUser = {}, onUserClick, onUserEdit
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Thao tác</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {sortedUsers.map((user) => (
-                            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedRows.has(user.id)}
-                                        onChange={() => handleSelectRow(user.id)}
-                                        className="rounded border-gray-300"
-                                    />
-                                </td>
-                                <td className="px-4 py-4">
-                                    <div className="flex items-center space-x-3">
+                <tbody className="divide-y divide-gray-200">
+                    {sortedUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-4">
+                                <div className="flex items-center space-x-3">
                                         <Avatar name={user.full_name} src={user.avatar} />
                                         <span className="text-sm font-medium text-gray-900">{user.full_name}</span>
                                     </div>
                                 </td>
-                                <td className="px-4 py-4 text-sm text-gray-600">{user.email}</td>
-                                <td className="px-4 py-4 text-sm text-gray-900">{user.phone || "-"}</td>
-                                <td className="px-4 py-4">{renderRoleBadges(user.id)}</td>
-                                <td className="px-4 py-4">{getStatusBadge(user)}</td>
-                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
-                                    {formatDateVN(user.created_at)}
-                                </td>
-                                <td className="px-4 py-4">
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => onUserClick?.(user)}
-                                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                            title="Xem chi tiết"
-                                        >
-                                            <FiEye className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => onUserEdit?.(user)}
-                                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                                            title="Chỉnh sửa"
-                                        >
-                                            <FiEdit2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Pagination */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-                <div className="flex items-center space-x-2">
-                    <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">&lt;</button>
-                    <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">&gt;</button>
-                </div>
-                <div className="text-sm text-gray-600">
-                    <span>Hiển thị {users.length} kết quả</span>
-                </div>
-            </div>
+                            <td className="px-4 py-4 text-sm text-gray-600">{user.email}</td>
+                            <td className="px-4 py-4 text-sm text-gray-900">{user.phone || "-"}</td>
+                            <td className="px-4 py-4">{renderRoleBadges(user.id)}</td>
+                            <td className="px-4 py-4">{getStatusBadge(user)}</td>
+                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
+                                {formatDateVN(user.created_at)}
+                            </td>
+                            <td className="px-4 py-4">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => onUserClick?.(user)}
+                                        className="p-1.5 text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                                        title="Xem chi tiết"
+                                    >
+                                        <FiEye className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => onUserEdit?.(user)}
+                                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                        title="Chỉnh sửa"
+                                    >
+                                        <FiEdit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => onUserDelete?.(user)}
+                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                        title="Xóa"
+                                    >
+                                        <FiTrash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 }
@@ -189,7 +149,7 @@ function TableHeader({ label, field, onSort, sortField, sortDirection }: TableHe
             <div className="flex items-center space-x-1">
                 <span>{label}</span>
                 {isSorted && (
-                    <span className="text-blue-600">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                    <span className="text-primary-600">{sortDirection === "asc" ? "↑" : "↓"}</span>
                 )}
             </div>
         </th>

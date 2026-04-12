@@ -96,7 +96,7 @@ export function SavedFiltersDropdown({ onSelectFilter, currentFilters }: SavedFi
                 <BookmarkPlus className="w-4 h-4" />
                 Bộ lọc đã lưu
                 {savedFilters.length > 0 && (
-                    <span className="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                    <span className="ml-1 px-2 py-0.5 bg-primary-100 text-primary-700 text-xs font-semibold rounded-full">
                         {savedFilters.length}
                     </span>
                 )}
@@ -110,7 +110,7 @@ export function SavedFiltersDropdown({ onSelectFilter, currentFilters }: SavedFi
                                 setIsSaveModalOpen(true);
                                 setIsOpen(false);
                             }}
-                            className="w-full flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
                         >
                             <Plus className="w-4 h-4" />
                             Lưu bộ lọc hiện tại

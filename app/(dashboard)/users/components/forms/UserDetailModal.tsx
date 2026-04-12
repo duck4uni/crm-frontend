@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Tabs } from "@/components/ui/Tabs";
 import { useDialog } from "@/components/ui/Dialog";
-import { formatDateVN } from "@/lib/utils";
+import { formatDateVN, formatDateVNDateOnly } from "@/lib/utils";
 import { userHistoryService } from "@/services/user-history";
 import {
     FiPhone,
@@ -27,7 +27,6 @@ interface UserDetailModalProps {
     user: UserProfile | null;
     onEdit?: (user: UserProfile) => void;
     onDelete?: (user: UserProfile) => void;
-    permissionNames?: string[];
 }
 
 interface ActivityItem {
@@ -45,7 +44,6 @@ export function UserDetailModal({
     user,
     onEdit,
     onDelete,
-    permissionNames = [],
 }: UserDetailModalProps) {
     const { showDialog, DialogComponent } = useDialog();
     const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -198,7 +196,7 @@ export function UserDetailModal({
                                 <div>
                                     <p className="text-xs text-gray-500">Ngày sinh</p>
                                     <p className="text-sm font-medium text-gray-900">
-                                        {user.birthday ? formatDateVN(user.birthday) : "-"}
+                                        {user.birthday ? formatDateVNDateOnly(user.birthday) : "-"}
                                     </p>
                                 </div>
                             </div>
@@ -227,27 +225,6 @@ export function UserDetailModal({
                                     <p className="text-xs text-gray-500">Cập nhật lần cuối</p>
                                     <p className="text-sm font-medium text-gray-900">{formatDateVN(user.updated_at)}</p>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className="rounded-lg border border-gray-200 p-4 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold text-gray-800">Quyền đã gán</h4>
-                                <span className="text-xs text-gray-500">{permissionNames.length} quyền</span>
-                            </div>
-
-                            {permissionNames.length === 0 ? (
-                                <p className="text-sm text-gray-500">Người dùng này chưa được gán quyền nào.</p>
-                            ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    {permissionNames.map((permissionName) => (
-                                        <Badge key={permissionName} variant="info">{permissionName}</Badge>
-                                    ))}
-                                </div>
-                            )}
-
-                            <div className="pt-2 border-t border-gray-100">
-                                <p className="text-xs text-gray-500">Để gán/gỡ quyền, bấm &quot;Chỉnh sửa&quot; và cập nhật tại form người dùng.</p>
                             </div>
                         </div>
                     </>

@@ -5,8 +5,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { Dialog, useDialog } from "@/components/ui/Dialog";
-import { formatDateVN } from "@/lib/utils";
+import { useDialog } from "@/components/ui/Dialog";
+import { formatDateVNDateOnly } from "@/lib/utils";
 import {
     FiPhone,
     FiMail,
@@ -14,9 +14,11 @@ import {
     FiUser,
     FiCalendar,
     FiUsers,
-    FiTarget,
     FiEdit,
     FiTrash2,
+    FiBriefcase,
+    FiFileText,
+    FiGlobe,
 } from "react-icons/fi";
 
 interface CustomerDetailModalProps {
@@ -27,36 +29,15 @@ interface CustomerDetailModalProps {
     onDelete?: (customer: Customer) => void;
 }
 
-const SALUTATION_LABELS: Record<string, string> = {
-    Mr: "Ông",
-    Mrs: "Bà",
-    Ms: "Cô",
+const TYPE_LABELS: Record<string, string> = {
+    individual: "Cá nhân",
+    company: "Doanh nghiệp",
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-    Referral: "Giới thiệu",
-    "Google Ads": "Quảng cáo Google",
-    "Walk-in": "Khách đến trực tiếp",
-    Website: "Trang web",
-    Email: "Thư điện tử",
-};
-
-const CUSTOMER_SOURCE_LABELS: Record<string, string> = {
-    "Data Import": "Nhập dữ liệu",
-    "Google Ads": "Quảng cáo Google",
-    "Walk-in": "Khách đến trực tiếp",
-    "Email Marketing": "Tiếp thị email",
-    Website: "Trang web",
-    Email: "Thư điện tử",
-};
-
-const ASSIGNEE_LABELS: Record<string, string> = {
-    "Getfly Admin": "Quản trị viên Getfly",
-};
-
-const RELATIONSHIP_LABELS: Record<string, string> = {
-    Data2: "Dữ liệu nhóm 2",
-    Data3: "Dữ liệu nhóm 3",
+const GENDER_LABELS: Record<string, string> = {
+    Male: "Nam",
+    Female: "Nữ",
+    Other: "Khác",
 };
 
 export function CustomerDetailModal({
@@ -87,34 +68,9 @@ export function CustomerDetailModal({
         });
     };
 
-    const salutation = SALUTATION_LABELS[customer.salutation] ?? customer.salutation;
-    const source = SOURCE_LABELS[customer.source] ?? customer.source;
-    const customerSource = CUSTOMER_SOURCE_LABELS[customer.customerSource || ""] ?? customer.customerSource;
-    const assignee = ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee;
-    const relationship = RELATIONSHIP_LABELS[customer.relationship || ""] ?? customer.relationship;
-
-    const getStatusBadge = (status: string) => {
-        const statusConfig: Record<
-            string,
-            { label: string; variant: "success" | "warning" | "danger" | "info" }
-        > = {
-            new: { label: "Đang mới", variant: "info" },
-            quoted: { label: "Dự báo giá", variant: "warning" },
-            contacted: { label: "Đã liên hệ", variant: "success" },
-            not_contacted: { label: "Chưa liên hệ được", variant: "danger" },
-            tested: { label: "Đã test đầu vào", variant: "info" },
-            registered: { label: "Đã đăng ký", variant: "success" },
-            considering: { label: "Đang cân nhắc", variant: "warning" },
-            upsell: { label: "Bán thêm", variant: "success" },
-            approached: { label: "Đã tiếp cận", variant: "info" },
-            surveyed: { label: "Khảo sát", variant: "info" },
-        };
-
-        const config = statusConfig[status] || {
-            label: status,
-            variant: "info" as const,
-        };
-        return <Badge variant={config.variant}>{config.label}</Badge>;
+    const getStatusBadge = () => {
+        if (customer.is_active === false) return <Badge variant="warning">Ngưng hoạt động</Badge>;
+        return <Badge variant="success">Hoạt động</Badge>;
     };
 
     return (
@@ -145,178 +101,134 @@ export function CustomerDetailModal({
             }
         >
             <div className="space-y-6">
-                {/* Header with Avatar and Basic Info */}
-                <div className="flex items-start gap-4 pb-6 border-b border-gray-200">
-                    <Avatar
-                        name={customer.customerName}
-                        src={customer.avatar}
-                        size="lg"
-                    />
+                {/* Header */}
+                <div className="flex items-start gap-4 pb-4 border-b border-gray-200">
+                    <Avatar name={customer.customerName} src={customer.avatar} size="lg" />
                     <div className="flex-1">
                         <div className="flex items-start justify-between">
                             <div>
-                                <h3 className="text-2xl font-semibold text-gray-900">
-                                    {salutation} {customer.customerName}
-                                </h3>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    Mã KH: #{customer.id}
-                                </p>
+                                <h3 className="text-xl font-semibold text-gray-900">{customer.customerName}</h3>
+                                <p className="text-sm text-gray-500 mt-0.5">Mã KH: #{customer.id.slice(0, 8)}</p>
                             </div>
-                            <div>{getStatusBadge(customer.status)}</div>
+                            <div className="flex items-center gap-2">
+                                {getStatusBadge()}
+                                {customer.type && (
+                                    <Badge variant="info">{TYPE_LABELS[customer.type] ?? customer.type}</Badge>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Contact Information */}
-                <div>
-                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
-                        Thông tin liên hệ
-                    </h4>
+                <Section title="Thông tin liên hệ">
                     <div className="grid grid-cols-2 gap-4">
-                        <InfoItem
-                            icon={<FiPhone className="w-5 h-5" />}
-                            label="Số điện thoại"
-                            value={customer.phone || "Chưa cập nhật"}
-                        />
-                        <InfoItem
-                            icon={<FiMail className="w-5 h-5" />}
-                            label="Email"
-                            value={customer.email || "Chưa cập nhật"}
-                        />
-                        <InfoItem
-                            icon={<FiPhone className="w-5 h-5" />}
-                            label="Số di động"
-                            value={customer.mobilePhone}
-                        />
-                        <InfoItem
-                            icon={<FiMapPin className="w-5 h-5" />}
-                            label="Địa chỉ"
-                            value={customer.address || "Chưa cập nhật"}
-                            className="col-span-2"
-                        />
+                        <InfoItem icon={<FiPhone className="w-4 h-4" />} label="Số điện thoại" value={customer.phone || "-"} />
+                        <InfoItem icon={<FiMail className="w-4 h-4" />} label="Email" value={customer.email || "-"} />
+                        <InfoItem icon={<FiMapPin className="w-4 h-4" />} label="Địa chỉ" value={customer.address || "-"} className="col-span-2" />
+                        <InfoItem icon={<FiGlobe className="w-4 h-4" />} label="Website" value={customer.website || "-"} />
+                        <InfoItem icon={<FiUsers className="w-4 h-4" />} label="Người phụ trách" value={customer.assignee || "-"} />
                     </div>
-                </div>
+                </Section>
 
-                {/* Personal Information */}
-                <div>
-                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
-                        Thông tin cá nhân
-                    </h4>
+                <Section title="Thông tin cá nhân">
                     <div className="grid grid-cols-2 gap-4">
+                        <InfoItem icon={<FiUser className="w-4 h-4" />} label="Giới tính" value={GENDER_LABELS[customer.gender] ?? customer.gender} />
                         <InfoItem
-                            icon={<FiUser className="w-5 h-5" />}
-                            label="Giới tính"
-                            value={
-                                customer.gender === "Male"
-                                    ? "Nam"
-                                    : customer.gender === "Female"
-                                        ? "Nữ"
-                                        : "Khác"
-                            }
+                            icon={<FiCalendar className="w-4 h-4" />}
+                            label="Ngày sinh"
+                            value={customer.day_of_birth ? formatDateVNDateOnly(customer.day_of_birth) : "-"}
                         />
-                        <InfoItem
-                            icon={<FiUser className="w-5 h-5" />}
-                            label="Danh xưng"
-                            value={customer.salutation}
-                        />
+                        <InfoItem icon={<FiBriefcase className="w-4 h-4" />} label="Ngành nghề" value={customer.major || "-"} />
                     </div>
-                </div>
+                </Section>
 
-                {/* Source & Assignment */}
-                <div>
-                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
-                        Nguồn & Phân công
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4">
-                        <InfoItem
-                            icon={<FiTarget className="w-5 h-5" />}
-                            label="Nguồn"
-                            value={source}
-                        />
-                        <InfoItem
-                            icon={<FiTarget className="w-5 h-5" />}
-                            label="Nguồn khách hàng"
-                            value={customerSource || "Chưa cập nhật"}
-                        />
-                        <InfoItem
-                            icon={<FiUsers className="w-5 h-5" />}
-                            label="Người phụ trách"
-                            value={assignee}
-                        />
-                        <InfoItem
-                            icon={<FiUsers className="w-5 h-5" />}
-                            label="Mối quan hệ"
-                            value={relationship || "Chưa cập nhật"}
-                        />
-                    </div>
-                </div>
+                {(customer.company_name || customer.tax_code || customer.company_establish_date) && (
+                    <Section title="Thông tin doanh nghiệp">
+                        <div className="grid grid-cols-2 gap-4">
+                            <InfoItem icon={<FiBriefcase className="w-4 h-4" />} label="Tên công ty" value={customer.company_name || "-"} />
+                            <InfoItem icon={<FiFileText className="w-4 h-4" />} label="Mã số thuế" value={customer.tax_code || "-"} />
+                            <InfoItem
+                                icon={<FiCalendar className="w-4 h-4" />}
+                                label="Ngày thành lập"
+                                value={customer.company_establish_date ? formatDateVNDateOnly(customer.company_establish_date) : "-"}
+                            />
+                        </div>
+                    </Section>
+                )}
 
-                <div>
-                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
-                        Nhóm khách hàng
-                    </h4>
-                    {customer.groups && customer.groups.length > 0 ? (
+                {/* CMND/CCCD */}
+                {(customer.id_no || customer.id_issued_by || customer.id_issued_date || customer.id_issued_place) && (
+                    <Section title="CMND / CCCD">
+                        <div className="grid grid-cols-2 gap-4">
+                            <InfoItem icon={<FiFileText className="w-4 h-4" />} label="Số CMND/CCCD" value={customer.id_no || "-"} />
+                            <InfoItem icon={<FiFileText className="w-4 h-4" />} label="Nơi cấp" value={customer.id_issued_by || "-"} />
+                            <InfoItem
+                                icon={<FiCalendar className="w-4 h-4" />}
+                                label="Ngày cấp"
+                                value={customer.id_issued_date ? formatDateVNDateOnly(customer.id_issued_date) : "-"}
+                            />
+                            <InfoItem icon={<FiMapPin className="w-4 h-4" />} label="Địa điểm cấp" value={customer.id_issued_place || "-"} />
+                        </div>
+                    </Section>
+                )}
+
+                {(customer.description || customer.note) && (
+                    <Section title="Ghi chú">
+                        <div className="space-y-3">
+                            {customer.description && (
+                                <InfoItem icon={<FiFileText className="w-4 h-4" />} label="Mô tả" value={customer.description} />
+                            )}
+                            {customer.note && (
+                                <InfoItem icon={<FiFileText className="w-4 h-4" />} label="Ghi chú" value={customer.note} />
+                            )}
+                        </div>
+                    </Section>
+                )}
+
+                {customer.groups && customer.groups.length > 0 && (
+                    <Section title="Nhóm khách hàng">
                         <div className="flex flex-wrap gap-2">
                             {customer.groups.map((groupName) => (
-                                <Badge key={groupName} variant="info">
-                                    {groupName}
-                                </Badge>
+                                <Badge key={groupName} variant="info">{groupName}</Badge>
                             ))}
                         </div>
-                    ) : (
-                        <p className="text-sm text-gray-500">Khách hàng chưa thuộc nhóm nào</p>
-                    )}
-                </div>
+                    </Section>
+                )}
 
-                {/* Sessions Information */}
-                {(customer.sessionCount !== undefined ||
-                    customer.remainingSessions !== undefined) && (
-                        <div>
-                            <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
-                                Thông tin buổi học
-                            </h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <InfoItem
-                                    icon={<FiCalendar className="w-5 h-5" />}
-                                    label="Tổng số buổi học"
-                                    value={customer.sessionCount?.toString() || "0"}
-                                />
-                                <InfoItem
-                                    icon={<FiCalendar className="w-5 h-5" />}
-                                    label="Số buổi còn lại"
-                                    value={customer.remainingSessions?.toString() || "0"}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                {/* Timeline */}
-                <div>
-                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
-                        Lịch sử
-                    </h4>
-                    <div className="space-y-3">
+                {/* Lịch sử */}
+                <Section title="Lịch sử">
+                    <div className="grid grid-cols-2 gap-4">
                         <InfoItem
-                            icon={<FiCalendar className="w-5 h-5" />}
+                            icon={<FiCalendar className="w-4 h-4" />}
                             label="Ngày tạo"
-                            value={formatDateVN(customer.createdDate)}
+                            value={customer.createdDate ? formatDateVNDateOnly(customer.createdDate) : "-"}
                         />
                         {customer.lastContactDate && (
                             <InfoItem
-                                icon={<FiCalendar className="w-5 h-5" />}
-                                label="Liên hệ lần cuối"
-                                value={formatDateVN(customer.lastContactDate)}
+                                icon={<FiCalendar className="w-4 h-4" />}
+                                label="Cập nhật lần cuối"
+                                value={formatDateVNDateOnly(customer.lastContactDate)}
                             />
                         )}
                     </div>
-                </div>
+                </Section>
             </div>
             <DialogComponent />
         </Modal>
     );
 }
 
-// Helper component for displaying info items
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 border-b border-gray-100 pb-2">
+                {title}
+            </h4>
+            {children}
+        </div>
+    );
+}
+
 interface InfoItemProps {
     icon: React.ReactNode;
     label: string;
@@ -327,12 +239,10 @@ interface InfoItemProps {
 function InfoItem({ icon, label, value, className = "" }: InfoItemProps) {
     return (
         <div className={`flex items-start gap-3 ${className}`}>
-            <div className="text-gray-400 mt-0.5">{icon}</div>
+            <div className="text-gray-400 mt-0.5 flex-shrink-0">{icon}</div>
             <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-500 mb-0.5">{label}</p>
-                <p className="text-sm text-gray-900 font-medium break-words">
-                    {value}
-                </p>
+                <p className="text-sm text-gray-900 font-medium break-words">{value}</p>
             </div>
         </div>
     );

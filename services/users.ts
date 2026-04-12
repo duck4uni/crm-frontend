@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import {
     GetMyInfoResponse,
     GetUsersResponse,
+    GetAdminUsersResponse,
     GetUserResponse,
     CreateUsersResponse,
     UpdateUserResponse,
@@ -16,6 +17,7 @@ import {
     CreateUserPayload,
     UpdateUserPayload,
     CreateAdminPayload,
+    CreateAdminUsersResponse,
     PaginatedParams,
 } from "@/types/api";
 
@@ -73,11 +75,11 @@ export const usersService = {
         return apiClient.upload<ImportUsersResponse>(USERS_IMPORT_ENDPOINT, file);
     },
 
-    async getAdminUsers(params?: PaginatedParams): Promise<GetUsersResponse> {
-        return apiClient.get<GetUsersResponse>(USERS_ADMIN_ENDPOINT, params);
+    async getAdminUsers(params?: PaginatedParams): Promise<GetAdminUsersResponse> {
+        return apiClient.get<GetAdminUsersResponse>(USERS_ADMIN_ENDPOINT, params);
     },
 
-    async createAdminUsers(users: CreateAdminPayload[], code: string): Promise<CreateUsersResponse> {
-        return apiClient.post<CreateUsersResponse>(`${USERS_ADMIN_ENDPOINT}?code=${encodeURIComponent(code)}`, users);
+    async createAdminUsers(users: CreateAdminPayload[], code: string): Promise<CreateAdminUsersResponse> {
+        return apiClient.post<CreateAdminUsersResponse>(`${USERS_ADMIN_ENDPOINT}?code=${encodeURIComponent(code)}`, users);
     },
 };

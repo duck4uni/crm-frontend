@@ -13,9 +13,9 @@ export const CUSTOMER_FILTERS: FilterButton[] = [
   {
     id: "all",
     label: "Tất cả",
-    bgColor: "bg-blue-500",
+    bgColor: "bg-primary-500",
     textColor: "text-white",
-    activeBgColor: "bg-blue-600",
+    activeBgColor: "bg-primary-600",
     activeTextColor: "text-white",
   },
   {

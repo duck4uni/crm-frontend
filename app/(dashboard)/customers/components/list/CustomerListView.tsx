@@ -16,6 +16,7 @@ import { usersService } from "@/services/users";
 import { CustomerFilterOption, CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
 import { CustomerTable } from "./CustomerTable";
+import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { CustomerFormModal } from "../forms/CustomerFormModal";
 import { CustomerDetailModal } from "../forms/CustomerDetailModal";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -37,9 +38,9 @@ const GROUP_FILTER_PAGE_SIZE = "5000";
 const DEFAULT_ALL_GROUP_FILTER: CustomerFilterOption = {
   id: "all",
   label: "Tất cả",
-  bgColor: "bg-blue-500",
+  bgColor: "bg-primary-500",
   textColor: "text-white",
-  activeBgColor: "bg-blue-600",
+  activeBgColor: "bg-primary-600",
   activeTextColor: "text-white",
 };
 
@@ -200,6 +201,21 @@ function mapApiRowToCustomerWithAssignee(
     status: mapIsActiveToStatus(row.is_active),
     avatar: undefined,
     groups: groupNamesByCustomerId[row.id] || [],
+    // API-matched fields
+    type: row.type || undefined,
+    company_name: row.company_name || undefined,
+    company_establish_date: row.company_establish_date ? new Date(row.company_establish_date) : undefined,
+    description: row.description || undefined,
+    day_of_birth: row.day_of_birth ? new Date(row.day_of_birth) : undefined,
+    major: row.major || undefined,
+    id_no: row.id_no || undefined,
+    id_issued_by: row.id_issued_by || undefined,
+    id_issued_date: row.id_issued_date ? new Date(row.id_issued_date) : undefined,
+    id_issued_place: row.id_issued_place || undefined,
+    tax_code: row.tax_code || undefined,
+    note: row.note || undefined,
+    website: row.website || undefined,
+    is_active: row.is_active,
   };
 }
 
@@ -252,6 +268,14 @@ function mapCustomerGroupNamesByCustomerId(
   }, {});
 }
 
+function formatDateForApi(date?: Date): string | undefined {
+  if (!date) return undefined;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload {
   const fullName = normalizeWhitespace(data.customerName || "");
   const { firstName, lastName } = splitCustomerName(fullName);
@@ -259,20 +283,29 @@ function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload 
   return {
     first_name: firstName,
     last_name: lastName,
-    description: normalizeWhitespace(data.relationship || "") || `Khach hang ${fullName || "moi"}`,
-    type: detectCustomerType(data),
     full_name: fullName || undefined,
+    description: normalizeWhitespace(data.description || "") || `Khach hang ${fullName || "moi"}`,
+    type: data.type || detectCustomerType(data),
     email: normalizeWhitespace(data.email || "") || undefined,
-    phone: (data.mobilePhone || data.phone || "").trim() || undefined,
+    phone: (data.phone || "").trim() || undefined,
     address: normalizeWhitespace(data.address || "") || undefined,
-    website: normalizeWhitespace(data.source || "") || undefined,
+    website: normalizeWhitespace(data.website || "") || undefined,
     gender: mapCustomerGenderToApi(data.gender),
-    note: normalizeWhitespace(data.relationship || "") || undefined,
+    day_of_birth: formatDateForApi(data.day_of_birth),
+    note: normalizeWhitespace(data.note || "") || undefined,
+    company_name: data.company_name || undefined,
+    company_establish_date: formatDateForApi(data.company_establish_date),
+    tax_code: data.tax_code || undefined,
+    major: data.major || undefined,
+    id_no: data.id_no || undefined,
+    id_issued_by: data.id_issued_by || undefined,
+    id_issued_date: formatDateForApi(data.id_issued_date),
+    id_issued_place: data.id_issued_place || undefined,
     assigned_user_id:
       data.assignee && UUID_PATTERN.test(data.assignee.trim())
         ? data.assignee.trim()
         : undefined,
-    is_active: mapStatusToIsActive(data.status),
+    is_active: data.is_active ?? mapStatusToIsActive(data.status),
   };
 }
 
@@ -283,20 +316,29 @@ function mapFormToUpdatePayload(data: Partial<Customer>): UpdateCustomerPayload 
   return {
     first_name: firstName,
     last_name: lastName,
-    description: normalizeWhitespace(data.relationship || "") || undefined,
-    type: detectCustomerType(data),
     full_name: fullName || undefined,
+    description: normalizeWhitespace(data.description || "") || undefined,
+    type: data.type || detectCustomerType(data),
     email: normalizeWhitespace(data.email || "") || undefined,
-    phone: (data.mobilePhone || data.phone || "").trim() || undefined,
+    phone: (data.phone || "").trim() || undefined,
     address: normalizeWhitespace(data.address || "") || undefined,
-    website: normalizeWhitespace(data.source || "") || undefined,
+    website: normalizeWhitespace(data.website || "") || undefined,
     gender: mapCustomerGenderToApi(data.gender),
-    note: normalizeWhitespace(data.relationship || "") || undefined,
+    day_of_birth: formatDateForApi(data.day_of_birth),
+    note: normalizeWhitespace(data.note || "") || undefined,
+    company_name: data.company_name || undefined,
+    company_establish_date: formatDateForApi(data.company_establish_date),
+    tax_code: data.tax_code || undefined,
+    major: data.major || undefined,
+    id_no: data.id_no || undefined,
+    id_issued_by: data.id_issued_by || undefined,
+    id_issued_date: formatDateForApi(data.id_issued_date),
+    id_issued_place: data.id_issued_place || undefined,
     assigned_user_id:
       data.assignee && UUID_PATTERN.test(data.assignee.trim())
         ? data.assignee.trim()
         : undefined,
-    is_active: mapStatusToIsActive(data.status),
+    is_active: data.is_active ?? mapStatusToIsActive(data.status),
   };
 }
 
@@ -337,6 +379,8 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
   const [groupNamesByCustomerId, setGroupNamesByCustomerId] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -429,11 +473,11 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Không thể tải danh sách khách hàng.";
-      toast.error("Tải dữ liệu thất bại", msg);
+      toastRef.current.error("Tải dữ liệu thất bại", msg);
     } finally {
       setIsLoading(false);
     }
-  }, [onCountChange, resolveAssigneeNameMap, toast]);
+  }, [onCountChange, resolveAssigneeNameMap]);
 
   useEffect(() => {
     void loadCustomers();
@@ -637,37 +681,35 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
 
   return (
     <div className="space-y-6">
-      <CustomerFilters
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        counts={filterCounts}
-        filters={groupFilters}
+      <ListPageLayout
+        items={filteredCustomers}
+        resetPageKey={`${activeFilter}|${searchQuery}`}
+        renderFilters={
+          <CustomerFilters
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            counts={filterCounts}
+            filters={groupFilters}
+          />
+        }
+        renderSearch={
+          <CustomerSearch
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onAddCustomer={handleAddCustomer}
+            onExport={handleExport}
+            onImport={handleImport}
+          />
+        }
+        renderTable={(paged) => (
+          <CustomerTable
+            customers={paged}
+            onCustomerClick={(customer) => { void handleCustomerClick(customer); }}
+            onCustomerEdit={handleEditCustomer}
+            onCustomerDelete={(customer) => { void handleDeleteCustomer(customer); }}
+          />
+        )}
       />
-
-      <CustomerSearch
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onAddCustomer={handleAddCustomer}
-        onExport={handleExport}
-        onImport={handleImport}
-      />
-
-      <CustomerTable
-        customers={filteredCustomers}
-        onCustomerClick={(customer) => {
-          void handleCustomerClick(customer);
-        }}
-        onCustomerEdit={handleEditCustomer}
-      />
-
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <span>
-            Hiển thị {filteredCustomers.length} khách hàng
-            {activeFilter !== "all" && " trong bộ lọc đã chọn"}
-          </span>
-        </div>
-      </div>
 
       <CustomerFormModal
         isOpen={isFormModalOpen}

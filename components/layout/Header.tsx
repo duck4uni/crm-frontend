@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
-import { FiSearch, FiMenu } from "react-icons/fi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { FiMenu, FiSettings, FiLogOut, FiChevronDown } from "react-icons/fi";
 import { Avatar } from "@/components/ui/Avatar";
 import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
 import {
+  clearAuthSession,
   getCurrentUserSession,
   hasAuthSession,
   setCurrentUserSession,
 } from "@/lib/auth-session";
 import { MyInfoResponseData } from "@/types/api";
+import { authService } from "@/services/auth";
 import { usersService } from "@/services/users";
 
 const moduleTitleMap: Record<string, string> = {
   "/": "Bảng điều khiển",
-  "/customers": "Khách hàng",
+  "/customers": "Quản lý khách hàng",
+  "/customers/groups": "Quản lý nhóm khách hàng",
   "/contacts": "Liên hệ",
   "/companies": "Công ty",
   "/deals": "Thương vụ",
@@ -23,6 +26,7 @@ const moduleTitleMap: Record<string, string> = {
   "/users": "Người dùng",
   "/notifications": "Thông báo",
   "/permissions": "Phân quyền",
+  "/zalo-oa": "Zalo OA",
   "/settings": "Cài đặt",
 };
 
@@ -33,7 +37,28 @@ interface HeaderProps {
 
 export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<MyInfoResponseData | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {}
+    clearAuthSession();
+    router.replace("/login");
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -76,51 +101,81 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
       return moduleTitleMap["/"];
     }
 
-    const segments = pathname.split("/").filter(Boolean);
-    const modulePath = `/${segments[0]}`;
+    // Match longest prefix first (e.g. /customers/groups before /customers)
+    const sortedKeys = Object.keys(moduleTitleMap).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+      if (key !== "/" && (pathname === key || pathname.startsWith(key + "/"))) {
+        return moduleTitleMap[key];
+      }
+    }
 
-    return moduleTitleMap[modulePath] ?? "Bảng điều khiển";
+    return "Bảng điều khiển";
   }, [pathname]);
 
   return (
     <header className="bg-white border-b border-gray-200 h-16">
-      <div className="grid h-full grid-cols-[minmax(120px,220px)_minmax(260px,1fr)_auto] items-center gap-4 px-4 md:gap-6 md:px-6">
-        <div className="min-w-0 flex items-center gap-2">
+      <div className="flex h-full items-center gap-4 px-4 md:gap-6 md:px-6">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onToggleSidebar}
             aria-label={isSidebarOpen ? "Thu gọn thanh bên" : "Mở rộng thanh bên"}
-            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
+            className="rounded-lg p-2 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
           >
             <FiMenu className="h-5 w-5" />
           </button>
-          <p className="truncate text-lg font-semibold text-gray-900">{activeModule}</p>
+          <p className="text-lg font-semibold text-gray-900 whitespace-nowrap">{activeModule}</p>
         </div>
 
-        <div className="flex justify-center">
-          <div className="relative w-full max-w-xl">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Tìm liên hệ, công ty, thương vụ..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-        </div>
+        <div className="flex-1" />
 
-        <div className="flex items-center space-x-4 justify-self-end">
+        <div className="flex items-center space-x-4">
           <NotificationDropdown />
 
-          <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
-            <Avatar name={currentUser?.full_name || "Người dùng hệ thống"} size="sm" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                {currentUser?.full_name || "Người dùng hệ thống"}
-              </p>
-              <p className="text-xs text-gray-500">
-                {currentUser?.email || "Quản lý kinh doanh"}
-              </p>
-            </div>
+          <div ref={userMenuRef} className="relative flex items-center space-x-3 pl-4 border-l border-gray-200">
+            <button
+              type="button"
+              onClick={() => setIsUserMenuOpen((prev) => !prev)}
+              className="flex items-center space-x-3 rounded-lg px-2 py-1 hover:bg-gray-50 transition-colors"
+            >
+              <Avatar
+                src={currentUser?.avatar ?? undefined}
+                name={currentUser?.full_name || "Người dùng hệ thống"}
+                size="sm"
+              />
+              <div className="hidden md:block text-left">
+                <p className="text-sm font-medium text-gray-900 leading-tight">
+                  {currentUser?.full_name || "Người dùng hệ thống"}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {currentUser?.email || "Quản lý kinh doanh"}
+                </p>
+              </div>
+              <FiChevronDown
+                className={`h-4 w-4 text-gray-400 transition-transform ${isUserMenuOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-gray-200 bg-white shadow-lg z-50">
+                <button
+                  type="button"
+                  onClick={() => { setIsUserMenuOpen(false); router.push("/settings"); }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <FiSettings className="h-4 w-4 text-gray-400" />
+                  Cài đặt
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <FiLogOut className="h-4 w-4" />
+                  Đăng xuất
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

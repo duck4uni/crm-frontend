@@ -158,8 +158,8 @@ export function FilterModal({ isOpen, onClose, onApply, initialFilters = {} }: F
                     />
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">
+                <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+                    <p className="text-sm text-primary-800">
                         💡 <strong>Mẹo:</strong> Để lưu bộ lọc này, hãy áp dụng rồi click &ldquo;Bộ lọc đã lưu&rdquo; để lưu lại.
                     </p>
                 </div>

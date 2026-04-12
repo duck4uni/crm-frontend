@@ -53,11 +53,11 @@ export function Toast({ type, title, description, onClose }: ToastProps) {
         },
         info: {
             icon: <FiInfo className="w-5 h-5" />,
-            bgColor: "bg-blue-50",
-            borderColor: "border-blue-200",
-            iconColor: "text-blue-600",
-            titleColor: "text-blue-900",
-            descColor: "text-blue-700",
+            bgColor: "bg-primary-50",
+            borderColor: "border-primary-200",
+            iconColor: "text-primary-600",
+            titleColor: "text-primary-900",
+            descColor: "text-primary-700",
         },
     };
 

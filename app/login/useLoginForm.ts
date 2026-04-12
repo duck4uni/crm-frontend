@@ -103,6 +103,7 @@ export function useLoginForm(): LoginFormBindings {
                 }
             } catch (profileError) {
                 console.error("Load current user profile failed:", profileError);
+                setAuthSession(response.responseData);
             }
 
             toast.success("Đăng nhập thành công", response.message_en || response.message);

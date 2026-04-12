@@ -23,7 +23,7 @@ import {
 function getCategoryConfig(category: NotificationCategory) {
     switch (category) {
         case NotificationCategory.DEAL:
-            return { icon: MdOutlineHandshake, bg: "bg-blue-100", color: "text-blue-600", label: "Thương vụ" };
+            return { icon: MdOutlineHandshake, bg: "bg-primary-100", color: "text-primary-600", label: "Thương vụ" };
         case NotificationCategory.TASK:
             return { icon: MdOutlineTask, bg: "bg-yellow-100", color: "text-yellow-600", label: "Công việc" };
         case NotificationCategory.CUSTOMER:
@@ -217,7 +217,7 @@ export function NotificationDropdown() {
                                         key={notification.id}
                                         onClick={() => handleItemClick(notification)}
                                         className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors border-b border-gray-50 last:border-b-0 ${!notification.has_user_read
-                                            ? "bg-blue-50/50 hover:bg-blue-50"
+                                            ? "bg-primary-50/50 hover:bg-primary-50"
                                             : "hover:bg-gray-50"
                                             }`}
                                     >
@@ -236,7 +236,7 @@ export function NotificationDropdown() {
                                                     {notification.title}
                                                 </p>
                                                 {!notification.has_user_read && (
-                                                    <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full" />
+                                                    <span className="flex-shrink-0 w-2 h-2 bg-primary-500 rounded-full" />
                                                 )}
                                                 {!notification.has_user_read && (
                                                     <button

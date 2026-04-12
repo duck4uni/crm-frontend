@@ -99,8 +99,12 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
     };
 
     const handleDownloadTemplate = () => {
-        // In real app, this would download a CSV/Excel template
-        alert("Đang tải xuống mẫu file...");
+        const link = document.createElement("a");
+        link.href = "/mauexcel.xlsx";
+        link.download = "mauexcel.xlsx";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -141,19 +145,19 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                 {!importResult ? (
                     <>
                         {/* Download Template */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
                             <div className="flex items-start gap-3">
-                                <FileSpreadsheet className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                <FileSpreadsheet className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                                    <h4 className="text-sm font-semibold text-primary-900 mb-1">
                                         Tải xuống file mẫu
                                     </h4>
-                                    <p className="text-sm text-blue-700 mb-3">
+                                    <p className="text-sm text-primary-700 mb-3">
                                         Sử dụng file mẫu để đảm bảo dữ liệu của bạn đúng định dạng
                                     </p>
                                     <button
                                         onClick={handleDownloadTemplate}
-                                        className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                        className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
                                     >
                                         <Download className="w-4 h-4" />
                                         Tải file mẫu
@@ -169,7 +173,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                             onDrop={handleDrop}
                             className={`
                 border-2 border-dashed rounded-lg p-8 text-center transition-all
-                ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400"}
+                ${isDragging ? "border-primary-500 bg-primary-50" : "border-gray-300 hover:border-gray-400"}
               `}
                         >
                             <input
@@ -191,7 +195,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                                     </div>
                                     <button
                                         onClick={handleReset}
-                                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                                     >
                                         Chọn file khác
                                     </button>
@@ -205,7 +209,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                                         </p>
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="text-blue-600 hover:text-blue-700 font-medium"
+                                            className="text-primary-600 hover:text-primary-700 font-medium"
                                         >
                                             chọn file từ máy tính
                                         </button>

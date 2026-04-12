@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { UserProfile } from "@/types/user";
-import { PermissionGroup } from "@/types/permission";
-import { PermissionApiRow, TagApiRow, UserApiRow, UserTagApiRow } from "@/types/api";
+import { AdminUserApiRow, PermissionApiRow } from "@/types/api";
 import { usersService } from "@/services/users";
 import { permissionsService } from "@/services/permissions";
-import { tagsService } from "@/services/tags";
-import { userTagsService } from "@/services/user-tags";
 import { UserFilters } from "./UserFilters";
 import { UserSearch } from "./UserSearch";
 import { UserTable } from "./UserTable";
+import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { UserFormModal } from "../forms/UserFormModal";
 import { UserDetailModal } from "../forms/UserDetailModal";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -23,8 +21,9 @@ interface PermissionOption {
 }
 
 const PAGE_SIZE = "500";
+const ALLOWED_ROLE_CODES = ["SITE_WORKER", "SITE_LEADER"];
 
-function mapApiRowToProfile(row: UserApiRow): UserProfile {
+function mapApiRowToProfile(row: AdminUserApiRow): UserProfile {
     return {
         id: row.id,
         email: row.email,
@@ -41,152 +40,62 @@ function mapApiRowToProfile(row: UserApiRow): UserProfile {
     };
 }
 
-function mapApiRowToPermission(row: PermissionApiRow): PermissionOption {
-    return {
-        id: row.id,
-        name: row.name,
-        code: row.code,
-        group_code: (row.group_code as PermissionGroup) || PermissionGroup.USER,
-    };
-}
-
-function normalizeValue(value?: string | null): string {
-    return (value || "").trim().toLowerCase();
-}
-
-function buildPermissionTagMap(
-    permissions: PermissionOption[],
-    tags: TagApiRow[],
-): Record<string, string> {
-    const tagByName = new Map<string, string>();
-
-    tags.forEach((tag) => {
-        const key = normalizeValue(tag.name);
-        if (key) {
-            tagByName.set(key, tag.id);
-        }
-    });
-
-    const mapping: Record<string, string> = {};
-
-    permissions.forEach((permission) => {
-        const byCode = tagByName.get(normalizeValue(permission.code));
-        const byName = tagByName.get(normalizeValue(permission.name));
-        const tagId = byCode || byName;
-
-        if (tagId) {
-            mapping[permission.id] = tagId;
-        }
-    });
-
-    return mapping;
-}
-
-function mapUserPermissionIdsByUser(
-    rows: UserTagApiRow[],
-    permissionTagMap: Record<string, string>,
-): Record<string, string[]> {
-    const reversePermissionTagMap = new Map<string, string>();
-    Object.entries(permissionTagMap).forEach(([permissionId, tagId]) => {
-        reversePermissionTagMap.set(tagId, permissionId);
-    });
-
-    const byUser: Record<string, Set<string>> = {};
-
-    rows.forEach((row) => {
-        const permissionId = reversePermissionTagMap.get(row.tag_id);
-        if (!permissionId) {
-            return;
-        }
-
-        if (!byUser[row.user_id]) {
-            byUser[row.user_id] = new Set<string>();
-        }
-
-        byUser[row.user_id].add(permissionId);
-    });
-
-    return Object.fromEntries(
-        Object.entries(byUser).map(([userId, permissionIds]) => [userId, Array.from(permissionIds)]),
-    );
-}
-
 export function UserListView() {
     const [users, setUsers] = useState<UserProfile[]>([]);
+    const [userRolesByUser, setUserRolesByUser] = useState<Record<string, string[]>>({});
     const [searchQuery, setSearchQuery] = useState("");
-    const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive" | "deleted">("all");
+    const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
     const [isLoading, setIsLoading] = useState(true);
     const [permissions, setPermissions] = useState<PermissionOption[]>([]);
-    const [allTags, setAllTags] = useState<TagApiRow[]>([]);
-    const [permissionTagMap, setPermissionTagMap] = useState<Record<string, string>>({});
-    const [userPermissionIdsByUser, setUserPermissionIdsByUser] = useState<Record<string, string[]>>({});
     const toast = useToast();
+    const toastRef = useRef(toast);
+    toastRef.current = toast;
 
     // Modal states
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-    const [selectedUserPermissionNames, setSelectedUserPermissionNames] = useState<string[]>([]);
 
     const loadUsers = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [usersRes, permissionsRes, tagsRes, userTagsRes] = await Promise.all([
-                usersService.getUsers({ pageSize: PAGE_SIZE }),
+            const [usersRes, permissionsRes] = await Promise.all([
+                usersService.getAdminUsers({ pageSize: PAGE_SIZE }),
                 permissionsService.getPermissions({ pageSize: PAGE_SIZE }),
-                tagsService.getTags({ pageSize: PAGE_SIZE }),
-                userTagsService.getUserTags({ pageSize: PAGE_SIZE }),
             ]);
 
             const rows = usersRes.responseData?.rows ?? [];
-            const permissionRows = permissionsRes.responseData?.rows ?? [];
-            const tagRows = tagsRes.responseData?.rows ?? [];
-            const userTagRows = userTagsRes.responseData?.rows ?? [];
+            const permissionRows = (permissionsRes.responseData?.rows ?? []) as PermissionApiRow[];
 
-            const mappedPermissions = permissionRows
-                .map(mapApiRowToPermission)
-                .sort((a, b) => a.name.localeCompare(b.name, "vi"));
-            const mappedPermissionTagMap = buildPermissionTagMap(mappedPermissions, tagRows);
-            const mappedUserPermissionIdsByUser = mapUserPermissionIdsByUser(userTagRows, mappedPermissionTagMap);
+            const filteredPermissions = permissionRows
+                .filter((p) => ALLOWED_ROLE_CODES.includes(p.code))
+                .map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    code: p.code,
+                    group_code: p.group_code,
+                }));
+
+            const rolesMap: Record<string, string[]> = {};
+            for (const row of rows) {
+                rolesMap[row.id] = (row.user_permisions ?? []).map((up) => up.permision.name);
+            }
 
             setUsers(rows.map(mapApiRowToProfile));
-            setPermissions(mappedPermissions);
-            setAllTags(tagRows);
-            setPermissionTagMap(mappedPermissionTagMap);
-            setUserPermissionIdsByUser(mappedUserPermissionIdsByUser);
+            setUserRolesByUser(rolesMap);
+            setPermissions(filteredPermissions);
         } catch (error) {
             const msg = error instanceof Error ? error.message : "Không thể tải danh sách người dùng.";
-            toast.error("Tải dữ liệu thất bại", msg);
+            toastRef.current.error("Tải dữ liệu thất bại", msg);
         } finally {
             setIsLoading(false);
         }
-    }, [toast]);
+    }, []);
 
     useEffect(() => {
-        loadUsers();
+        void loadUsers();
     }, [loadUsers]);
-
-    const getPermissionNamesForUser = useCallback((userId: string) => {
-        const permissionIds = userPermissionIdsByUser[userId] || [];
-        if (permissionIds.length === 0) {
-            return [];
-        }
-
-        const permissionNameById = new Map(permissions.map((permission) => [permission.id, permission.name]));
-        return permissionIds
-            .map((permissionId) => permissionNameById.get(permissionId))
-            .filter((name): name is string => Boolean(name));
-    }, [permissions, userPermissionIdsByUser]);
-
-    useEffect(() => {
-        if (!selectedUser) {
-            setSelectedUserPermissionNames([]);
-            return;
-        }
-
-        setSelectedUserPermissionNames(getPermissionNamesForUser(selectedUser.id));
-    }, [getPermissionNamesForUser, selectedUser]);
 
     // Calculate filter counts
     const filterCounts = useMemo(() => {
@@ -194,7 +103,6 @@ export function UserListView() {
             all: users.length,
             active: users.filter((u) => u.is_active && !u.is_delete).length,
             inactive: users.filter((u) => !u.is_active && !u.is_delete).length,
-            deleted: users.filter((u) => u.is_delete).length,
         };
     }, [users]);
 
@@ -206,8 +114,6 @@ export function UserListView() {
             filtered = filtered.filter((u) => u.is_active && !u.is_delete);
         } else if (activeFilter === "inactive") {
             filtered = filtered.filter((u) => !u.is_active && !u.is_delete);
-        } else if (activeFilter === "deleted") {
-            filtered = filtered.filter((u) => u.is_delete);
         }
 
         if (searchQuery.trim()) {
@@ -223,13 +129,8 @@ export function UserListView() {
         return filtered;
     }, [users, activeFilter, searchQuery]);
 
-    const userRolesByUser = useMemo(() => {
-        return Object.fromEntries(users.map((user) => [user.id, getPermissionNamesForUser(user.id)]));
-    }, [getPermissionNamesForUser, users]);
-
     const handleUserClick = (user: UserProfile) => {
         setSelectedUser(user);
-        setSelectedUserPermissionNames(getPermissionNamesForUser(user.id));
         setIsDetailModalOpen(true);
     };
 
@@ -244,115 +145,41 @@ export function UserListView() {
         setIsFormModalOpen(true);
     };
 
-    const ensurePermissionTagId = useCallback(async (permissionId: string): Promise<string> => {
-        const existingTagId = permissionTagMap[permissionId];
-        if (existingTagId) {
-            return existingTagId;
-        }
-
-        const permission = permissions.find((item) => item.id === permissionId);
-        if (!permission) {
-            throw new Error("Không tìm thấy quyền cần gán.");
-        }
-
-        const keyByCode = normalizeValue(permission.code);
-        const keyByName = normalizeValue(permission.name);
-        const existedTag = allTags.find(
-            (tag) =>
-                normalizeValue(tag.name) === keyByCode ||
-                normalizeValue(tag.name) === keyByName,
-        );
-
-        if (existedTag) {
-            setPermissionTagMap((prev) => ({ ...prev, [permissionId]: existedTag.id }));
-            return existedTag.id;
-        }
-
-        const createResponse = await tagsService.createTag({ name: permission.code || permission.name });
-        const createdTag = createResponse.responseData;
-
-        setAllTags((prev) => [...prev, createdTag]);
-        setPermissionTagMap((prev) => ({ ...prev, [permissionId]: createdTag.id }));
-
-        return createdTag.id;
-    }, [allTags, permissionTagMap, permissions]);
-
-    const syncUserPermissions = useCallback(async (userId: string, nextPermissionIds: string[]) => {
-        const normalizedNextPermissionIds = Array.from(new Set(nextPermissionIds.filter(Boolean)));
-        const existingResponse = await userTagsService.getUserTagsByUserId(userId, { pageSize: PAGE_SIZE });
-        const existingRows = existingResponse.responseData?.rows || [];
-
-        const reverseTagIdToPermissionId = new Map<string, string>();
-        Object.entries(permissionTagMap).forEach(([permissionId, tagId]) => {
-            reverseTagIdToPermissionId.set(tagId, permissionId);
-        });
-
-        const existingPermissionIdByUserTagId = new Map<string, string>();
-        existingRows.forEach((row) => {
-            const permissionId = reverseTagIdToPermissionId.get(row.tag_id);
-            if (permissionId) {
-                existingPermissionIdByUserTagId.set(row.id, permissionId);
-            }
-        });
-
-        const existingPermissionIdSet = new Set(existingPermissionIdByUserTagId.values());
-        const nextPermissionIdSet = new Set(normalizedNextPermissionIds);
-
-        const permissionIdsToAdd = normalizedNextPermissionIds.filter(
-            (permissionId) => !existingPermissionIdSet.has(permissionId),
-        );
-
-        const userTagIdsToDelete = Array.from(existingPermissionIdByUserTagId.entries())
-            .filter(([, permissionId]) => !nextPermissionIdSet.has(permissionId))
-            .map(([userTagId]) => userTagId);
-
-        if (permissionIdsToAdd.length > 0) {
-            const payload: Array<{ user_id: string; tag_id: string }> = [];
-
-            for (const permissionId of permissionIdsToAdd) {
-                const tagId = await ensurePermissionTagId(permissionId);
-                payload.push({ user_id: userId, tag_id: tagId });
-            }
-
-            if (payload.length > 0) {
-                await userTagsService.createUserTags(payload);
-            }
-        }
-
-        if (userTagIdsToDelete.length > 0) {
-            await Promise.all(userTagIdsToDelete.map((userTagId) => userTagsService.deleteUserTag(userTagId)));
-        }
-    }, [ensurePermissionTagId, permissionTagMap]);
-
-    const handleSaveUser = async (userData: Partial<UserProfile>, permissionIds: string[]) => {
+    const handleSaveUser = async (userData: Partial<UserProfile> & { password?: string }, roleCode: string | null) => {
         try {
             let targetUserId: string | undefined;
 
             if (editingUser) {
-                const response = await usersService.updateUser(editingUser.id, {
-                    email: userData.email,
-                    full_name: userData.full_name,
-                    phone: userData.phone,
-                    avatar: userData.avatar,
-                    birthday: userData.birthday ? new Date(userData.birthday).toISOString() : undefined,
-                    is_active: userData.is_active,
-                });
+                const updatePayload: Record<string, any> = {};
+                
+                if (userData.email && userData.email !== editingUser.email) updatePayload.email = userData.email;
+                if (userData.full_name && userData.full_name !== editingUser.full_name) updatePayload.full_name = userData.full_name;
+                if (userData.phone && userData.phone !== editingUser.phone) updatePayload.phone = userData.phone;
+                if (userData.avatar !== undefined && userData.avatar !== editingUser.avatar) updatePayload.avatar = userData.avatar;
+                if (userData.is_active !== undefined && userData.is_active !== editingUser.is_active) updatePayload.is_active = userData.is_active;
+                if (userData.birthday !== undefined && new Date(userData.birthday).getTime() !== new Date(editingUser.birthday || 0).getTime()) {
+                    const birthdayDate = new Date(userData.birthday);
+                    const year = birthdayDate.getFullYear();
+                    const month = String(birthdayDate.getMonth() + 1).padStart(2, "0");
+                    const day = String(birthdayDate.getDate()).padStart(2, "0");
+                    updatePayload.birthday = userData.birthday ? `${year}-${month}-${day}` : null;
+                }
+
+                console.log("Update payload:", updatePayload);
+                const response = await usersService.updateUser(editingUser.id, updatePayload);
                 targetUserId = response.responseData.id;
                 toast.success("Cập nhật thành công", `Người dùng "${userData.full_name}" đã được cập nhật.`);
             } else {
-                const response = await usersService.createUsers([{
-                    email: userData.email || "",
-                    full_name: userData.full_name,
-                    phone: userData.phone,
-                    avatar: userData.avatar,
-                    birthday: userData.birthday ? new Date(userData.birthday).toISOString() : undefined,
-                }]);
-                targetUserId = response.responseData?.[0]?.id;
+                await usersService.createAdminUsers(
+                    [{
+                        email: userData.email || "",
+                        full_name: userData.full_name,
+                        phone: userData.phone,
+                        password: userData.password || "",
+                    }],
+                    roleCode ?? "",
+                );
                 toast.success("Thêm mới thành công", `Người dùng "${userData.full_name}" đã được thêm.`);
-            }
-
-            if (targetUserId) {
-                await syncUserPermissions(targetUserId, permissionIds);
             }
 
             await loadUsers();
@@ -402,57 +229,53 @@ export function UserListView() {
     }
 
     return (
-        <div className="space-y-6">
-            {/* Filters */}
-            <UserFilters
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-                counts={filterCounts}
+        <>
+            <ListPageLayout
+                items={filteredUsers}
+                isLoading={isLoading}
+                loadingText="Đang tải danh sách người dùng..."
+                resetPageKey={`${activeFilter}|${searchQuery}`}
+                renderFilters={
+                    <UserFilters
+                        activeFilter={activeFilter}
+                        onFilterChange={setActiveFilter}
+                        counts={filterCounts}
+                    />
+                }
+                renderSearch={
+                    <UserSearch
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        onAddUser={handleAddUser}
+                        onExport={handleExport}
+                    />
+                }
+                renderTable={(paged) => (
+                    <UserTable
+                        users={paged}
+                        userRolesByUser={userRolesByUser}
+                        onUserClick={handleUserClick}
+                        onUserEdit={handleEditUser}
+                        onUserDelete={(user) => { void handleDeleteUser(user); }}
+                    />
+                )}
             />
 
-            {/* Search and Actions */}
-            <UserSearch
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                onAddUser={handleAddUser}
-                onExport={handleExport}
-            />
-
-            {/* User Table */}
-            <UserTable
-                users={filteredUsers}
-                userRolesByUser={userRolesByUser}
-                onUserClick={handleUserClick}
-                onUserEdit={handleEditUser}
-            />
-
-            {/* Summary */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                    <span>Tổng số: {filteredUsers.length} người dùng</span>
-                    <span>Đang hoạt động: {filterCounts.active}</span>
-                </div>
-            </div>
-
-            {/* Form Modal */}
             <UserFormModal
                 isOpen={isFormModalOpen}
                 onClose={() => setIsFormModalOpen(false)}
                 onSave={handleSaveUser}
                 user={editingUser}
                 permissions={permissions}
-                initialPermissionIds={editingUser ? (userPermissionIdsByUser[editingUser.id] || []) : []}
             />
 
-            {/* Detail Modal */}
             <UserDetailModal
                 isOpen={isDetailModalOpen}
                 onClose={() => setIsDetailModalOpen(false)}
                 user={selectedUser}
                 onEdit={handleEditUser}
                 onDelete={handleDeleteUser}
-                permissionNames={selectedUserPermissionNames}
             />
-        </div>
+        </>
     );
 }
