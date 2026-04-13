@@ -23,6 +23,13 @@ interface GroupOption {
     name: string;
 }
 
+const UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeCustomerType(value?: string): "individual" | "company" {
+    return value?.trim().toLowerCase() === "company" ? "company" : "individual";
+}
+
 export function CustomerFormModal({
     isOpen,
     onClose,
@@ -39,13 +46,11 @@ export function CustomerFormModal({
         address: "",
         website: "",
         assignee: "",
+        assigned_user_id: "",
         type: "individual",
         company_name: "",
         tax_code: "",
         major: "",
-        id_no: "",
-        id_issued_by: "",
-        id_issued_place: "",
         description: "",
         note: "",
         is_active: true,
@@ -69,15 +74,12 @@ export function CustomerFormModal({
                 address: customer.address || "",
                 website: customer.website || customer.source || "",
                 assignee: customer.assignee || "",
-                type: customer.type || "individual",
+                assigned_user_id: customer.assigned_user_id || "",
+                type: normalizeCustomerType(customer.type),
                 company_name: customer.company_name || "",
                 company_establish_date: customer.company_establish_date,
                 tax_code: customer.tax_code || "",
                 major: customer.major || "",
-                id_no: customer.id_no || "",
-                id_issued_by: customer.id_issued_by || "",
-                id_issued_date: customer.id_issued_date,
-                id_issued_place: customer.id_issued_place || "",
                 day_of_birth: customer.day_of_birth,
                 description: customer.description || "",
                 note: customer.note || "",
@@ -92,13 +94,11 @@ export function CustomerFormModal({
                 address: "",
                 website: "",
                 assignee: "",
+                assigned_user_id: "",
                 type: "individual",
                 company_name: "",
                 tax_code: "",
                 major: "",
-                id_no: "",
-                id_issued_by: "",
-                id_issued_place: "",
                 description: "",
                 note: "",
                 is_active: true,
@@ -149,7 +149,21 @@ export function CustomerFormModal({
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        if (name === "assignee") {
+            const trimmed = value.trim();
+            setFormData((prev) => ({
+                ...prev,
+                assignee: value,
+                assigned_user_id: UUID_PATTERN.test(trimmed) ? trimmed : "",
+            }));
+        } else if (name === "type") {
+            setFormData((prev) => ({
+                ...prev,
+                type: normalizeCustomerType(value),
+            }));
+        } else {
+            setFormData((prev) => ({ ...prev, [name]: value }));
+        }
         if (errors[name]) {
             setErrors((prev) => { const n = { ...prev }; delete n[name]; return n; });
         }
@@ -239,7 +253,7 @@ export function CustomerFormModal({
                         <Select
                             label="Loại khách hàng"
                             name="type"
-                            value={formData.type || "individual"}
+                            value={normalizeCustomerType(formData.type)}
                             onChange={handleChange}
                             options={typeOptions}
                             variant="default"
@@ -328,77 +342,35 @@ export function CustomerFormModal({
                     </div>
                 </FormSection>
 
-                {formData.type === "company" && (
-                    <FormSection title="Thông tin doanh nghiệp">
-                        <div className="grid grid-cols-2 gap-4">
-                            <Input
-                                label="Tên công ty"
-                                name="company_name"
-                                value={formData.company_name || ""}
-                                onChange={handleChange}
-                                placeholder="Nhập tên công ty"
-                                disabled={isLoading}
-                                className="col-span-2"
-                            />
-                            <Input
-                                label="Mã số thuế"
-                                name="tax_code"
-                                value={formData.tax_code || ""}
-                                onChange={handleChange}
-                                placeholder="Nhập mã số thuế"
-                                disabled={isLoading}
-                            />
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày thành lập</label>
-                                <input
-                                    type="date"
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    value={formatDateForInput(formData.company_establish_date)}
-                                    onChange={(e) => handleDateChange("company_establish_date", e.target.value)}
-                                    disabled={isLoading}
-                                />
-                            </div>
-                        </div>
-                    </FormSection>
-                )}
-
-                {/* CMND/CCCD */}
-                <FormSection title="CMND / CCCD">
+                <FormSection title="Thông tin doanh nghiệp">
                     <div className="grid grid-cols-2 gap-4">
                         <Input
-                            label="Số CMND/CCCD"
-                            name="id_no"
-                            value={formData.id_no || ""}
+                            label="Tên công ty"
+                            name="company_name"
+                            value={formData.company_name || ""}
                             onChange={handleChange}
-                            placeholder="Nhập số CMND/CCCD"
+                            placeholder="Nhập tên công ty"
                             disabled={isLoading}
+                            className="col-span-2"
                         />
                         <Input
-                            label="Nơi cấp"
-                            name="id_issued_by"
-                            value={formData.id_issued_by || ""}
+                            label="Mã số thuế"
+                            name="tax_code"
+                            value={formData.tax_code || ""}
                             onChange={handleChange}
-                            placeholder="VD: Công an TP.HCM"
+                            placeholder="Nhập mã số thuế"
                             disabled={isLoading}
                         />
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày cấp</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày thành lập</label>
                             <input
                                 type="date"
                                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                value={formatDateForInput(formData.id_issued_date)}
-                                onChange={(e) => handleDateChange("id_issued_date", e.target.value)}
+                                value={formatDateForInput(formData.company_establish_date)}
+                                onChange={(e) => handleDateChange("company_establish_date", e.target.value)}
                                 disabled={isLoading}
                             />
                         </div>
-                        <Input
-                            label="Địa điểm cấp"
-                            name="id_issued_place"
-                            value={formData.id_issued_place || ""}
-                            onChange={handleChange}
-                            placeholder="VD: TP.HCM"
-                            disabled={isLoading}
-                        />
                     </div>
                 </FormSection>
 

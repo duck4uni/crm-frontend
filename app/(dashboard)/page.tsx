@@ -228,27 +228,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Charts row 2: Leader vs Worker bar chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Hiệu suất nhân viên</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={performanceData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-              <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 12 }} unit="%" />
-              <Tooltip />
-              <Legend />
-              <Bar yAxisId="left" dataKey="closedJobs" name="Công việc hoàn thành" fill="#2563eb" radius={[4, 4, 0, 0]} />
-              <Bar yAxisId="right" dataKey="responseRate" name="Tỷ lệ phản hồi (%)" fill="#16a34a" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
       {/* Performance detail tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Leader performance */}

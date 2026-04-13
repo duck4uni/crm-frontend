@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Customer, CustomerStatus } from "@/types/customer";
 import {
-  CreateCustomerPayload,
   CustomerApiRow,
   CustomerTagApiRow,
   TagApiRow,
-  UpdateCustomerPayload,
 } from "@/types/api";
 import { customerTagsService } from "@/services/customer-tags";
 import { customersService } from "@/services/customers";
@@ -17,8 +16,6 @@ import { CustomerFilterOption, CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
 import { CustomerTable } from "./CustomerTable";
 import { ListPageLayout } from "@/components/ui/ListPageLayout";
-import { CustomerFormModal } from "../forms/CustomerFormModal";
-import { CustomerDetailModal } from "../forms/CustomerDetailModal";
 import { useToast } from "@/components/ui/ToastProvider";
 
 interface ImportFeedback {
@@ -131,37 +128,8 @@ function mapApiGenderToCustomer(gender?: string | null): Customer["gender"] {
   return "Other";
 }
 
-function mapCustomerGenderToApi(gender?: Customer["gender"]): string | undefined {
-  if (gender === "Male") {
-    return "male";
-  }
-
-  if (gender === "Female") {
-    return "female";
-  }
-
-  return undefined;
-}
-
-function mapStatusToIsActive(status?: CustomerStatus): boolean | undefined {
-  if (!status) {
-    return undefined;
-  }
-
-  return status !== CustomerStatus.NOT_CONTACTED;
-}
-
 function mapIsActiveToStatus(isActive?: boolean): CustomerStatus {
   return isActive === false ? CustomerStatus.NOT_CONTACTED : CustomerStatus.REGISTERED;
-}
-
-function detectCustomerType(data: Partial<Customer>): "individual" | "company" {
-  const signal = `${data.customerSource || ""} ${data.source || ""}`.toLowerCase();
-  if (signal.includes("company") || signal.includes("cong ty")) {
-    return "company";
-  }
-
-  return "individual";
 }
 
 function mapApiRowToCustomer(row: CustomerApiRow, index: number): Customer {
@@ -201,6 +169,11 @@ function mapApiRowToCustomerWithAssignee(
     status: mapIsActiveToStatus(row.is_active),
     avatar: undefined,
     groups: groupNamesByCustomerId[row.id] || [],
+    first_name: row.first_name,
+    last_name: row.last_name,
+    full_name: row.full_name || undefined,
+    assigned_user_id: row.assigned_user_id || undefined,
+    customer_source_id: row.customer_source_id || undefined,
     // API-matched fields
     type: row.type || undefined,
     company_name: row.company_name || undefined,
@@ -268,109 +241,9 @@ function mapCustomerGroupNamesByCustomerId(
   }, {});
 }
 
-function formatDateForApi(date?: Date): string | undefined {
-  if (!date) return undefined;
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload {
-  const fullName = normalizeWhitespace(data.customerName || "");
-  const { firstName, lastName } = splitCustomerName(fullName);
-
-  return {
-    first_name: firstName,
-    last_name: lastName,
-    full_name: fullName || undefined,
-    description: normalizeWhitespace(data.description || "") || `Khach hang ${fullName || "moi"}`,
-    type: data.type || detectCustomerType(data),
-    email: normalizeWhitespace(data.email || "") || undefined,
-    phone: (data.phone || "").trim() || undefined,
-    address: normalizeWhitespace(data.address || "") || undefined,
-    website: normalizeWhitespace(data.website || "") || undefined,
-    gender: mapCustomerGenderToApi(data.gender),
-    day_of_birth: formatDateForApi(data.day_of_birth),
-    note: normalizeWhitespace(data.note || "") || undefined,
-    company_name: data.company_name || undefined,
-    company_establish_date: formatDateForApi(data.company_establish_date),
-    tax_code: data.tax_code || undefined,
-    major: data.major || undefined,
-    id_no: data.id_no || undefined,
-    id_issued_by: data.id_issued_by || undefined,
-    id_issued_date: formatDateForApi(data.id_issued_date),
-    id_issued_place: data.id_issued_place || undefined,
-    assigned_user_id:
-      data.assignee && UUID_PATTERN.test(data.assignee.trim())
-        ? data.assignee.trim()
-        : undefined,
-    is_active: data.is_active ?? mapStatusToIsActive(data.status),
-  };
-}
-
-function mapFormToUpdatePayload(data: Partial<Customer>): UpdateCustomerPayload {
-  const fullName = normalizeWhitespace(data.customerName || "");
-  const { firstName, lastName } = splitCustomerName(fullName);
-
-  return {
-    first_name: firstName,
-    last_name: lastName,
-    full_name: fullName || undefined,
-    description: normalizeWhitespace(data.description || "") || undefined,
-    type: data.type || detectCustomerType(data),
-    email: normalizeWhitespace(data.email || "") || undefined,
-    phone: (data.phone || "").trim() || undefined,
-    address: normalizeWhitespace(data.address || "") || undefined,
-    website: normalizeWhitespace(data.website || "") || undefined,
-    gender: mapCustomerGenderToApi(data.gender),
-    day_of_birth: formatDateForApi(data.day_of_birth),
-    note: normalizeWhitespace(data.note || "") || undefined,
-    company_name: data.company_name || undefined,
-    company_establish_date: formatDateForApi(data.company_establish_date),
-    tax_code: data.tax_code || undefined,
-    major: data.major || undefined,
-    id_no: data.id_no || undefined,
-    id_issued_by: data.id_issued_by || undefined,
-    id_issued_date: formatDateForApi(data.id_issued_date),
-    id_issued_place: data.id_issued_place || undefined,
-    assigned_user_id:
-      data.assignee && UUID_PATTERN.test(data.assignee.trim())
-        ? data.assignee.trim()
-        : undefined,
-    is_active: data.is_active ?? mapStatusToIsActive(data.status),
-  };
-}
-
-async function syncCustomerGroups(customerId: string, nextGroupIds: string[]): Promise<void> {
-  const normalizedNextGroupIds = Array.from(new Set(nextGroupIds.filter(Boolean)));
-  const existingLinksResponse = await customerTagsService.getCustomerTagsByCustomerId(customerId, {
-    currentPage: "1",
-    pageSize: GROUP_FILTER_PAGE_SIZE,
-  });
-
-  const existingLinks = existingLinksResponse.responseData?.rows || [];
-  const existingGroupIdSet = new Set(existingLinks.map((link) => link.tag_id));
-  const nextGroupIdSet = new Set(normalizedNextGroupIds);
-
-  const groupsToAdd = normalizedNextGroupIds.filter((groupId) => !existingGroupIdSet.has(groupId));
-  const linksToDelete = existingLinks.filter((link) => !nextGroupIdSet.has(link.tag_id));
-
-  if (groupsToAdd.length > 0) {
-    await customerTagsService.createCustomerTags(
-      groupsToAdd.map((groupId) => ({
-        customer_id: customerId,
-        tag_id: groupId,
-      })),
-    );
-  }
-
-  if (linksToDelete.length > 0) {
-    await Promise.all(linksToDelete.map((link) => customerTagsService.deleteCustomerTag(link.id)));
-  }
-}
 
 export function CustomerListView({ onCountChange }: CustomerListViewProps) {
+  const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string>("all");
@@ -382,10 +255,6 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const assigneeNameCacheRef = useRef<Record<string, string>>({});
 
   const resolveAssigneeNameMap = useCallback(async (rows: CustomerApiRow[]) => {
@@ -531,80 +400,21 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
     );
   }, [activeFilter, customerIdsByGroup, customers, searchQuery]);
 
-  const handleCustomerClick = async (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setIsDetailModalOpen(true);
-
-    try {
-      const response = await customersService.getCustomer(customer.id);
-      const detail = response.responseData;
-      if (detail) {
-        const assigneeNameMap = await resolveAssigneeNameMap([detail]);
-        setSelectedCustomer(
-          mapApiRowToCustomerWithAssignee(
-            detail,
-            Math.max(customer.orderNumber - 1, 0),
-            assigneeNameMap,
-            groupNamesByCustomerId,
-          ),
-        );
-      }
-    } catch {
-      // Keep optimistic detail from table row if detail request fails.
-    }
+  const handleCustomerClick = (customer: Customer) => {
+    router.push(`/customers/${customer.id}?tab=detail`);
   };
 
   const handleAddCustomer = () => {
-    setEditingCustomer(null);
-    setIsFormModalOpen(true);
+    router.push("/customers/new");
   };
 
   const handleEditCustomer = (customer: Customer) => {
-    setEditingCustomer(customer);
-    setIsDetailModalOpen(false);
-    setIsFormModalOpen(true);
-  };
-
-  const handleSaveCustomer = async (customerData: Partial<Customer>, groupIds: string[]) => {
-    try {
-      let customerId: string | undefined;
-
-      if (editingCustomer) {
-        await customersService.updateCustomer(
-          editingCustomer.id,
-          mapFormToUpdatePayload(customerData),
-        );
-        customerId = editingCustomer.id;
-        toast.success(
-          "Cập nhật thành công",
-          `Khách hàng "${customerData.customerName}" đã được cập nhật.`,
-        );
-      } else {
-        const createResponse = await customersService.createCustomer(mapFormToCreatePayload(customerData));
-        customerId = createResponse.responseData?.id;
-        toast.success(
-          "Thêm mới thành công",
-          `Khách hàng "${customerData.customerName}" đã được thêm vào danh sách.`,
-        );
-      }
-
-      if (customerId) {
-        await syncCustomerGroups(customerId, groupIds);
-      }
-
-      await loadCustomers();
-    } catch (error) {
-      const msg =
-        error instanceof Error ? error.message : "Không thể lưu khách hàng.";
-      toast.error("Lưu thất bại", msg);
-      throw error;
-    }
+    router.push(`/customers/${customer.id}?tab=detail&mode=edit`);
   };
 
   const handleDeleteCustomer = async (customer: Customer) => {
     try {
       await customersService.deleteCustomer(customer.id);
-      setIsDetailModalOpen(false);
       await loadCustomers();
       toast.success(
         "Xóa thành công",
@@ -704,28 +514,11 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
         renderTable={(paged) => (
           <CustomerTable
             customers={paged}
-            onCustomerClick={(customer) => { void handleCustomerClick(customer); }}
+            onCustomerClick={handleCustomerClick}
             onCustomerEdit={handleEditCustomer}
             onCustomerDelete={(customer) => { void handleDeleteCustomer(customer); }}
           />
         )}
-      />
-
-      <CustomerFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        onSave={handleSaveCustomer}
-        customer={editingCustomer}
-      />
-
-      <CustomerDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        customer={selectedCustomer}
-        onEdit={handleEditCustomer}
-        onDelete={(customer) => {
-          void handleDeleteCustomer(customer);
-        }}
       />
     </div>
   );

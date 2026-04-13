@@ -1,0 +1,583 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Spinner } from "@/components/ui/Spinner";
+import { formatDateForInput } from "@/lib/utils";
+import { customerTagsService } from "@/services/customer-tags";
+import { tagsService } from "@/services/tags";
+import { usersService } from "@/services/users";
+import { Customer } from "@/types/customer";
+
+interface GroupOption {
+  id: string;
+  name: string;
+}
+
+interface UserOption {
+  value: string;
+  label: string;
+}
+
+interface CustomerEditorFormProps {
+  initialData?: Partial<Customer> | null;
+  customerId?: string;
+  submitText: string;
+  onSubmit: (customer: Partial<Customer>, groupIds: string[]) => Promise<void>;
+  onCancel?: () => void;
+}
+
+function normalizeCustomerType(value?: string): "individual" | "company" {
+  return value?.trim().toLowerCase() === "company" ? "company" : "individual";
+}
+
+function buildDefaultFormData(): Partial<Customer> {
+  return {
+    customerName: "",
+    email: "",
+    phone: "",
+    gender: "Male",
+    address: "",
+    website: "",
+    assignee: "",
+    assigned_user_id: "",
+    type: "individual",
+    company_name: "",
+    tax_code: "",
+    major: "",
+    description: "",
+    note: "",
+    is_active: true,
+  };
+}
+
+function mergeInitialData(initialData?: Partial<Customer> | null): Partial<Customer> {
+  if (!initialData) {
+    return buildDefaultFormData();
+  }
+
+  return {
+    ...buildDefaultFormData(),
+    ...initialData,
+    gender: initialData.gender || "Male",
+    type: normalizeCustomerType(initialData.type),
+    customerName: initialData.customerName || "",
+    email: initialData.email || "",
+    phone: initialData.phone || "",
+    address: initialData.address || "",
+    website: initialData.website || initialData.source || "",
+    assignee: initialData.assignee || "",
+    assigned_user_id: initialData.assigned_user_id || "",
+    company_name: initialData.company_name || "",
+    tax_code: initialData.tax_code || "",
+    major: initialData.major || "",
+    description: initialData.description || "",
+    note: initialData.note || "",
+    is_active: initialData.is_active ?? true,
+  };
+}
+
+export function CustomerEditorForm({
+  initialData,
+  customerId,
+  submitText,
+  onSubmit,
+  onCancel,
+}: CustomerEditorFormProps) {
+  const [formData, setFormData] = useState<Partial<Customer>>(mergeInitialData(initialData));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [groupSearchKeyword, setGroupSearchKeyword] = useState("");
+  const [userOptions, setUserOptions] = useState<UserOption[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  useEffect(() => {
+    setFormData(mergeInitialData(initialData));
+  }, [initialData]);
+
+  useEffect(() => {
+    let isDisposed = false;
+
+    const loadGroups = async () => {
+      setIsLoadingGroups(true);
+      try {
+        const [tagsResponse, customerTagsResponse] = await Promise.all([
+          tagsService.getTags({ currentPage: "1", pageSize: "5000" }),
+          customerId
+            ? customerTagsService.getCustomerTagsByCustomerId(customerId, {
+                currentPage: "1",
+                pageSize: "5000",
+              })
+            : Promise.resolve(null),
+        ]);
+
+        if (isDisposed) return;
+
+        const groups = (tagsResponse.responseData?.rows || [])
+          .map((tag) => ({ id: tag.id, name: tag.name }))
+          .sort((a, b) => a.name.localeCompare(b.name, "vi"));
+
+        const nextSelectedIds = customerTagsResponse?.responseData?.rows
+          ? Array.from(new Set(customerTagsResponse.responseData.rows.map((row) => row.tag_id)))
+          : [];
+
+        setGroupOptions(groups);
+        setSelectedGroupIds(nextSelectedIds);
+      } catch {
+        if (!isDisposed) {
+          setGroupOptions([]);
+          setSelectedGroupIds([]);
+        }
+      } finally {
+        if (!isDisposed) {
+          setIsLoadingGroups(false);
+        }
+      }
+    };
+
+    void loadGroups();
+    return () => {
+      isDisposed = true;
+    };
+  }, [customerId]);
+
+  useEffect(() => {
+    let isDisposed = false;
+
+    const loadUsers = async () => {
+      setIsLoadingUsers(true);
+      try {
+        const response = await usersService.getUsers({
+          currentPage: "1",
+          pageSize: "500",
+        });
+
+        if (isDisposed) {
+          return;
+        }
+
+        const options = (response.responseData?.rows || [])
+          .map((user) => ({
+            value: user.id,
+            label: user.full_name?.trim() || user.email || user.id,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label, "vi"));
+
+        setUserOptions(options);
+      } catch {
+        if (!isDisposed) {
+          setUserOptions([]);
+        }
+      } finally {
+        if (!isDisposed) {
+          setIsLoadingUsers(false);
+        }
+      }
+    };
+
+    void loadUsers();
+    return () => {
+      isDisposed = true;
+    };
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+
+    if (name === "assigned_user_id") {
+      setFormData((prev) => ({
+        ...prev,
+        assigned_user_id: value,
+      }));
+    } else if (name === "type") {
+      setFormData((prev) => ({ ...prev, type: normalizeCustomerType(value) }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+  };
+
+  const handleDateChange = (field: keyof Customer, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value ? new Date(value) : undefined }));
+  };
+
+  const validate = (): boolean => {
+    const nextErrors: Record<string, string> = {};
+
+    if (!formData.customerName?.trim()) {
+      nextErrors.customerName = "Tên khách hàng là bắt buộc";
+    }
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      nextErrors.email = "Email không hợp lệ";
+    }
+
+    if (formData.phone && !/^[0-9]{9,11}$/.test(formData.phone.trim())) {
+      nextErrors.phone = "Số điện thoại không hợp lệ (9-11 chữ số)";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData, selectedGroupIds);
+    } catch {
+      // Parent page handles toast/error display.
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedGroupIds((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId],
+    );
+  };
+
+  const filteredGroupOptions = useMemo(() => {
+    const keyword = groupSearchKeyword.trim().toLowerCase();
+    if (!keyword) {
+      return groupOptions;
+    }
+
+    return groupOptions.filter((group) => group.name.toLowerCase().includes(keyword));
+  }, [groupOptions, groupSearchKeyword]);
+
+  const selectedGroupNameById = useMemo(
+    () =>
+      groupOptions.reduce<Record<string, string>>((acc, group) => {
+        acc[group.id] = group.name;
+        return acc;
+      }, {}),
+    [groupOptions],
+  );
+
+  const allFilteredGroupsSelected =
+    filteredGroupOptions.length > 0 &&
+    filteredGroupOptions.every((group) => selectedGroupIds.includes(group.id));
+
+  const toggleSelectAllFilteredGroups = () => {
+    const filteredGroupIdSet = new Set(filteredGroupOptions.map((group) => group.id));
+
+    setSelectedGroupIds((prev) => {
+      if (allFilteredGroupsSelected) {
+        return prev.filter((id) => !filteredGroupIdSet.has(id));
+      }
+
+      const next = new Set(prev);
+      filteredGroupOptions.forEach((group) => next.add(group.id));
+      return Array.from(next);
+    });
+  };
+
+  const genderOptions = [
+    { value: "Male", label: "Nam" },
+    { value: "Female", label: "Nữ" },
+    { value: "Other", label: "Khác" },
+  ];
+
+  const typeOptions = [
+    { value: "individual", label: "Cá nhân" },
+    { value: "company", label: "Doanh nghiệp" },
+  ];
+
+  const activeOptions = [
+    { value: "true", label: "Hoạt động" },
+    { value: "false", label: "Ngưng hoạt động" },
+  ];
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <FormSection title="Thông tin cơ bản">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Tên khách hàng *"
+            name="customerName"
+            value={formData.customerName || ""}
+            onChange={handleChange}
+            error={errors.customerName}
+            placeholder="Nhập tên khách hàng"
+            disabled={isSubmitting}
+            className="md:col-span-2"
+          />
+          <Select
+            label="Loại khách hàng"
+            name="type"
+            value={normalizeCustomerType(formData.type)}
+            onChange={handleChange}
+            options={typeOptions}
+            variant="default"
+            disabled={isSubmitting}
+          />
+          <Select
+            label="Giới tính"
+            name="gender"
+            value={formData.gender || "Male"}
+            onChange={handleChange}
+            options={genderOptions}
+            variant="default"
+            disabled={isSubmitting}
+          />
+          <Input
+            label="Email"
+            name="email"
+            type="email"
+            value={formData.email || ""}
+            onChange={handleChange}
+            error={errors.email}
+            placeholder="example@domain.com"
+            disabled={isSubmitting}
+          />
+          <Input
+            label="Số điện thoại"
+            name="phone"
+            value={formData.phone || ""}
+            onChange={handleChange}
+            error={errors.phone}
+            placeholder="Nhập số điện thoại"
+            disabled={isSubmitting}
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
+            <input
+              type="date"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={formatDateForInput(formData.day_of_birth)}
+              onChange={(e) => handleDateChange("day_of_birth", e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+          <Input
+            label="Ngành nghề"
+            name="major"
+            value={formData.major || ""}
+            onChange={handleChange}
+            placeholder="VD: Xây dựng, CNTT..."
+            disabled={isSubmitting}
+          />
+          <Input
+            label="Địa chỉ"
+            name="address"
+            value={formData.address || ""}
+            onChange={handleChange}
+            placeholder="Nhập địa chỉ"
+            className="md:col-span-2"
+            disabled={isSubmitting}
+          />
+          <Input
+            label="Website"
+            name="website"
+            value={formData.website || ""}
+            onChange={handleChange}
+            placeholder="https://example.com"
+            disabled={isSubmitting}
+          />
+          <Select
+            label="Người phụ trách"
+            name="assigned_user_id"
+            value={formData.assigned_user_id || ""}
+            onChange={handleChange}
+            options={userOptions}
+            placeholder={isLoadingUsers ? "Đang tải danh sách user..." : "Chọn người phụ trách"}
+            variant="default"
+            disabled={isSubmitting || isLoadingUsers}
+          />
+          <Select
+            label="Trạng thái"
+            name="is_active"
+            value={formData.is_active === false ? "false" : "true"}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, is_active: e.target.value === "true" }))
+            }
+            options={activeOptions}
+            variant="default"
+            disabled={isSubmitting}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection title="Thông tin doanh nghiệp">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Tên công ty"
+            name="company_name"
+            value={formData.company_name || ""}
+            onChange={handleChange}
+            placeholder="Nhập tên công ty"
+            disabled={isSubmitting}
+            className="md:col-span-2"
+          />
+          <Input
+            label="Mã số thuế"
+            name="tax_code"
+            value={formData.tax_code || ""}
+            onChange={handleChange}
+            placeholder="Nhập mã số thuế"
+            disabled={isSubmitting}
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày thành lập</label>
+            <input
+              type="date"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={formatDateForInput(formData.company_establish_date)}
+              onChange={(e) => handleDateChange("company_establish_date", e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
+      </FormSection>
+
+      <FormSection title="Ghi chú">
+        <div className="grid grid-cols-1 gap-4">
+          <Input
+            label="Mô tả"
+            name="description"
+            value={formData.description || ""}
+            onChange={handleChange}
+            placeholder="Mô tả ngắn về khách hàng"
+            disabled={isSubmitting}
+          />
+          <Input
+            label="Ghi chú"
+            name="note"
+            value={formData.note || ""}
+            onChange={handleChange}
+            placeholder="Ghi chú thêm"
+            disabled={isSubmitting}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection title="Nhóm khách hàng">
+        <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+          {isLoadingGroups && <p className="text-sm text-gray-500">Đang tải danh sách nhóm...</p>}
+          {!isLoadingGroups && groupOptions.length === 0 && (
+            <p className="text-sm text-gray-500">Chưa có nhóm khách hàng nào.</p>
+          )}
+          {!isLoadingGroups && groupOptions.length > 0 && (
+            <div className="space-y-3">
+              <Input
+                name="groupSearch"
+                value={groupSearchKeyword}
+                onChange={(event) => setGroupSearchKeyword(event.target.value)}
+                placeholder="Tìm theo tên nhóm khách hàng"
+                disabled={isSubmitting}
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-gray-500">
+                  Hiển thị {filteredGroupOptions.length}/{groupOptions.length} nhóm
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={toggleSelectAllFilteredGroups}
+                  disabled={isSubmitting || filteredGroupOptions.length === 0}
+                >
+                  {allFilteredGroupsSelected ? "Bỏ chọn nhóm đang lọc" : "Chọn nhóm đang lọc"}
+                </Button>
+              </div>
+
+              {filteredGroupOptions.length === 0 ? (
+                <p className="text-sm text-gray-500">Không tìm thấy nhóm phù hợp.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                  {filteredGroupOptions.map((group) => {
+                    const isChecked = selectedGroupIds.includes(group.id);
+                    return (
+                      <label
+                        key={group.id}
+                        className={`flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+                          isChecked
+                            ? "border-primary-500 bg-primary-50"
+                            : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleGroupSelection(group.id)}
+                          disabled={isSubmitting}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm text-gray-900">{group.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {selectedGroupIds.length > 0 && (
+                <div className="rounded-md border border-dashed border-gray-300 p-2">
+                  <p className="text-xs text-gray-500 mb-2">Nhóm đã chọn</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedGroupIds.map((groupId) => (
+                      <span
+                        key={groupId}
+                        className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700"
+                      >
+                        {selectedGroupNameById[groupId] || groupId}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-gray-500">Đã chọn {selectedGroupIds.length} nhóm.</p>
+        </div>
+      </FormSection>
+
+      <div className="flex items-center justify-end gap-3 pt-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+            Hủy
+          </Button>
+        )}
+        <Button type="submit" variant="primary" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Spinner size="sm" className="mr-2" />Đang xử lý...
+            </>
+          ) : (
+            submitText
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 border-b border-gray-100 pb-2">
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}

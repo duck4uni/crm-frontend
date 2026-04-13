@@ -202,11 +202,6 @@ export default function CustomerGroupsPage() {
             Quản lý danh sách nhóm và truy cập nhanh trang thành viên theo từng nhóm.
           </p>
         </div>
-
-        <Button variant="outline" onClick={() => router.push("/customers")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Quay lại danh sách khách hàng
-        </Button>
       </div>
 
       <Card>

@@ -1,18 +1,26 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import {
   FiSettings,
   FiChevronRight,
   FiSearch,
   FiLink,
+  FiSend,
   FiTrash2,
 } from "react-icons/fi";
 import { Select } from "@/components/ui/Select";
-import { initialConnections, mockConversations, mockAutoConfigs } from "@/mock-data/zalo-oa";
+import {
+  initialConnections,
+  mockConversations,
+  mockConversationMessages,
+  mockAutoConfigs,
+} from "@/mock-data/zalo-oa";
 import type {
   OaConnection,
   ZaloConversation,
+  ZaloChatMessage,
   AutoConfig,
   AutoConfigFormState,
 } from "@/types/zalo-oa";
@@ -115,7 +123,7 @@ function ConversationRow({
       <div className="relative flex-shrink-0">
         <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center overflow-hidden">
           {conv.avatar ? (
-            <img src={conv.avatar} alt={conv.name} className="w-full h-full object-cover" />
+            <Image src={conv.avatar} alt={conv.name} fill sizes="40px" className="object-cover" unoptimized />
           ) : (
             <span className="text-white text-xs font-bold select-none">Z</span>
           )}
@@ -145,6 +153,35 @@ function ConversationRow({
   );
 }
 
+function ChatMessageRow({ message }: { message: ZaloChatMessage }) {
+  if (message.sender === "system") {
+    return (
+      <div className="flex justify-center">
+        <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] text-gray-500">
+          {message.content}
+        </span>
+      </div>
+    );
+  }
+
+  const isAgent = message.sender === "agent";
+
+  return (
+    <div className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
+      <div className={`max-w-[75%] ${isAgent ? "items-end" : "items-start"} flex flex-col gap-1`}>
+        <div
+          className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+            isAgent ? "bg-primary-600 text-white rounded-br-md" : "bg-white text-gray-800 rounded-bl-md border border-gray-200"
+          }`}
+        >
+          {message.content}
+        </div>
+        <span className="text-[11px] text-gray-400">{message.timestamp}</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main view ───────────────────────────────────────────────────────────────
 export function ZaloOaView() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("tuong-tac");
@@ -152,18 +189,57 @@ export function ZaloOaView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configFormOpen, setConfigFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [chatComposerValue, setChatComposerValue] = useState("");
+  const [conversations, setConversations] = useState<ZaloConversation[]>(mockConversations);
+  const [messagesByConversation, setMessagesByConversation] =
+    useState<Record<string, ZaloChatMessage[]>>(mockConversationMessages);
   const [connections] = useState<OaConnection[]>(initialConnections);
   const [autoConfigs, setAutoConfigs] = useState<AutoConfig[]>(mockAutoConfigs);
   const [configForm, setConfigForm] = useState<AutoConfigFormState>(initialConfigForm);
   const [selectedOaFilter, setSelectedOaFilter] = useState("all");
 
+  const selectedConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === selectedConvId) || null,
+    [conversations, selectedConvId],
+  );
+
+  const selectedOaName = useMemo(() => {
+    if (!selectedConversation) {
+      return "";
+    }
+
+    return connections.find((connection) => connection.id === selectedConversation.oaId)?.oaName || "";
+  }, [connections, selectedConversation]);
+
+  const selectedMessages = useMemo(() => {
+    if (!selectedConvId) {
+      return [];
+    }
+
+    return messagesByConversation[selectedConvId] || [];
+  }, [messagesByConversation, selectedConvId]);
+
   const filteredConversations = useMemo(
     () =>
-      mockConversations.filter((c) =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-    [searchQuery],
+      conversations.filter((c) => {
+        const matchedByOa = selectedOaFilter === "all" || c.oaId === selectedOaFilter;
+        const matchedByName = c.name.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchedByOa && matchedByName;
+      }),
+    [conversations, searchQuery, selectedOaFilter],
   );
+
+  useEffect(() => {
+    if (!selectedConvId || selectedOaFilter === "all") {
+      return;
+    }
+
+    const selected = conversations.find((conversation) => conversation.id === selectedConvId);
+    if (selected && selected.oaId !== selectedOaFilter) {
+      setSelectedConvId(null);
+      setChatComposerValue("");
+    }
+  }, [conversations, selectedConvId, selectedOaFilter]);
 
   const handleAddConfig = () => {
     if (!configForm.oaId) return;
@@ -189,6 +265,42 @@ export function ZaloOaView() {
   const openConfigForm = () => {
     setSettingsOpen(false);
     setConfigFormOpen(true);
+  };
+
+  const handleSendMockMessage = () => {
+    if (!selectedConvId || !chatComposerValue.trim()) {
+      return;
+    }
+
+    const nowTime = new Date().toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const newMessage: ZaloChatMessage = {
+      id: `${selectedConvId}-local-${Date.now()}`,
+      conversationId: selectedConvId,
+      sender: "agent",
+      content: chatComposerValue.trim(),
+      timestamp: nowTime,
+    };
+
+    setMessagesByConversation((prev) => ({
+      ...prev,
+      [selectedConvId]: [...(prev[selectedConvId] || []), newMessage],
+    }));
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === selectedConvId
+          ? {
+              ...conversation,
+              lastMessage: newMessage.content,
+              timestamp: nowTime,
+              unreadCount: 0,
+            }
+          : conversation,
+      ),
+    );
+    setChatComposerValue("");
   };
 
   return (
@@ -288,14 +400,77 @@ export function ZaloOaView() {
       {/* ════════════════════ RIGHT MAIN AREA ════════════════════ */}
       <div className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 min-w-0">
         {activeTab === "tuong-tac" ? (
-          /* Tương tác empty state */
-          <div className="flex-1 flex items-center justify-center">
-            {selectedConvId ? (
-              <p className="text-sm text-gray-400">Tính năng chat đang phát triển...</p>
-            ) : (
+          selectedConversation ? (
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative h-10 w-10 rounded-full bg-primary-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {selectedConversation.avatar ? (
+                      <Image
+                        src={selectedConversation.avatar}
+                        alt={selectedConversation.name}
+                        fill
+                        sizes="40px"
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="text-white text-sm font-semibold select-none">Z</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{selectedConversation.name}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {selectedConversation.customerPhone || "Chưa có số điện thoại"}
+                      {selectedOaName ? ` • ${selectedOaName}` : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {selectedMessages.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center pt-8">Chưa có tin nhắn trong hội thoại này.</p>
+                ) : (
+                  selectedMessages.map((message) => (
+                    <ChatMessageRow key={message.id} message={message} />
+                  ))
+                )}
+              </div>
+
+              <div className="border-t border-gray-200 bg-white p-3">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={chatComposerValue}
+                    onChange={(event) => setChatComposerValue(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        handleSendMockMessage();
+                      }
+                    }}
+                    placeholder="Nhập nội dung tin nhắn..."
+                    rows={2}
+                    className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendMockMessage}
+                    disabled={!chatComposerValue.trim()}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary-600 text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Gửi tin nhắn"
+                  >
+                    <FiSend className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] text-gray-400">Nhấn Enter để gửi, Shift + Enter để xuống dòng.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
               <EmptyState />
-            )}
-          </div>
+            </div>
+          )
         ) : (
           /* Cấu hình tự động */
           <div className="flex-1 overflow-auto p-5">

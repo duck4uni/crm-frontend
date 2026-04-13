@@ -156,22 +156,6 @@ export function CustomerDetailModal({
                     </Section>
                 )}
 
-                {/* CMND/CCCD */}
-                {(customer.id_no || customer.id_issued_by || customer.id_issued_date || customer.id_issued_place) && (
-                    <Section title="CMND / CCCD">
-                        <div className="grid grid-cols-2 gap-4">
-                            <InfoItem icon={<FiFileText className="w-4 h-4" />} label="Số CMND/CCCD" value={customer.id_no || "-"} />
-                            <InfoItem icon={<FiFileText className="w-4 h-4" />} label="Nơi cấp" value={customer.id_issued_by || "-"} />
-                            <InfoItem
-                                icon={<FiCalendar className="w-4 h-4" />}
-                                label="Ngày cấp"
-                                value={customer.id_issued_date ? formatDateVNDateOnly(customer.id_issued_date) : "-"}
-                            />
-                            <InfoItem icon={<FiMapPin className="w-4 h-4" />} label="Địa điểm cấp" value={customer.id_issued_place || "-"} />
-                        </div>
-                    </Section>
-                )}
-
                 {(customer.description || customer.note) && (
                     <Section title="Ghi chú">
                         <div className="space-y-3">

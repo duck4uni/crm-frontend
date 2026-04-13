@@ -1,4 +1,4 @@
-import { AutoConfig, OaConnection, ZaloConversation } from "@/types/zalo-oa";
+import { AutoConfig, OaConnection, ZaloChatMessage, ZaloConversation } from "@/types/zalo-oa";
 
 export const initialConnections: OaConnection[] = [
   {
@@ -24,16 +24,221 @@ export const initialConnections: OaConnection[] = [
 ];
 
 export const mockConversations: ZaloConversation[] = [
-  { id: "c1", name: "Zalo-542576996549178921", lastMessage: "Tệp đính kèm", timestamp: "09/04 23:32", unreadCount: 1 },
-  { id: "c2", name: "Zalo-326881135739109107", lastMessage: "Uike e chúc vui", timestamp: "09/04 21:59", unreadCount: 1 },
-  { id: "c3", name: "Phương Dorky", lastMessage: "Tệp đính kèm", timestamp: "09/04 10:09", unreadCount: 1 },
-  { id: "c4", name: "Zalo-760205566844211220", lastMessage: "🌿 Chào mừng anh/chị đến với Official Account ...", timestamp: "05/04 17:57", unreadCount: 0 },
-  { id: "c5", name: "Zalo-854062044865428023", lastMessage: "Cho e xin sdt mai e liên hệ báo giá và lấy thông ti...", timestamp: "04/04 21:57", unreadCount: 0 },
-  { id: "c6", name: "Zalo-102389764396748329", lastMessage: "C muốn mua để uống giảm cân", timestamp: "04/04 20:35", unreadCount: 0 },
-  { id: "c7", name: "Zalo-742302455842457668", lastMessage: "Da c", timestamp: "03/04 16:06", unreadCount: 0 },
-  { id: "c8", name: "Zalo-884897847772983197", lastMessage: "Tệp đính kèm", timestamp: "01/04 22:15", unreadCount: 0 },
-  { id: "c9", name: "Zalo-902885364461027529", lastMessage: "", timestamp: "01/04 21:06", unreadCount: 0 },
+  {
+    id: "c1",
+    oaId: "oa-01",
+    name: "Zalo-542576996549178921",
+    customerPhone: "0901123456",
+    lastMessage: "Tệp đính kèm",
+    timestamp: "09/04 23:32",
+    unreadCount: 1,
+  },
+  {
+    id: "c2",
+    oaId: "oa-01",
+    name: "Zalo-326881135739109107",
+    customerPhone: "0912233445",
+    lastMessage: "Uike e chúc vui",
+    timestamp: "09/04 21:59",
+    unreadCount: 1,
+  },
+  {
+    id: "c3",
+    oaId: "oa-01",
+    name: "Phương Dorky",
+    customerPhone: "0989777666",
+    lastMessage: "Tệp đính kèm",
+    timestamp: "09/04 10:09",
+    unreadCount: 1,
+  },
+  {
+    id: "c4",
+    oaId: "oa-01",
+    name: "Zalo-760205566844211220",
+    customerPhone: "0976554433",
+    lastMessage: "🌿 Chào mừng anh/chị đến với Official Account ...",
+    timestamp: "05/04 17:57",
+    unreadCount: 0,
+  },
+  {
+    id: "c5",
+    oaId: "oa-02",
+    name: "Zalo-854062044865428023",
+    customerPhone: "0933888999",
+    lastMessage: "Cho e xin sdt mai e liên hệ báo giá và lấy thông ti...",
+    timestamp: "04/04 21:57",
+    unreadCount: 0,
+  },
+  {
+    id: "c6",
+    oaId: "oa-02",
+    name: "Zalo-102389764396748329",
+    customerPhone: "0966333222",
+    lastMessage: "C muốn mua để uống giảm cân",
+    timestamp: "04/04 20:35",
+    unreadCount: 0,
+  },
+  {
+    id: "c7",
+    oaId: "oa-02",
+    name: "Zalo-742302455842457668",
+    customerPhone: "0905666777",
+    lastMessage: "Da c",
+    timestamp: "03/04 16:06",
+    unreadCount: 0,
+  },
+  {
+    id: "c8",
+    oaId: "oa-02",
+    name: "Zalo-884897847772983197",
+    customerPhone: "0908000111",
+    lastMessage: "Tệp đính kèm",
+    timestamp: "01/04 22:15",
+    unreadCount: 0,
+  },
+  {
+    id: "c9",
+    oaId: "oa-01",
+    name: "Zalo-902885364461027529",
+    customerPhone: "0912000222",
+    lastMessage: "",
+    timestamp: "01/04 21:06",
+    unreadCount: 0,
+  },
 ];
+
+export const mockConversationMessages: Record<string, ZaloChatMessage[]> = {
+  c1: [
+    {
+      id: "c1-m1",
+      conversationId: "c1",
+      sender: "system",
+      content: "Khách hàng bắt đầu cuộc trò chuyện từ OA Điện Lạnh Hà Nội",
+      timestamp: "09/04 23:20",
+    },
+    {
+      id: "c1-m2",
+      conversationId: "c1",
+      sender: "customer",
+      content: "Shop còn lịch vệ sinh điều hòa tối nay không ạ?",
+      timestamp: "09/04 23:23",
+    },
+    {
+      id: "c1-m3",
+      conversationId: "c1",
+      sender: "agent",
+      content: "Dạ bên em còn lịch 20:30, anh/chị cho em xin địa chỉ nhé.",
+      timestamp: "09/04 23:25",
+    },
+    {
+      id: "c1-m4",
+      conversationId: "c1",
+      sender: "customer",
+      content: "Em gửi ảnh dàn nóng cho shop kiểm tra trước nha.",
+      timestamp: "09/04 23:32",
+    },
+  ],
+  c2: [
+    {
+      id: "c2-m1",
+      conversationId: "c2",
+      sender: "customer",
+      content: "Uike e chúc vui",
+      timestamp: "09/04 21:59",
+    },
+    {
+      id: "c2-m2",
+      conversationId: "c2",
+      sender: "agent",
+      content: "Cảm ơn anh/chị nhiều ạ. Cần hỗ trợ gì cứ nhắn cho em nhé.",
+      timestamp: "09/04 22:03",
+    },
+  ],
+  c3: [
+    {
+      id: "c3-m1",
+      conversationId: "c3",
+      sender: "customer",
+      content: "Bên mình có gói bảo trì theo quý không?",
+      timestamp: "09/04 09:52",
+    },
+    {
+      id: "c3-m2",
+      conversationId: "c3",
+      sender: "agent",
+      content: "Dạ có chị nhé, em vừa gửi bảng giá chi tiết để chị tham khảo.",
+      timestamp: "09/04 10:01",
+    },
+    {
+      id: "c3-m3",
+      conversationId: "c3",
+      sender: "customer",
+      content: "Ok chị xem rồi phản hồi lại sau.",
+      timestamp: "09/04 10:09",
+    },
+  ],
+  c4: [
+    {
+      id: "c4-m1",
+      conversationId: "c4",
+      sender: "system",
+      content: "Mẫu tin chăm sóc tự động đã được gửi thành công",
+      timestamp: "05/04 17:40",
+    },
+    {
+      id: "c4-m2",
+      conversationId: "c4",
+      sender: "customer",
+      content: "Em nhận được rồi ạ, để em đặt lịch trong tuần này.",
+      timestamp: "05/04 17:57",
+    },
+  ],
+  c5: [
+    {
+      id: "c5-m1",
+      conversationId: "c5",
+      sender: "customer",
+      content: "Cho e xin sdt mai e liên hệ báo giá và lấy thông tin",
+      timestamp: "04/04 21:57",
+    },
+  ],
+  c6: [
+    {
+      id: "c6-m1",
+      conversationId: "c6",
+      sender: "customer",
+      content: "C muốn mua để uống giảm cân",
+      timestamp: "04/04 20:35",
+    },
+  ],
+  c7: [
+    {
+      id: "c7-m1",
+      conversationId: "c7",
+      sender: "customer",
+      content: "Da c",
+      timestamp: "03/04 16:06",
+    },
+  ],
+  c8: [
+    {
+      id: "c8-m1",
+      conversationId: "c8",
+      sender: "customer",
+      content: "Em đã gửi ảnh tình trạng máy, shop kiểm tra giúp em nhé.",
+      timestamp: "01/04 22:15",
+    },
+  ],
+  c9: [
+    {
+      id: "c9-m1",
+      conversationId: "c9",
+      sender: "system",
+      content: "Khách hàng mới theo dõi OA",
+      timestamp: "01/04 21:06",
+    },
+  ],
+};
 
 export const mockAutoConfigs: AutoConfig[] = [
   { id: "ac-01", oaName: "Điện Lạnh Hà Nội", createdBy: "Admin CRM", createdByRole: "Quản trị viên hệ thống", createdAt: "04/04/2026 12:38" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -19,8 +19,6 @@ import {
   FiFileText,
   FiLink,
   FiMessageCircle,
-  FiSend,
-  FiZap,
   FiChevronDown,
 } from "react-icons/fi";
 import { clearAuthSession } from "@/lib/auth-session";
@@ -52,15 +50,49 @@ const navigation: NavItem[] = [
   { name: "Người dùng", href: "/users", icon: FiUser },
   { name: "Công việc", href: "/tasks", icon: FiCheckSquare },
   { name: "Thông báo", href: "/notifications", icon: FiBell },
-  { name: "Zalo OA", href: "/zalo-oa", icon: FiLink },
+  {
+    name: "Zalo OA",
+    href: "/zalo-oa",
+    icon: FiLink,
+    children: [
+      { name: "Marketing", href: "/zalo-oa/marketing" },
+      { name: "Automation", href: "/zalo-oa/automation" },
+    ],
+  },
   { name: "Chat", href: "/chat", icon: FiMessageCircle },
-  { name: "Marketing", href: "/marketing", icon: FiSend },
-  { name: "Automation", href: "/automation", icon: FiZap },
   { name: "Cài đặt", href: "/settings", icon: FiSettings },
 ];
 
 interface SidebarProps {
   isOpen: boolean;
+}
+
+function isPathMatch(pathname: string, href: string): boolean {
+  if (href === "/") {
+    return pathname === "/";
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function isExactPathMatch(pathname: string, href: string): boolean {
+  if (href === "/") {
+    return pathname === "/";
+  }
+
+  return pathname === href;
+}
+
+function getActiveChildHref(pathname: string, children: NavChild[]): string | null {
+  const sortedChildren = [...children].sort((a, b) => b.href.length - a.href.length);
+  const matchedChild = sortedChildren.find((child) => isPathMatch(pathname, child.href));
+  return matchedChild?.href ?? null;
+}
+
+function isGroupRouteActive(pathname: string, item: NavItem): boolean {
+  const matchesSelf = item.href ? isPathMatch(pathname, item.href) : false;
+  const matchesChild = item.children ? Boolean(getActiveChildHref(pathname, item.children)) : false;
+  return matchesSelf || matchesChild;
 }
 
 export function Sidebar({ isOpen }: SidebarProps) {
@@ -72,12 +104,37 @@ export function Sidebar({ isOpen }: SidebarProps) {
     // Auto-expand if any child is active
     const expanded = new Set<string>();
     navigation.forEach((item) => {
-      if (item.children?.some((child) => pathname === child.href)) {
+      if (item.children && isGroupRouteActive(pathname, item)) {
         expanded.add(item.name);
       }
     });
     return expanded;
   });
+
+  // Keep groups expanded when current route belongs to one of their child routes.
+  useEffect(() => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      navigation.forEach((item) => {
+        if (item.children && isGroupRouteActive(pathname, item)) {
+          next.add(item.name);
+        }
+      });
+      return next;
+    });
+  }, [pathname]);
+
+  const expandGroup = (name: string) => {
+    setExpandedItems((prev) => {
+      if (prev.has(name)) {
+        return prev;
+      }
+
+      const next = new Set(prev);
+      next.add(name);
+      return next;
+    });
+  };
 
   const toggleExpanded = (name: string) => {
     setExpandedItems((prev) => {
@@ -91,8 +148,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
     });
   };
 
-  const isChildActive = (item: NavItem) =>
-    item.children?.some((child) => pathname === child.href) ?? false;
+  const getActiveChild = (item: NavItem): string | null => {
+    if (!item.children) {
+      return null;
+    }
+
+    return getActiveChildHref(pathname, item.children);
+  };
 
   const handleLogout = () => {
     startLogoutTransition(async () => {
@@ -150,20 +212,22 @@ export function Sidebar({ isOpen }: SidebarProps) {
           // Nav item with children (expandable group)
           if (item.children) {
             const isExpanded = expandedItems.has(item.name);
-            const hasActiveChild = isChildActive(item);
+            const activeChildHref = getActiveChild(item);
+            const isGroupActive = isGroupRouteActive(pathname, item);
+            const isParentRouteActive = item.href ? isExactPathMatch(pathname, item.href) : false;
 
             if (!isOpen) {
-              // Collapsed sidebar: clicking the icon navigates to first child
+              // Collapsed sidebar: clicking the icon navigates to parent route if present.
               return (
                 <Link
                   key={item.name}
-                  href={item.children[0].href}
+                  href={item.href || item.children[0].href}
                   title={item.name}
                   aria-label={item.name}
                   className={cn(
                     "flex items-center text-sm font-medium rounded-xl transition-colors",
                     "mx-auto h-10 w-10 justify-center p-0",
-                    hasActiveChild
+                    isGroupActive
                       ? "bg-indigo-600 text-white shadow-sm shadow-indigo-900/50"
                       : "text-indigo-200 hover:bg-indigo-800/60 hover:text-white",
                   )}
@@ -179,10 +243,18 @@ export function Sidebar({ isOpen }: SidebarProps) {
                 {/* Group toggle button */}
                 <button
                   type="button"
-                  onClick={() => toggleExpanded(item.name)}
+                  onClick={() => {
+                    if (item.href) {
+                      router.push(item.href);
+                      expandGroup(item.name);
+                      return;
+                    }
+
+                    toggleExpanded(item.name);
+                  }}
                   className={cn(
                     "flex w-full items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
-                    hasActiveChild && !isExpanded
+                    isParentRouteActive
                       ? "bg-indigo-600 text-white shadow-sm shadow-indigo-900/50"
                       : "text-indigo-200 hover:bg-indigo-800/60 hover:text-white",
                   )}
@@ -201,7 +273,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
                 {isExpanded && (
                   <div className="mt-1 ml-4 pl-4 border-l border-indigo-700/50 space-y-1">
                     {item.children.map((child) => {
-                      const isActive = pathname === child.href;
+                      const isActive = activeChildHref === child.href;
                       return (
                         <Link
                           key={child.href}
@@ -225,9 +297,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
           // Regular nav item (no children) - exclude paths that are child paths of expandable items
           const isActive = item.href
-            ? item.href === "/"
-              ? pathname === "/"
-              : pathname === item.href
+            ? isPathMatch(pathname, item.href)
             : false;
 
           return (

@@ -17,11 +17,23 @@ export interface OaConnectionFormState {
 
 export interface ZaloConversation {
   id: string;
+  oaId: string;
   name: string;
   avatar?: string;
+  customerPhone?: string;
   lastMessage: string;
   timestamp: string;
   unreadCount: number;
+}
+
+export type ZaloChatSender = "customer" | "agent" | "system";
+
+export interface ZaloChatMessage {
+  id: string;
+  conversationId: string;
+  sender: ZaloChatSender;
+  content: string;
+  timestamp: string;
 }
 
 export interface AutoConfig {

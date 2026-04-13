@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Plus } from "lucide-react";
+import { Search } from "lucide-react";
 
 interface NotificationSearchProps {
     searchQuery: string;
@@ -8,7 +8,6 @@ interface NotificationSearchProps {
     unreadCount: number;
     isMarkAllPending: boolean;
     onMarkAllAsRead: () => void;
-    onCreateNotification?: () => void;
 }
 
 export function NotificationSearch({
@@ -17,7 +16,6 @@ export function NotificationSearch({
     unreadCount,
     isMarkAllPending,
     onMarkAllAsRead,
-    onCreateNotification,
 }: NotificationSearchProps) {
     return (
         <div className="flex items-center gap-3">
@@ -40,17 +38,6 @@ export function NotificationSearch({
             >
                 {isMarkAllPending ? "Đang xử lý..." : `Đánh dấu tất cả đã đọc (${unreadCount})`}
             </button>
-
-            {onCreateNotification && (
-                <button
-                    type="button"
-                    onClick={onCreateNotification}
-                    className="h-10 px-4 flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow"
-                >
-                    <Plus className="w-4 h-4" />
-                    Tạo thông báo
-                </button>
-            )}
         </div>
     );
 }

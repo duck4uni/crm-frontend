@@ -217,7 +217,6 @@ export function NotificationListView() {
                         unreadCount={filterCounts[NotificationStatus.UNREAD]}
                         isMarkAllPending={isMarkAllPending}
                         onMarkAllAsRead={handleMarkAllAsRead}
-                        onCreateNotification={() => setIsFormModalOpen(true)}
                     />
                 }
                 renderTable={(paged) => (

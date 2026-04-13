@@ -19,6 +19,12 @@ export interface Customer {
   status: CustomerStatus;
   avatar?: string;
   groups?: string[];
+  // Raw API name/id fields
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  assigned_user_id?: string;
+  customer_source_id?: string;
   // API-matched fields
   type?: string;
   company_name?: string;
