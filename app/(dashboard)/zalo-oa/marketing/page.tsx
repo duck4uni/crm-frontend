@@ -1,7 +1,7 @@
 "use client";
 
-import { MarketingView } from "../../marketing/components/list/MarketingView";
+import { MarketingSection } from "../components/sections/MarketingSection";
 
 export default function ZaloOaMarketingPage() {
-  return <MarketingView />;
+  return <MarketingSection />;
 }

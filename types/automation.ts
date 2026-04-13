@@ -1,5 +1,6 @@
 export interface AutomationRule {
   id: string;
+  oaId?: string;
   name: string;
   trigger: string;
   action: string;
@@ -10,6 +11,7 @@ export interface AutomationRule {
 }
 
 export interface AutomationFormState {
+  oaId?: string;
   name: string;
   trigger: string;
   action: string;

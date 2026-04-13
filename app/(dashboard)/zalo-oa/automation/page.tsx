@@ -1,7 +1,7 @@
 "use client";
 
-import { AutomationView } from "../../automation/components/list/AutomationView";
+import { AutomationSection } from "../components/sections/AutomationSection";
 
 export default function ZaloOaAutomationPage() {
-  return <AutomationView />;
+  return <AutomationSection />;
 }

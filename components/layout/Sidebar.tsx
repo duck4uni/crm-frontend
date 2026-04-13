@@ -18,7 +18,6 @@ import {
   FiFolder,
   FiFileText,
   FiLink,
-  FiMessageCircle,
   FiChevronDown,
 } from "react-icons/fi";
 import { clearAuthSession } from "@/lib/auth-session";
@@ -59,7 +58,6 @@ const navigation: NavItem[] = [
       { name: "Automation", href: "/zalo-oa/automation" },
     ],
   },
-  { name: "Chat", href: "/chat", icon: FiMessageCircle },
   { name: "Cài đặt", href: "/settings", icon: FiSettings },
 ];
 

@@ -9,6 +9,33 @@
 }
 
 @layer utilities {
+  @keyframes crm-float {
+    0%,
+    100% {
+      transform: translateY(0px) translateX(0px);
+    }
+    50% {
+      transform: translateY(-14px) translateX(6px);
+    }
+  }
+
+  @keyframes crm-orbit {
+    0% {
+      transform: rotate(0deg) translateX(16px) rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg) translateX(16px) rotate(-360deg);
+    }
+  }
+
+  .animate-crm-float {
+    animation: crm-float 6s ease-in-out infinite;
+  }
+
+  .animate-crm-orbit {
+    animation: crm-orbit 9s linear infinite;
+  }
+
   .sidebar-scroll {
     scrollbar-width: thin;
     scrollbar-color: rgba(148, 163, 184, 0.42) transparent;

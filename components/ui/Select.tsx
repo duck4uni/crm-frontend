@@ -97,31 +97,28 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
 
       const rect = triggerRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
       const viewportPadding = 8;
       const menuGap = 6;
-      const minimumMenuHeight = 160;
+      const minimumMenuHeight = 96;
       const preferredMenuHeight = 260;
 
-      const spaceBelow = viewportHeight - rect.bottom - viewportPadding;
-      const spaceAbove = rect.top - viewportPadding;
-      const openUpward = spaceBelow < 200 && spaceAbove > spaceBelow;
-
-      const availableHeight = openUpward ? spaceAbove - menuGap : spaceBelow - menuGap;
+      // Keep the menu attached under the trigger to avoid detached/far-away popups.
+      const spaceBelow = Math.max(0, viewportHeight - rect.bottom - viewportPadding - menuGap);
       const maxHeight = Math.max(
         minimumMenuHeight,
-        Math.min(preferredMenuHeight, availableHeight),
+        Math.min(preferredMenuHeight, spaceBelow),
       );
 
-      const top = openUpward
-        ? Math.max(viewportPadding, rect.top - maxHeight - menuGap)
-        : rect.bottom + menuGap;
+      const top = rect.bottom + menuGap;
+      const left = Math.min(rect.left, viewportWidth - rect.width - viewportPadding);
 
       setMenuPosition({
         top,
-        left: rect.left,
+        left: Math.max(viewportPadding, left),
         width: rect.width,
         maxHeight,
-        openUpward,
+        openUpward: false,
       });
     }, []);
 
