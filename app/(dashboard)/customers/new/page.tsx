@@ -5,14 +5,12 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/ToastProvider";
+import { customerAssignedUsersService } from "@/services/customer-assigned-users";
 import { customerTagsService } from "@/services/customer-tags";
 import { customersService } from "@/services/customers";
 import { CreateCustomerPayload } from "@/types/api";
 import { Customer } from "@/types/customer";
 import { CustomerEditorForm } from "../components/forms/CustomerEditorForm";
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -64,20 +62,20 @@ function mapStatusToIsActive(status?: Customer["status"]): boolean | undefined {
   return status !== "not_contacted";
 }
 
-function resolveAssignedUserId(data: Partial<Customer>): string | undefined {
-  const assignedUserId =
-    typeof data.assigned_user_id === "string" ? data.assigned_user_id.trim() : "";
+function resolveAssignedUserIds(data: Partial<Customer>): string[] {
+  const idsFromField = Array.isArray(data.assigned_user_ids) ? data.assigned_user_ids : [];
+  const idsFromUsers = Array.isArray(data.assigned_users)
+    ? data.assigned_users.map((user) => user?.id || "")
+    : [];
+  const singleId = typeof data.assigned_user_id === "string" ? data.assigned_user_id : "";
 
-  if (assignedUserId && UUID_PATTERN.test(assignedUserId)) {
-    return assignedUserId;
-  }
-
-  const assigneeInput = typeof data.assignee === "string" ? data.assignee.trim() : "";
-  if (assigneeInput && UUID_PATTERN.test(assigneeInput)) {
-    return assigneeInput;
-  }
-
-  return undefined;
+  return Array.from(
+    new Set(
+      [...idsFromField, ...idsFromUsers, singleId]
+        .map((id) => (typeof id === "string" ? id.trim() : ""))
+        .filter(Boolean),
+    ),
+  );
 }
 
 function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload {
@@ -100,7 +98,6 @@ function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload 
     company_establish_date: formatDateForApi(data.company_establish_date),
     tax_code: data.tax_code || undefined,
     major: data.major || undefined,
-    assigned_user_id: resolveAssignedUserId(data),
     is_active: data.is_active ?? mapStatusToIsActive(data.status),
   };
 }
@@ -110,11 +107,19 @@ export default function NewCustomerPage() {
   const toast = useToast();
 
   const handleSave = async (formData: Partial<Customer>, groupIds: string[]) => {
+    const assignedUserIds = resolveAssignedUserIds(formData);
     const response = await customersService.createCustomer(mapFormToCreatePayload(formData));
     const createdCustomerId = response.responseData?.id;
 
     if (!createdCustomerId) {
       throw new Error("Không nhận được mã khách hàng sau khi tạo.");
+    }
+
+    if (assignedUserIds.length > 0) {
+      await customerAssignedUsersService.setCustomerAssignedUsers({
+        customer_id: createdCustomerId,
+        assigned_user_ids: assignedUserIds,
+      });
     }
 
     const normalizedGroupIds = Array.from(new Set(groupIds.filter(Boolean)));

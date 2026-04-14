@@ -275,7 +275,11 @@ export interface CustomerApiRow {
   tax_code: string | null;
   note: string | null;
   full_name: string | null;
-  assigned_user_id: string | null;
+  assigned_user_id?: string | null;
+  assigned_users?: Array<{
+    id: string;
+    full_name: string;
+  }>;
   created_at: string | null;
   created_by: string | null;
   updated_at: string | null;
@@ -334,6 +338,40 @@ export interface UpdateCustomerPayload {
   full_name?: string;
   assigned_user_id?: string;
   is_active?: boolean;
+}
+
+export interface CustomerAssignedUserCustomerRef {
+  id: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+export interface CustomerAssignedUserRef {
+  id: string;
+  full_name: string;
+}
+
+export interface CustomerAssignedUserApiRow {
+  id: string;
+  customer_id: string;
+  assigned_user_id: string;
+  created_at: string | null;
+  created_by: string | null;
+  customer?: CustomerAssignedUserCustomerRef | null;
+  assigned_user?: CustomerAssignedUserRef | null;
+}
+
+export interface SetCustomerAssignedUsersPayload {
+  customer_id: string;
+  assigned_user_ids: string[];
+}
+
+export interface UpdateCustomerAssignedUserPayload {
+  customer_id?: string;
+  assigned_user_id?: string;
 }
 
 export interface ExportCustomersPayload {
@@ -492,15 +530,50 @@ export interface UpdatePermissionPayload {
   group_code?: string;
 }
 
+// ── Status ────────────────────────────────────────────────────────
+export interface StatusApiRow {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  description: string | null;
+  is_active?: boolean;
+  is_delete?: boolean;
+  created_at?: string | null;
+  created_by?: string | null;
+  updated_at?: string | null;
+  updated_by?: string | null;
+}
+
 // ── Jobs ───────────────────────────────────────────────────────────
+export interface JobPerformerRef {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+export interface JobCustomerRef {
+  id: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
 export interface JobApiRow {
   id: string;
   job_name: string;
   job_time: JobTimeRange[] | JobTimeRange | null;
   content: string;
-  performer_uuid: string | null;
-  customer_uuid: string | null;
-  status_id: string | null;
+  note: string | null;
+  progress: number | null;
+  performer_uuid?: string | null;
+  customer_uuid?: string | null;
+  status_id?: string | null;
+  performer?: JobPerformerRef | null;
+  customer?: JobCustomerRef | null;
+  status?: StatusApiRow | null;
   created_by: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -508,17 +581,20 @@ export interface JobApiRow {
 
 export interface CreateJobPayload {
   job_name: string;
-  job_time: JobTimeRange[];
+  job_time: JobTimeRange[] | JobTimeRange;
   content: string;
+  note?: string;
+  progress?: number;
   performer_uuid?: string;
   customer_uuid?: string;
-  status_id?: string;
 }
 
 export interface UpdateJobPayload {
   job_name?: string;
-  job_time?: JobTimeRange[];
+  job_time?: JobTimeRange[] | JobTimeRange;
   content?: string;
+  note?: string;
+  progress?: number;
   performer_uuid?: string;
   customer_uuid?: string;
   status_id?: string;
@@ -610,6 +686,11 @@ export type GetCustomerTagResponse = ApiEnvelope<CustomerTagApiRow>;
 export type CreateCustomerTagsResponse = ApiEnvelope<CustomerTagApiRow[]>;
 export type UpdateCustomerTagResponse = ApiEnvelope<CustomerTagApiRow>;
 export type DeleteCustomerTagResponse = ApiEnvelope<null>;
+export type GetCustomerAssignedUsersResponse = ApiEnvelope<PaginatedRows<CustomerAssignedUserApiRow>>;
+export type GetCustomerAssignedUserResponse = ApiEnvelope<CustomerAssignedUserApiRow>;
+export type SetCustomerAssignedUsersResponse = ApiEnvelope<CustomerAssignedUserApiRow[]>;
+export type UpdateCustomerAssignedUserResponse = ApiEnvelope<CustomerAssignedUserApiRow>;
+export type DeleteCustomerAssignedUserResponse = ApiEnvelope<null>;
 export type GetUserTagsResponse = ApiEnvelope<PaginatedRows<UserTagApiRow>>;
 export type GetUserTagResponse = ApiEnvelope<UserTagApiRow>;
 export type CreateUserTagsResponse = ApiEnvelope<UserTagApiRow[]>;
@@ -619,6 +700,8 @@ export type GetPermissionsResponse = ApiEnvelope<PaginatedRows<PermissionApiRow>
 export type GetPermissionResponse = ApiEnvelope<PermissionApiRow>;
 export type CreatePermissionsResponse = ApiEnvelope<PermissionApiRow[]>;
 export type UpdatePermissionResponse = ApiEnvelope<PermissionApiRow>;
+export type GetStatusesResponse = ApiEnvelope<PaginatedRows<StatusApiRow>>;
+export type GetStatusResponse = ApiEnvelope<StatusApiRow>;
 export type GetNotificationsResponse = ApiEnvelope<NotificationsResponseData>;
 export type CreateNotificationsResponse = ApiEnvelope<NotificationApiRow[]>;
 export type MarkAllNotificationsAsReadResponse = ApiEnvelope<number[]>;

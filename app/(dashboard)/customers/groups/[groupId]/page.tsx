@@ -1,24 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { useToast } from "@/components/ui/ToastProvider";
+import { customerAssignedUsersService } from "@/services/customer-assigned-users";
 import { customerTagsService } from "@/services/customer-tags";
 import { customersService } from "@/services/customers";
 import { tagsService } from "@/services/tags";
 import { usersService } from "@/services/users";
-import { CustomerApiRow, CustomerTagApiRow } from "@/types/api";
+import { formatPermissionName } from "@/lib/utils";
+import { CustomerApiRow, CustomerAssignedUserApiRow, CustomerTagApiRow } from "@/types/api";
 import { ArrowLeft, Search, Trash2, UserPlus, Users } from "lucide-react";
 
 interface CustomerLookupItem {
   id: string;
   customerName: string;
   phone?: string;
-  assigneeId?: string;
+  assigneeIds: string[];
   assigneeName: string;
 }
 
@@ -29,12 +30,13 @@ interface GroupMemberItem extends CustomerLookupItem {
 interface UserOption {
   id: string;
   label: string;
+  role: "SITE LEADER" | "SITE WORKER";
 }
 
 const CUSTOMER_PAGE_SIZE = "1000";
 const LINK_PAGE_SIZE = "5000";
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LEADER_ROLE_NAME = "SITE LEADER";
+const WORKER_ROLE_NAME = "SITE WORKER";
 
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -44,6 +46,64 @@ function toCustomerName(row: CustomerApiRow): string {
   return (
     row.full_name || `${row.last_name || ""} ${row.first_name || ""}`.trim() || row.email || row.id
   );
+}
+
+function mapAssignedUsersByCustomerId(
+  rows: CustomerAssignedUserApiRow[],
+): Record<string, Array<{ id: string; full_name: string }>> {
+  return rows.reduce<Record<string, Array<{ id: string; full_name: string }>>>((acc, row) => {
+    const customerId = typeof row.customer_id === "string" ? row.customer_id.trim() : "";
+    const assignedUserId = typeof row.assigned_user_id === "string" ? row.assigned_user_id.trim() : "";
+    if (!customerId || !assignedUserId) {
+      return acc;
+    }
+
+    if (!acc[customerId]) {
+      acc[customerId] = [];
+    }
+
+    if (!acc[customerId].some((item) => item.id === assignedUserId)) {
+      acc[customerId].push({
+        id: assignedUserId,
+        full_name: row.assigned_user?.full_name?.trim() || assignedUserId,
+      });
+    }
+
+    return acc;
+  }, {});
+}
+
+function resolveAssignedUsersForCustomer(
+  row: CustomerApiRow,
+  assignedUsersByCustomerId: Record<string, Array<{ id: string; full_name: string }>>,
+): Array<{ id: string; full_name: string }> {
+  const fromAssignmentApi = assignedUsersByCustomerId[row.id] || [];
+  if (fromAssignmentApi.length > 0) {
+    return fromAssignmentApi;
+  }
+
+  const seen = new Set<string>();
+  return (row.assigned_users || []).reduce<Array<{ id: string; full_name: string }>>((acc, user) => {
+    const id = typeof user?.id === "string" ? user.id.trim() : "";
+    if (!id || seen.has(id)) {
+      return acc;
+    }
+
+    seen.add(id);
+    acc.push({
+      id,
+      full_name: typeof user.full_name === "string" ? user.full_name.trim() || id : id,
+    });
+    return acc;
+  }, []);
+}
+
+function toAssigneeDisplayName(assignedUsers: Array<{ id: string; full_name: string }>): string {
+  if (assignedUsers.length === 0) {
+    return "-";
+  }
+
+  return assignedUsers.map((user) => user.full_name || user.id).filter(Boolean).join(", ");
 }
 
 export default function CustomerGroupDetailPage() {
@@ -59,56 +119,29 @@ export default function CustomerGroupDetailPage() {
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([]);
   const [selectedToRemove, setSelectedToRemove] = useState<string[]>([]);
   const [userOptions, setUserOptions] = useState<UserOption[]>([]);
+  const [editingAssigneeCustomerId, setEditingAssigneeCustomerId] = useState<string | null>(null);
+  const [assigneeSearchKeyword, setAssigneeSearchKeyword] = useState("");
+  const [assigneeDraftIds, setAssigneeDraftIds] = useState<string[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [assigningCustomerId, setAssigningCustomerId] = useState<string | null>(null);
 
-  const assigneeCacheRef = useRef<Record<string, string>>({});
-
-  const resolveAssigneeNameMap = useCallback(async (rows: CustomerApiRow[]) => {
-    const assigneeIds = Array.from(
-      new Set(
-        rows
-          .map((row) => row.assigned_user_id)
-          .filter((id): id is string => typeof id === "string" && UUID_PATTERN.test(id)),
-      ),
-    );
-
-    const missingIds = assigneeIds.filter((id) => !assigneeCacheRef.current[id]);
-
-    if (missingIds.length > 0) {
-      const fetched = await Promise.all(
-        missingIds.map(async (id) => {
-          try {
-            const response = await usersService.getUser(id);
-            const fullName = response.responseData?.full_name?.trim();
-            return [id, fullName || id] as const;
-          } catch {
-            return [id, id] as const;
-          }
-        }),
-      );
-
-      assigneeCacheRef.current = {
-        ...assigneeCacheRef.current,
-        ...Object.fromEntries(fetched),
-      };
-    }
-
-    return assigneeCacheRef.current;
-  }, []);
-
   const mapCustomerRow = useCallback(
-    (row: CustomerApiRow, assigneeMap: Record<string, string>): CustomerLookupItem => ({
-      id: row.id,
-      customerName: toCustomerName(row),
-      phone: row.phone || undefined,
-      assigneeId: row.assigned_user_id || undefined,
-      assigneeName: row.assigned_user_id
-        ? assigneeMap[row.assigned_user_id] || row.assigned_user_id
-        : "-",
-    }),
+    (
+      row: CustomerApiRow,
+      assignedUsersByCustomerId: Record<string, Array<{ id: string; full_name: string }>>,
+    ): CustomerLookupItem => {
+      const assignedUsers = resolveAssignedUsersForCustomer(row, assignedUsersByCustomerId);
+
+      return {
+        id: row.id,
+        customerName: toCustomerName(row),
+        phone: row.phone || undefined,
+        assigneeIds: assignedUsers.map((user) => user.id),
+        assigneeName: toAssigneeDisplayName(assignedUsers),
+      };
+    },
     [],
   );
 
@@ -128,11 +161,15 @@ export default function CustomerGroupDetailPage() {
 
     setIsLoading(true);
     try {
-      const [groupRes, customersRes, links, usersRes] = await Promise.all([
+      const [groupRes, customersRes, links, usersRes, customerAssignedUsersRes] = await Promise.all([
         tagsService.getTag(groupId),
         customersService.getCustomers({ currentPage: "1", pageSize: CUSTOMER_PAGE_SIZE }),
         getCustomerTagsByGroup(),
-        usersService.getUsers({ currentPage: "1", pageSize: "500" }),
+        usersService.getAdminUsers({ currentPage: "1", pageSize: "500" }),
+        customerAssignedUsersService.getCustomerAssignedUsers({
+          currentPage: "1",
+          pageSize: LINK_PAGE_SIZE,
+        }),
       ]);
 
       const group = groupRes.responseData;
@@ -145,21 +182,34 @@ export default function CustomerGroupDetailPage() {
       setGroupName(group.name || "Nhóm khách hàng");
 
       const mappedUserOptions = (usersRes.responseData?.rows || [])
-        .map((user) => ({
-          id: user.id,
-          label: user.full_name?.trim() || user.email || user.id,
-        }))
+        .map((user) => {
+          const permissionNames = (user.user_permisions || [])
+            .map((item) => item.permision?.name || "")
+            .map((name) => name.trim());
+
+          const isLeader = permissionNames.includes(LEADER_ROLE_NAME);
+          const isWorker = permissionNames.includes(WORKER_ROLE_NAME);
+
+          if (!isLeader && !isWorker) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            label: user.full_name?.trim() || user.email || user.id,
+            role: isLeader ? LEADER_ROLE_NAME : WORKER_ROLE_NAME,
+          };
+        })
+        .filter((user): user is UserOption => Boolean(user))
         .sort((a, b) => a.label.localeCompare(b.label, "vi"));
 
       setUserOptions(mappedUserOptions);
-      assigneeCacheRef.current = {
-        ...Object.fromEntries(mappedUserOptions.map((user) => [user.id, user.label])),
-        ...assigneeCacheRef.current,
-      };
 
       const rows = customersRes.responseData?.rows || [];
-      const assigneeMap = await resolveAssigneeNameMap(rows);
-      const mappedAllCustomers = rows.map((row) => mapCustomerRow(row, assigneeMap));
+      const assignedUsersByCustomerId = mapAssignedUsersByCustomerId(
+        customerAssignedUsersRes.responseData?.rows || [],
+      );
+      const mappedAllCustomers = rows.map((row) => mapCustomerRow(row, assignedUsersByCustomerId));
       setAllCustomers(mappedAllCustomers);
 
       const allById = new Map(mappedAllCustomers.map((item) => [item.id, item]));
@@ -181,9 +231,8 @@ export default function CustomerGroupDetailPage() {
 
         const validMissingRows = missingRows.filter((row): row is CustomerApiRow => Boolean(row));
         if (validMissingRows.length > 0) {
-          const missingAssigneeMap = await resolveAssigneeNameMap(validMissingRows);
           validMissingRows.forEach((row) => {
-            allById.set(row.id, mapCustomerRow(row, missingAssigneeMap));
+            allById.set(row.id, mapCustomerRow(row, assignedUsersByCustomerId));
           });
         }
       }
@@ -197,7 +246,7 @@ export default function CustomerGroupDetailPage() {
               id: link.customer_id,
               customerName: "Khách hàng",
               phone: undefined,
-              assigneeId: undefined,
+              assigneeIds: [],
               assigneeName: "-",
             };
           }
@@ -212,12 +261,15 @@ export default function CustomerGroupDetailPage() {
       setMembers(mappedMembers);
       setSelectedToAdd([]);
       setSelectedToRemove([]);
+      setEditingAssigneeCustomerId(null);
+      setAssigneeSearchKeyword("");
+      setAssigneeDraftIds([]);
     } catch (error) {
       toast.error("Không thể tải dữ liệu nhóm", toErrorMessage(error, "Đã có lỗi xảy ra."));
     } finally {
       setIsLoading(false);
     }
-  }, [getCustomerTagsByGroup, groupId, mapCustomerRow, resolveAssigneeNameMap, router, toast]);
+  }, [getCustomerTagsByGroup, groupId, mapCustomerRow, router, toast]);
 
   useEffect(() => {
     void loadData();
@@ -246,6 +298,33 @@ export default function CustomerGroupDetailPage() {
     () => Object.fromEntries(userOptions.map((option) => [option.id, option.label])),
     [userOptions],
   );
+  const editingAssigneeCustomer = useMemo(
+    () => members.find((member) => member.id === editingAssigneeCustomerId) || null,
+    [editingAssigneeCustomerId, members],
+  );
+
+  const filteredAssigneeOptions = useMemo(() => {
+    const keyword = assigneeSearchKeyword.trim().toLowerCase();
+    if (!keyword) {
+      return userOptions;
+    }
+
+    return userOptions.filter((option) => option.label.toLowerCase().includes(keyword));
+  }, [assigneeSearchKeyword, userOptions]);
+
+  const filteredLeaderOptions = useMemo(
+    () => filteredAssigneeOptions.filter((option) => option.role === LEADER_ROLE_NAME),
+    [filteredAssigneeOptions],
+  );
+
+  const filteredWorkerOptions = useMemo(
+    () => filteredAssigneeOptions.filter((option) => option.role === WORKER_ROLE_NAME),
+    [filteredAssigneeOptions],
+  );
+
+  const allFilteredAssigneesSelected =
+    filteredAssigneeOptions.length > 0 &&
+    filteredAssigneeOptions.every((option) => assigneeDraftIds.includes(option.id));
   const isAllMembersSelected =
     members.length > 0 && members.every((member) => selectedRemoveSet.has(member.customerTagId));
 
@@ -270,6 +349,32 @@ export default function CustomerGroupDetailPage() {
     }
 
     setSelectedToRemove(members.map((member) => member.customerTagId));
+  };
+
+  const openAssigneeEditor = (member: GroupMemberItem) => {
+    setEditingAssigneeCustomerId(member.id);
+    setAssigneeSearchKeyword("");
+    setAssigneeDraftIds(member.assigneeIds);
+  };
+
+  const toggleAssigneeSelection = (userId: string) => {
+    setAssigneeDraftIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+    );
+  };
+
+  const toggleSelectAllFilteredAssignees = () => {
+    setAssigneeDraftIds((prev) => {
+      const next = new Set(prev);
+
+      if (allFilteredAssigneesSelected) {
+        filteredAssigneeOptions.forEach((option) => next.delete(option.id));
+      } else {
+        filteredAssigneeOptions.forEach((option) => next.add(option.id));
+      }
+
+      return Array.from(next);
+    });
   };
 
   const handleAddSelectedCustomers = async () => {
@@ -326,21 +431,30 @@ export default function CustomerGroupDetailPage() {
     }
   };
 
-  const handleAssignCustomerOwner = async (customerId: string, userId: string) => {
+  const handleAssignCustomerOwner = async () => {
+    if (!editingAssigneeCustomer) {
+      return;
+    }
+
+    const customerId = editingAssigneeCustomer.id;
     setAssigningCustomerId(customerId);
     try {
-      await customersService.updateCustomer(customerId, {
-        assigned_user_id: userId || undefined,
+      await customerAssignedUsersService.setCustomerAssignedUsers({
+        customer_id: customerId,
+        assigned_user_ids: assigneeDraftIds,
       });
 
-      const assigneeName = userId ? userNameById[userId] || userId : "-";
+      const assigneeName =
+        assigneeDraftIds.length > 0
+          ? assigneeDraftIds.map((id) => userNameById[id] || id).filter(Boolean).join(", ")
+          : "-";
 
       setMembers((prev) =>
         prev.map((member) =>
           member.id === customerId
             ? {
                 ...member,
-                assigneeId: userId || undefined,
+                assigneeIds: assigneeDraftIds,
                 assigneeName,
               }
             : member,
@@ -352,12 +466,16 @@ export default function CustomerGroupDetailPage() {
           customer.id === customerId
             ? {
                 ...customer,
-                assigneeId: userId || undefined,
+                assigneeIds: assigneeDraftIds,
                 assigneeName,
               }
             : customer,
         ),
       );
+
+      setEditingAssigneeCustomerId(null);
+      setAssigneeSearchKeyword("");
+      setAssigneeDraftIds([]);
 
       toast.success("Cập nhật phụ trách", "Đã cập nhật người phụ trách cho khách hàng.");
     } catch (error) {
@@ -442,18 +560,18 @@ export default function CustomerGroupDetailPage() {
                       <div className="text-xs text-gray-500">{member.phone || "-"}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <Select
-                        value={member.assigneeId || ""}
-                        onChange={(e) => void handleAssignCustomerOwner(member.id, e.target.value)}
-                        disabled={isSaving || assigningCustomerId === member.id}
-                        variant="subtle"
-                        size="sm"
-                        placeholder="Chưa gán"
-                        options={userOptions.map((option) => ({
-                          value: option.id,
-                          label: option.label,
-                        }))}
-                      />
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-700">{member.assigneeName || "-"}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openAssigneeEditor(member)}
+                          disabled={isSaving || assigningCustomerId === member.id}
+                        >
+                          Phân người phụ trách
+                        </Button>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <button
@@ -474,6 +592,81 @@ export default function CustomerGroupDetailPage() {
               <div className="p-8 text-center text-sm text-gray-500">Nhóm này hiện chưa có khách hàng.</div>
             )}
           </div>
+
+          {editingAssigneeCustomer && (
+            <div className="border-t border-gray-200 p-4 space-y-3 bg-white">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    Phân người phụ trách: {editingAssigneeCustomer.customerName}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">Đã chọn {assigneeDraftIds.length} người</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingAssigneeCustomerId(null);
+                      setAssigneeSearchKeyword("");
+                      setAssigneeDraftIds([]);
+                    }}
+                    disabled={assigningCustomerId === editingAssigneeCustomer.id}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleAssignCustomerOwner()}
+                    disabled={assigningCustomerId === editingAssigneeCustomer.id}
+                  >
+                    Lưu phụ trách
+                  </Button>
+                </div>
+              </div>
+
+              <Input
+                value={assigneeSearchKeyword}
+                onChange={(event) => setAssigneeSearchKeyword(event.target.value)}
+                placeholder="Tìm theo tên user"
+                disabled={assigningCustomerId === editingAssigneeCustomer.id}
+              />
+
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs text-gray-500">
+                  Hiển thị {filteredAssigneeOptions.length}/{userOptions.length} user
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={toggleSelectAllFilteredAssignees}
+                  disabled={filteredAssigneeOptions.length === 0 || assigningCustomerId === editingAssigneeCustomer.id}
+                >
+                  {allFilteredAssigneesSelected ? "Bỏ chọn user đang lọc" : "Chọn user đang lọc"}
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <AssigneeRoleSection
+                  title={formatPermissionName(LEADER_ROLE_NAME)}
+                  users={filteredLeaderOptions}
+                  selectedIds={assigneeDraftIds}
+                  onToggle={toggleAssigneeSelection}
+                  disabled={assigningCustomerId === editingAssigneeCustomer.id}
+                />
+                <AssigneeRoleSection
+                  title={formatPermissionName(WORKER_ROLE_NAME)}
+                  users={filteredWorkerOptions}
+                  selectedIds={assigneeDraftIds}
+                  onToggle={toggleAssigneeSelection}
+                  disabled={assigningCustomerId === editingAssigneeCustomer.id}
+                />
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card className="overflow-hidden">
@@ -547,6 +740,57 @@ export default function CustomerGroupDetailPage() {
 
       {isLoading && (
         <div className="text-sm text-gray-500">Đang tải dữ liệu nhóm khách hàng...</div>
+      )}
+    </div>
+  );
+}
+
+function AssigneeRoleSection({
+  title,
+  users,
+  selectedIds,
+  onToggle,
+  disabled,
+}: {
+  title: string;
+  users: UserOption[];
+  selectedIds: string[];
+  onToggle: (userId: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="border border-gray-200 rounded-md overflow-hidden">
+      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-700 uppercase tracking-wider">
+        {title} ({users.length})
+      </div>
+
+      {users.length === 0 ? (
+        <p className="px-3 py-3 text-sm text-gray-500">Không có user phù hợp.</p>
+      ) : (
+        <div className="max-h-44 overflow-y-auto">
+          <table className="w-full">
+            <tbody className="divide-y divide-gray-200">
+              {users.map((user) => {
+                const isChecked = selectedIds.includes(user.id);
+
+                return (
+                  <tr key={user.id} className={isChecked ? "bg-primary-50" : "hover:bg-gray-50"}>
+                    <td className="px-3 py-2 w-10">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => onToggle(user.id)}
+                        disabled={disabled}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">{user.label}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

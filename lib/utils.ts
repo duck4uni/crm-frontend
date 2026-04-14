@@ -89,3 +89,20 @@ export function debounce<T extends (...args: any[]) => any>(
 export function generateId(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
+
+const PERMISSION_DISPLAY_NAME_MAP: Record<string, string> = {
+  "SITE LEADER": "Leader",
+  "SITE_WORKER": "Worker",
+  "SITE WORKER": "Worker",
+  "SITE_OWNER": "Owner",
+  "SITE OWNER": "Owner",
+};
+
+export function formatPermissionName(permissionName?: string | null): string {
+  const normalized = (permissionName || "").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  return PERMISSION_DISPLAY_NAME_MAP[normalized.toUpperCase()] || normalized;
+}

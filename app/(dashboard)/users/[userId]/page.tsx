@@ -20,13 +20,14 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Tabs } from "@/components/ui/Tabs";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatDateVN, formatDateVNDateOnly } from "@/lib/utils";
+import { jobsService } from "@/services/jobs";
 import { userHistoryService } from "@/services/user-history";
 import { usersService } from "@/services/users";
-import { UpdateUserPayload, UserApiRow, UserHistoryApiRow } from "@/types/api";
+import { JobApiRow, UpdateUserPayload, UserApiRow, UserHistoryApiRow } from "@/types/api";
 import { UserProfile } from "@/types/user";
 import { UserEditorForm } from "../components/forms/UserEditorForm";
 
-type UserTab = "detail" | "activity";
+type UserTab = "detail" | "activity" | "work";
 
 function mapApiRowToProfile(row: UserApiRow): UserProfile {
   return {
@@ -97,6 +98,116 @@ function buildUpdatePayload(nextData: Partial<UserProfile>, currentUser: UserPro
   return payload;
 }
 
+function getJobDateValue(job: JobApiRow): number {
+  const date = job.created_at || job.updated_at;
+  return date ? new Date(date).getTime() : 0;
+}
+
+function normalizeComparable(value?: string | null): string {
+  return (value || "").trim().toLowerCase();
+}
+
+function getRelatedPerformerIds(job: JobApiRow): string[] {
+  const jobWithLegacyFields = job as JobApiRow & {
+    performer_id?: string | null;
+    user_id?: string | null;
+    assigned_user_id?: string | null;
+  };
+
+  const performerWithLegacyFields = (job.performer || null) as
+    | (NonNullable<JobApiRow["performer"]> & {
+        uuid?: string | null;
+        user_id?: string | null;
+      })
+    | null;
+
+  const candidates = [
+    performerWithLegacyFields?.id,
+    performerWithLegacyFields?.uuid,
+    performerWithLegacyFields?.user_id,
+    job.performer_uuid,
+    jobWithLegacyFields.performer_id,
+    jobWithLegacyFields.user_id,
+    jobWithLegacyFields.assigned_user_id,
+    job.created_by,
+  ];
+
+  return candidates.filter((value): value is string => Boolean(value && value.trim()));
+}
+
+function isJobRelatedToUser(job: JobApiRow, user: UserProfile): boolean {
+  const normalizedUserId = normalizeComparable(user.id);
+  const normalizedUserEmail = normalizeComparable(user.email);
+  const normalizedUserName = normalizeComparable(user.full_name);
+
+  if (!normalizedUserId && !normalizedUserEmail && !normalizedUserName) {
+    return false;
+  }
+
+  const relatedIds = getRelatedPerformerIds(job).map((value) => normalizeComparable(value));
+  if (normalizedUserId && relatedIds.includes(normalizedUserId)) {
+    return true;
+  }
+
+  const performerEmail = normalizeComparable(job.performer?.email);
+  if (normalizedUserEmail && performerEmail && normalizedUserEmail === performerEmail) {
+    return true;
+  }
+
+  const performerName = normalizeComparable(job.performer?.full_name);
+  return Boolean(normalizedUserName && performerName && normalizedUserName === performerName);
+}
+
+function getJobTimeRange(jobTime: JobApiRow["job_time"]): { start?: string; end?: string } {
+  if (Array.isArray(jobTime)) {
+    const firstRange = jobTime[0] || {};
+    return {
+      start: firstRange.start,
+      end: firstRange.end,
+    };
+  }
+
+  return {
+    start: jobTime?.start,
+    end: jobTime?.end,
+  };
+}
+
+function getJobCustomerLabel(job: JobApiRow): string {
+  if (job.customer?.full_name) {
+    return job.customer.full_name;
+  }
+
+  const fallbackName = `${job.customer?.last_name || ""} ${job.customer?.first_name || ""}`.trim();
+  if (fallbackName) {
+    return fallbackName;
+  }
+
+  return job.customer?.email || job.customer_uuid || "Không gắn khách hàng";
+}
+
+function getJobStatusVariant(statusName?: string | null): "default" | "success" | "warning" | "danger" | "info" {
+  const normalized = (statusName || "").toLowerCase();
+
+  if (normalized.includes("hoàn thành") || normalized.includes("thành công") || normalized.includes("xong")) {
+    return "success";
+  }
+
+  if (normalized.includes("hủy") || normalized.includes("từ chối") || normalized.includes("thất bại")) {
+    return "danger";
+  }
+
+  if (normalized.includes("chờ") || normalized.includes("chưa") || normalized.includes("mới")) {
+    return "warning";
+  }
+
+  if (normalized.includes("đang") || normalized.includes("thực hiện") || normalized.includes("xử lý")) {
+    return "info";
+  }
+
+  return "default";
+}
+
 export default function UserDetailPage() {
   const params = useParams<{ userId: string }>();
   const router = useRouter();
@@ -115,9 +226,12 @@ export default function UserDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activities, setActivities] = useState<UserHistoryApiRow[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [workJobs, setWorkJobs] = useState<JobApiRow[]>([]);
+  const [isLoadingWorkJobs, setIsLoadingWorkJobs] = useState(false);
+  const [assignerNameById, setAssignerNameById] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (requestedTab === "activity" || requestedTab === "detail") {
+    if (requestedTab === "activity" || requestedTab === "detail" || requestedTab === "work") {
       setActiveTab(requestedTab);
     }
   }, [requestedTab]);
@@ -196,12 +310,121 @@ export default function UserDetailPage() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (activeTab !== "work" || !user?.id) {
+      return;
+    }
+
+    let isDisposed = false;
+
+    const loadWorkJobs = async () => {
+      setIsLoadingWorkJobs(true);
+      try {
+        let rows: JobApiRow[] = [];
+
+        try {
+          const filteredResponse = await jobsService.getJobs({
+            currentPage: "1",
+            pageSize: "300",
+            filters: `performer_uuid==${user.id}`,
+          });
+          rows = filteredResponse.responseData?.rows || [];
+        } catch {
+          rows = [];
+        }
+
+        if (rows.length === 0) {
+          try {
+            const createdByResponse = await jobsService.getJobs({
+              currentPage: "1",
+              pageSize: "300",
+              filters: `created_by==${user.id}`,
+            });
+            rows = createdByResponse.responseData?.rows || [];
+          } catch {
+            rows = [];
+          }
+        }
+
+        if (rows.length === 0) {
+          const fallbackResponse = await jobsService.getJobs({
+            currentPage: "1",
+            pageSize: "500",
+          });
+
+          rows = (fallbackResponse.responseData?.rows || []).filter(
+            (job) => isJobRelatedToUser(job, user),
+          );
+        }
+
+        const assignerIds = Array.from(
+          new Set(
+            rows
+              .map((job) => job.created_by)
+              .filter((createdBy): createdBy is string => Boolean(createdBy && createdBy.trim())),
+          ),
+        );
+
+        if (assignerIds.length > 0) {
+          try {
+            const usersResponse = await usersService.getUsers({ currentPage: "1", pageSize: "500" });
+            const rowsById = (usersResponse.responseData?.rows || []).reduce<Record<string, string>>((acc, row) => {
+              acc[row.id] = row.full_name || row.email || row.id;
+              return acc;
+            }, {});
+
+            const nextAssignerMap = assignerIds.reduce<Record<string, string>>((acc, id) => {
+              acc[id] = rowsById[id] || (id === user.id ? user.full_name : id);
+              return acc;
+            }, {});
+
+            if (!isDisposed) {
+              setAssignerNameById(nextAssignerMap);
+            }
+          } catch {
+            const fallbackAssignerMap = assignerIds.reduce<Record<string, string>>((acc, id) => {
+              acc[id] = id === user.id ? user.full_name : id;
+              return acc;
+            }, {});
+
+            if (!isDisposed) {
+              setAssignerNameById(fallbackAssignerMap);
+            }
+          }
+        } else if (!isDisposed) {
+          setAssignerNameById({});
+        }
+
+        if (isDisposed) {
+          return;
+        }
+
+        setWorkJobs([...rows].sort((a, b) => getJobDateValue(b) - getJobDateValue(a)));
+      } catch {
+        if (!isDisposed) {
+          setWorkJobs([]);
+        }
+      } finally {
+        if (!isDisposed) {
+          setIsLoadingWorkJobs(false);
+        }
+      }
+    };
+
+    void loadWorkJobs();
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [activeTab, user]);
+
   const tabs = useMemo(
     () => [
       { id: "detail", label: "Thông tin chi tiết" },
-      { id: "activity", label: "Lịch sử hoạt động", badge: activities.length },
+      { id: "activity", label: "Lịch sử hoạt động" },
+      { id: "work", label: "Lịch sử công việc" },
     ],
-    [activities.length],
+    [],
   );
 
   const handleUpdate = async (formData: Partial<UserProfile>) => {
@@ -327,6 +550,52 @@ export default function UserDetailPage() {
                       <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{item.note || "-"}</p>
                     </div>
                   ))}
+              </div>
+            )}
+
+            {activeTab === "work" && (
+              <div className="space-y-3">
+                {isLoadingWorkJobs && <div className="text-sm text-gray-500">Đang tải lịch sử công việc...</div>}
+
+                {!isLoadingWorkJobs && workJobs.length === 0 && (
+                  <div className="border border-dashed border-gray-300 rounded-lg p-6 text-sm text-gray-500">
+                    Chưa có công việc nào thuộc người dùng này.
+                  </div>
+                )}
+
+                {!isLoadingWorkJobs &&
+                  workJobs.map((item) => {
+                    const statusName = item.status?.name || "Không có trạng thái";
+                    const timeRange = getJobTimeRange(item.job_time);
+                    const assignerLabel = item.created_by
+                      ? assignerNameById[item.created_by] || (item.created_by === user.id ? user.full_name : item.created_by)
+                      : "Không rõ";
+
+                    return (
+                      <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-900">{item.job_name}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={getJobStatusVariant(statusName)}>{statusName}</Badge>
+                            {item.progress != null && <Badge variant="warning">{item.progress}%</Badge>}
+                          </div>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.content || "-"}</p>
+                          {item.note && <p className="text-sm text-gray-600 whitespace-pre-wrap mt-2">Ghi chú: {item.note}</p>}
+                        </div>
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
+                          <p>Khách hàng: {getJobCustomerLabel(item)}</p>
+                          <p>Người giao: {assignerLabel}</p>
+                          <p className="md:col-span-2">
+                            Thời gian: {timeRange.start ? formatDateVNDateOnly(new Date(timeRange.start)) : "-"}
+                            {timeRange.start && timeRange.end ? " -> " : ""}
+                            {timeRange.end ? formatDateVNDateOnly(new Date(timeRange.end)) : ""}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>

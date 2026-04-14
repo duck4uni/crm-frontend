@@ -10,19 +10,22 @@ import { Tabs } from "@/components/ui/Tabs";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatDateVNDateOnly } from "@/lib/utils";
 import { initialConversations } from "@/mock-data/chat";
+import { customerAssignedUsersService } from "@/services/customer-assigned-users";
 import { customerTagsService } from "@/services/customer-tags";
 import { customersService } from "@/services/customers";
+import { jobsService } from "@/services/jobs";
 import { tagsService } from "@/services/tags";
-import { userHistoryService } from "@/services/user-history";
 import { usersService } from "@/services/users";
-import { CreateCustomerPayload, CustomerApiRow, UpdateCustomerPayload, UserHistoryApiRow } from "@/types/api";
+import {
+  CustomerApiRow,
+  CustomerAssignedUserApiRow,
+  JobApiRow,
+  UpdateCustomerPayload,
+} from "@/types/api";
 import { Customer, CustomerStatus } from "@/types/customer";
 import { CustomerEditorForm } from "../components/forms/CustomerEditorForm";
 
 type CustomerTab = "detail" | "chat" | "work";
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -88,20 +91,20 @@ function mapStatusToIsActive(status?: Customer["status"]): boolean | undefined {
   return status !== "not_contacted";
 }
 
-function resolveAssignedUserId(data: Partial<Customer>): string | undefined {
-  const assignedUserId =
-    typeof data.assigned_user_id === "string" ? data.assigned_user_id.trim() : "";
+function resolveAssignedUserIds(data: Partial<Customer>): string[] {
+  const idsFromField = Array.isArray(data.assigned_user_ids) ? data.assigned_user_ids : [];
+  const idsFromUsers = Array.isArray(data.assigned_users)
+    ? data.assigned_users.map((user) => user?.id || "")
+    : [];
+  const singleId = typeof data.assigned_user_id === "string" ? data.assigned_user_id : "";
 
-  if (assignedUserId && UUID_PATTERN.test(assignedUserId)) {
-    return assignedUserId;
-  }
-
-  const assigneeInput = typeof data.assignee === "string" ? data.assignee.trim() : "";
-  if (assigneeInput && UUID_PATTERN.test(assigneeInput)) {
-    return assigneeInput;
-  }
-
-  return undefined;
+  return Array.from(
+    new Set(
+      [...idsFromField, ...idsFromUsers, singleId]
+        .map((id) => (typeof id === "string" ? id.trim() : ""))
+        .filter(Boolean),
+    ),
+  );
 }
 
 function mapFormToUpdatePayload(data: Partial<Customer>): UpdateCustomerPayload {
@@ -124,18 +127,70 @@ function mapFormToUpdatePayload(data: Partial<Customer>): UpdateCustomerPayload 
     company_establish_date: formatDateForApi(data.company_establish_date),
     tax_code: data.tax_code || undefined,
     major: data.major || undefined,
-    assigned_user_id: resolveAssignedUserId(data),
     is_active: data.is_active ?? mapStatusToIsActive(data.status),
   };
 }
 
+function toAssignedUsersFromApiRows(
+  customerId: string,
+  rows: CustomerAssignedUserApiRow[],
+): Array<{ id: string; full_name: string }> {
+  const seen = new Set<string>();
+
+  return rows.reduce<Array<{ id: string; full_name: string }>>((acc, row) => {
+    if (row.customer_id !== customerId) {
+      return acc;
+    }
+
+    const assignedUserId = typeof row.assigned_user_id === "string" ? row.assigned_user_id.trim() : "";
+    if (!assignedUserId || seen.has(assignedUserId)) {
+      return acc;
+    }
+
+    seen.add(assignedUserId);
+    acc.push({
+      id: assignedUserId,
+      full_name: row.assigned_user?.full_name?.trim() || assignedUserId,
+    });
+
+    return acc;
+  }, []);
+}
+
+function resolveAssignedUsers(
+  row: CustomerApiRow,
+  assignedUserRows: CustomerAssignedUserApiRow[],
+): Array<{ id: string; full_name: string }> {
+  const fromAssignedUserApi = toAssignedUsersFromApiRows(row.id, assignedUserRows);
+  if (fromAssignedUserApi.length > 0) {
+    return fromAssignedUserApi;
+  }
+
+  const seen = new Set<string>();
+  return (row.assigned_users || []).reduce<Array<{ id: string; full_name: string }>>((acc, user) => {
+    const id = typeof user?.id === "string" ? user.id.trim() : "";
+    if (!id || seen.has(id)) {
+      return acc;
+    }
+
+    seen.add(id);
+    acc.push({
+      id,
+      full_name: typeof user.full_name === "string" ? user.full_name.trim() || id : id,
+    });
+    return acc;
+  }, []);
+}
+
 function mapApiRowToCustomerDetail(
   row: CustomerApiRow,
-  assigneeName: string,
+  assignedUsers: Array<{ id: string; full_name: string }>,
   groupNames: string[],
 ): Customer {
   const customerName =
     row.full_name || `${row.last_name || ""} ${row.first_name || ""}`.trim() || row.email || "Khach hang";
+
+  const assigneeName = assignedUsers.map((user) => user.full_name || user.id).filter(Boolean).join(", ");
 
   return {
     id: row.id,
@@ -159,7 +214,8 @@ function mapApiRowToCustomerDetail(
     first_name: row.first_name,
     last_name: row.last_name,
     full_name: row.full_name || undefined,
-    assigned_user_id: row.assigned_user_id || undefined,
+    assigned_user_id: assignedUsers[0]?.id || row.assigned_user_id || undefined,
+    assigned_users: assignedUsers,
     customer_source_id: row.customer_source_id || undefined,
     type: row.type || undefined,
     company_name: row.company_name || undefined,
@@ -172,6 +228,56 @@ function mapApiRowToCustomerDetail(
     website: row.website || undefined,
     is_active: row.is_active,
   };
+}
+
+function getJobDateValue(job: JobApiRow): number {
+  const date = job.created_at || job.updated_at;
+  return date ? new Date(date).getTime() : 0;
+}
+
+function getRelatedCustomerId(job: JobApiRow): string | null {
+  return job.customer?.id || job.customer_uuid || null;
+}
+
+function getJobTimeRange(jobTime: JobApiRow["job_time"]): { start?: string; end?: string } {
+  if (Array.isArray(jobTime)) {
+    const firstRange = jobTime[0] || {};
+    return {
+      start: firstRange.start,
+      end: firstRange.end,
+    };
+  }
+
+  return {
+    start: jobTime?.start,
+    end: jobTime?.end,
+  };
+}
+
+function getJobPerformerLabel(job: JobApiRow): string {
+  return job.performer?.full_name || job.performer?.email || job.performer_uuid || "Chưa phân công";
+}
+
+function getJobStatusVariant(statusName?: string | null): "default" | "success" | "warning" | "danger" | "info" {
+  const normalized = (statusName || "").toLowerCase();
+
+  if (normalized.includes("hoàn thành") || normalized.includes("thành công") || normalized.includes("xong")) {
+    return "success";
+  }
+
+  if (normalized.includes("hủy") || normalized.includes("từ chối") || normalized.includes("thất bại")) {
+    return "danger";
+  }
+
+  if (normalized.includes("chờ") || normalized.includes("chưa") || normalized.includes("mới")) {
+    return "warning";
+  }
+
+  if (normalized.includes("đang") || normalized.includes("thực hiện") || normalized.includes("xử lý")) {
+    return "info";
+  }
+
+  return "default";
 }
 
 export default function CustomerDetailPage() {
@@ -189,8 +295,9 @@ export default function CustomerDetailPage() {
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [workHistory, setWorkHistory] = useState<UserHistoryApiRow[]>([]);
-  const [isLoadingWorkHistory, setIsLoadingWorkHistory] = useState(false);
+  const [workJobs, setWorkJobs] = useState<JobApiRow[]>([]);
+  const [isLoadingWorkJobs, setIsLoadingWorkJobs] = useState(false);
+  const [assignerNameById, setAssignerNameById] = useState<Record<string, string>>({});
 
   const loadCustomer = useCallback(async () => {
     if (!customerId) {
@@ -199,10 +306,14 @@ export default function CustomerDetailPage() {
 
     setIsLoading(true);
     try {
-      const [customerResponse, tagsResponse, customerTagsResponse] = await Promise.all([
+      const [customerResponse, tagsResponse, customerTagsResponse, customerAssignedUsersResponse] = await Promise.all([
         customersService.getCustomer(customerId),
         tagsService.getTags({ currentPage: "1", pageSize: "5000" }),
         customerTagsService.getCustomerTagsByCustomerId(customerId, {
+          currentPage: "1",
+          pageSize: "5000",
+        }),
+        customerAssignedUsersService.getCustomerAssignedUsersByCustomerId(customerId, {
           currentPage: "1",
           pageSize: "5000",
         }),
@@ -227,17 +338,12 @@ export default function CustomerDetailPage() {
         .map((link) => tagNameById[link.tag_id])
         .filter((name): name is string => Boolean(name));
 
-      let assigneeName = row.assigned_user_id || "";
-      if (row.assigned_user_id && UUID_PATTERN.test(row.assigned_user_id)) {
-        try {
-          const userResponse = await usersService.getUser(row.assigned_user_id);
-          assigneeName = userResponse.responseData?.full_name?.trim() || row.assigned_user_id;
-        } catch {
-          assigneeName = row.assigned_user_id;
-        }
-      }
+      const assignedUsers = resolveAssignedUsers(
+        row,
+        customerAssignedUsersResponse.responseData?.rows || [],
+      );
 
-      setCustomer(mapApiRowToCustomerDetail(row, assigneeName, groupNames));
+      setCustomer(mapApiRowToCustomerDetail(row, assignedUsers, groupNames));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Không thể tải chi tiết khách hàng.";
       toast.error("Tải dữ liệu thất bại", message);
@@ -251,51 +357,89 @@ export default function CustomerDetailPage() {
   }, [loadCustomer]);
 
   useEffect(() => {
-    if (activeTab !== "work" || !customer) {
+    if (activeTab !== "work" || !customerId) {
       return;
     }
 
     let isDisposed = false;
 
     const loadWorkHistory = async () => {
-      setIsLoadingWorkHistory(true);
+      setIsLoadingWorkJobs(true);
       try {
-        const response = await userHistoryService.getUserHistories({
-          currentPage: "1",
-          pageSize: "200",
-        });
+        let rows: JobApiRow[] = [];
+
+        try {
+          const filteredResponse = await jobsService.getJobs({
+            currentPage: "1",
+            pageSize: "300",
+            filters: `customer_uuid==${customerId}`,
+          });
+          rows = filteredResponse.responseData?.rows || [];
+        } catch {
+          rows = [];
+        }
+
+        if (rows.length === 0) {
+          const fallbackResponse = await jobsService.getJobs({
+            currentPage: "1",
+            pageSize: "500",
+          });
+
+          rows = (fallbackResponse.responseData?.rows || []).filter(
+            (job) => getRelatedCustomerId(job) === customerId,
+          );
+        }
+
+        const assignerIds = Array.from(
+          new Set(
+            rows
+              .map((job) => job.created_by)
+              .filter((createdBy): createdBy is string => Boolean(createdBy && createdBy.trim())),
+          ),
+        );
+
+        if (assignerIds.length > 0) {
+          try {
+            const usersResponse = await usersService.getUsers({ currentPage: "1", pageSize: "500" });
+            const rowsById = (usersResponse.responseData?.rows || []).reduce<Record<string, string>>((acc, row) => {
+              acc[row.id] = row.full_name || row.email || row.id;
+              return acc;
+            }, {});
+
+            const nextAssignerMap = assignerIds.reduce<Record<string, string>>((acc, id) => {
+              acc[id] = rowsById[id] || id;
+              return acc;
+            }, {});
+
+            if (!isDisposed) {
+              setAssignerNameById(nextAssignerMap);
+            }
+          } catch {
+            const fallbackAssignerMap = assignerIds.reduce<Record<string, string>>((acc, id) => {
+              acc[id] = id;
+              return acc;
+            }, {});
+
+            if (!isDisposed) {
+              setAssignerNameById(fallbackAssignerMap);
+            }
+          }
+        } else if (!isDisposed) {
+          setAssignerNameById({});
+        }
 
         if (isDisposed) {
           return;
         }
 
-        const rows = response.responseData?.rows || [];
-        const keywords = [
-          customer.customerName.toLowerCase(),
-          customer.id.toLowerCase(),
-          (customer.email || "").toLowerCase(),
-          (customer.phone || "").toLowerCase(),
-        ].filter(Boolean);
-
-        const filtered = rows
-          .filter((item) => {
-            const text = `${item.title || ""} ${item.note || ""}`.toLowerCase();
-            return keywords.some((keyword) => text.includes(keyword));
-          })
-          .sort((a, b) => {
-            const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-            return bTime - aTime;
-          });
-
-        setWorkHistory(filtered);
+        setWorkJobs([...rows].sort((a, b) => getJobDateValue(b) - getJobDateValue(a)));
       } catch {
         if (!isDisposed) {
-          setWorkHistory([]);
+          setWorkJobs([]);
         }
       } finally {
         if (!isDisposed) {
-          setIsLoadingWorkHistory(false);
+          setIsLoadingWorkJobs(false);
         }
       }
     };
@@ -305,7 +449,7 @@ export default function CustomerDetailPage() {
     return () => {
       isDisposed = true;
     };
-  }, [activeTab, customer]);
+  }, [activeTab, customerId]);
 
   const conversation = useMemo(() => {
     if (!customer) {
@@ -323,16 +467,18 @@ export default function CustomerDetailPage() {
   const tabs = useMemo(
     () => [
       { id: "detail", label: "Chi tiết khách" },
-      { id: "chat", label: "Lịch sử chat", badge: conversation?.messages.length || 0 },
-      { id: "work", label: "Lịch sử công việc", badge: workHistory.length },
+      { id: "chat", label: "Lịch sử chat" },
+      { id: "work", label: "Lịch sử công việc" },
     ],
-    [conversation?.messages.length, workHistory.length],
+    [],
   );
 
   const handleUpdate = async (formData: Partial<Customer>, groupIds: string[]) => {
     if (!customerId) {
       return;
     }
+
+    const selectedAssignedUserIds = resolveAssignedUserIds(formData);
 
     try {
       await customersService.updateCustomer(customerId, mapFormToUpdatePayload(formData));
@@ -343,6 +489,11 @@ export default function CustomerDetailPage() {
     }
 
     try {
+      await customerAssignedUsersService.setCustomerAssignedUsers({
+        customer_id: customerId,
+        assigned_user_ids: selectedAssignedUserIds,
+      });
+
       const normalizedNextGroupIds = Array.from(new Set(groupIds.filter(Boolean)));
       const existingLinksResponse = await customerTagsService.getCustomerTagsByCustomerId(customerId, {
         currentPage: "1",
@@ -369,7 +520,10 @@ export default function CustomerDetailPage() {
         await Promise.all(linksToDelete.map((link) => customerTagsService.deleteCustomerTag(link.id)));
       }
     } catch {
-      toast.warning("Đã lưu thông tin", "Cập nhật nhóm khách hàng chưa thành công, vui lòng thử lại.");
+      toast.warning(
+        "Đã lưu thông tin",
+        "Cập nhật nhóm khách hàng hoặc người phụ trách chưa thành công, vui lòng thử lại.",
+      );
     }
 
     toast.success("Cập nhật thành công", "Thông tin khách hàng đã được lưu.");
@@ -478,26 +632,49 @@ export default function CustomerDetailPage() {
 
             {activeTab === "work" && (
               <div className="space-y-3">
-                {isLoadingWorkHistory && (
+                {isLoadingWorkJobs && (
                   <div className="text-sm text-gray-500">Đang tải lịch sử công việc...</div>
                 )}
 
-                {!isLoadingWorkHistory && workHistory.length === 0 && (
+                {!isLoadingWorkJobs && workJobs.length === 0 && (
                   <div className="border border-dashed border-gray-300 rounded-lg p-6 text-sm text-gray-500">
-                    Chưa có lịch sử công việc phù hợp.
+                    Chưa có công việc nào thuộc khách hàng này.
                   </div>
                 )}
 
-                {!isLoadingWorkHistory &&
-                  workHistory.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-gray-200 p-3 bg-white">
-                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                      <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{item.note || "-"}</p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        {item.created_at ? formatDateVNDateOnly(new Date(item.created_at)) : "-"}
-                      </p>
-                    </div>
-                  ))}
+                {!isLoadingWorkJobs &&
+                  workJobs.map((item) => {
+                    const timeRange = getJobTimeRange(item.job_time);
+                    const statusName = item.status?.name || "Không có trạng thái";
+                    const assignerLabel = item.created_by
+                      ? assignerNameById[item.created_by] || item.created_by
+                      : "Không rõ";
+
+                    return (
+                      <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-900">{item.job_name}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={getJobStatusVariant(statusName)}>{statusName}</Badge>
+                            {item.progress != null && <Badge variant="warning">{item.progress}%</Badge>}
+                          </div>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.content || "-"}</p>
+                          {item.note && <p className="text-sm text-gray-600 whitespace-pre-wrap mt-2">Ghi chú: {item.note}</p>}
+                        </div>
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
+                          <p>Người thực hiện: {getJobPerformerLabel(item)}</p>
+                          <p>Người giao: {assignerLabel}</p>
+                          <p className="md:col-span-2">
+                            Thời gian: {timeRange.start ? formatDateVNDateOnly(new Date(timeRange.start)) : "-"}
+                            {timeRange.start && timeRange.end ? " -> " : ""}
+                            {timeRange.end ? formatDateVNDateOnly(new Date(timeRange.end)) : ""}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>

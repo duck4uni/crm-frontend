@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
-import { formatDateForInput } from "@/lib/utils";
+import { formatDateForInput, formatPermissionName } from "@/lib/utils";
 import { customerTagsService } from "@/services/customer-tags";
 import { tagsService } from "@/services/tags";
 import { usersService } from "@/services/users";
@@ -17,9 +17,13 @@ interface GroupOption {
 }
 
 interface UserOption {
-  value: string;
+  id: string;
   label: string;
+  role: "SITE LEADER" | "SITE WORKER";
 }
+
+const LEADER_ROLE_NAME = "SITE LEADER";
+const WORKER_ROLE_NAME = "SITE WORKER";
 
 interface CustomerEditorFormProps {
   initialData?: Partial<Customer> | null;
@@ -33,6 +37,22 @@ function normalizeCustomerType(value?: string): "individual" | "company" {
   return value?.trim().toLowerCase() === "company" ? "company" : "individual";
 }
 
+function toAssignedUserIds(data?: Partial<Customer> | null): string[] {
+  const idsFromField = Array.isArray(data?.assigned_user_ids) ? data.assigned_user_ids : [];
+  const idsFromUsers = Array.isArray(data?.assigned_users)
+    ? data.assigned_users.map((user) => user?.id || "")
+    : [];
+  const singleId = typeof data?.assigned_user_id === "string" ? data.assigned_user_id : "";
+
+  return Array.from(
+    new Set(
+      [...idsFromField, ...idsFromUsers, singleId]
+        .map((id) => (typeof id === "string" ? id.trim() : ""))
+        .filter(Boolean),
+    ),
+  );
+}
+
 function buildDefaultFormData(): Partial<Customer> {
   return {
     customerName: "",
@@ -43,6 +63,7 @@ function buildDefaultFormData(): Partial<Customer> {
     website: "",
     assignee: "",
     assigned_user_id: "",
+    assigned_user_ids: [],
     type: "individual",
     company_name: "",
     tax_code: "",
@@ -70,6 +91,7 @@ function mergeInitialData(initialData?: Partial<Customer> | null): Partial<Custo
     website: initialData.website || initialData.source || "",
     assignee: initialData.assignee || "",
     assigned_user_id: initialData.assigned_user_id || "",
+    assigned_user_ids: toAssignedUserIds(initialData),
     company_name: initialData.company_name || "",
     tax_code: initialData.tax_code || "",
     major: initialData.major || "",
@@ -93,11 +115,13 @@ export function CustomerEditorForm({
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [groupSearchKeyword, setGroupSearchKeyword] = useState("");
   const [userOptions, setUserOptions] = useState<UserOption[]>([]);
+  const [assigneeSearchKeyword, setAssigneeSearchKeyword] = useState("");
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   useEffect(() => {
     setFormData(mergeInitialData(initialData));
+    setAssigneeSearchKeyword("");
   }, [initialData]);
 
   useEffect(() => {
@@ -152,7 +176,7 @@ export function CustomerEditorForm({
     const loadUsers = async () => {
       setIsLoadingUsers(true);
       try {
-        const response = await usersService.getUsers({
+        const response = await usersService.getAdminUsers({
           currentPage: "1",
           pageSize: "500",
         });
@@ -162,10 +186,25 @@ export function CustomerEditorForm({
         }
 
         const options = (response.responseData?.rows || [])
-          .map((user) => ({
-            value: user.id,
-            label: user.full_name?.trim() || user.email || user.id,
-          }))
+          .map((user) => {
+            const permissionNames = (user.user_permisions || [])
+              .map((item) => item.permision?.name || "")
+              .map((name) => name.trim());
+
+            const isLeader = permissionNames.includes(LEADER_ROLE_NAME);
+            const isWorker = permissionNames.includes(WORKER_ROLE_NAME);
+
+            if (!isLeader && !isWorker) {
+              return null;
+            }
+
+            return {
+              id: user.id,
+              label: user.full_name?.trim() || user.email || user.id,
+              role: isLeader ? LEADER_ROLE_NAME : WORKER_ROLE_NAME,
+            };
+          })
+          .filter((user): user is UserOption => Boolean(user))
           .sort((a, b) => a.label.localeCompare(b.label, "vi"));
 
         setUserOptions(options);
@@ -189,12 +228,7 @@ export function CustomerEditorForm({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
-    if (name === "assigned_user_id") {
-      setFormData((prev) => ({
-        ...prev,
-        assigned_user_id: value,
-      }));
-    } else if (name === "type") {
+    if (name === "type") {
       setFormData((prev) => ({ ...prev, type: normalizeCustomerType(value) }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -241,7 +275,15 @@ export function CustomerEditorForm({
 
     setIsSubmitting(true);
     try {
-      await onSubmit(formData, selectedGroupIds);
+      const normalizedAssignedUserIds = toAssignedUserIds(formData);
+
+      await onSubmit(
+        {
+          ...formData,
+          assigned_user_ids: normalizedAssignedUserIds,
+        },
+        selectedGroupIds,
+      );
     } catch {
       // Parent page handles toast/error display.
     } finally {
@@ -254,6 +296,70 @@ export function CustomerEditorForm({
       prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId],
     );
   };
+
+  const selectedAssignedUserIds = useMemo(() => toAssignedUserIds(formData), [formData]);
+
+  const toggleAssigneeSelection = (userId: string) => {
+    setFormData((prev) => {
+      const currentIds = toAssignedUserIds(prev);
+
+      return {
+        ...prev,
+        assigned_user_ids: currentIds.includes(userId)
+          ? currentIds.filter((id) => id !== userId)
+          : [...currentIds, userId],
+      };
+    });
+  };
+
+  const filteredUserOptions = useMemo(() => {
+    const keyword = assigneeSearchKeyword.trim().toLowerCase();
+    if (!keyword) {
+      return userOptions;
+    }
+
+    return userOptions.filter((user) => user.label.toLowerCase().includes(keyword));
+  }, [assigneeSearchKeyword, userOptions]);
+
+  const filteredLeaderOptions = useMemo(
+    () => filteredUserOptions.filter((user) => user.role === LEADER_ROLE_NAME),
+    [filteredUserOptions],
+  );
+
+  const filteredWorkerOptions = useMemo(
+    () => filteredUserOptions.filter((user) => user.role === WORKER_ROLE_NAME),
+    [filteredUserOptions],
+  );
+
+  const allFilteredAssigneesSelected =
+    filteredUserOptions.length > 0 &&
+    filteredUserOptions.every((user) => selectedAssignedUserIds.includes(user.id));
+
+  const toggleSelectAllFilteredAssignees = () => {
+    setFormData((prev) => {
+      const currentIds = new Set(toAssignedUserIds(prev));
+
+      if (allFilteredAssigneesSelected) {
+        filteredUserOptions.forEach((user) => currentIds.delete(user.id));
+      } else {
+        filteredUserOptions.forEach((user) => currentIds.add(user.id));
+      }
+
+      return {
+        ...prev,
+        assigned_user_ids: Array.from(currentIds),
+      };
+    });
+  };
+
+  const userNameById = useMemo(
+    () =>
+      userOptions.reduce<Record<string, string>>((acc, user) => {
+        acc[user.id] = user.label;
+        return acc;
+      }, {}),
+    [userOptions],
+  );
 
   const filteredGroupOptions = useMemo(() => {
     const keyword = groupSearchKeyword.trim().toLowerCase();
@@ -394,16 +500,6 @@ export function CustomerEditorForm({
             disabled={isSubmitting}
           />
           <Select
-            label="Người phụ trách"
-            name="assigned_user_id"
-            value={formData.assigned_user_id || ""}
-            onChange={handleChange}
-            options={userOptions}
-            placeholder={isLoadingUsers ? "Đang tải danh sách user..." : "Chọn người phụ trách"}
-            variant="default"
-            disabled={isSubmitting || isLoadingUsers}
-          />
-          <Select
             label="Trạng thái"
             name="is_active"
             value={formData.is_active === false ? "false" : "true"}
@@ -414,6 +510,82 @@ export function CustomerEditorForm({
             variant="default"
             disabled={isSubmitting}
           />
+
+          <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-sm font-medium text-gray-700">Người phụ trách</p>
+              <p className="text-xs text-gray-500">Đã chọn {selectedAssignedUserIds.length} người</p>
+            </div>
+
+            <Input
+              name="assigneeSearch"
+              value={assigneeSearchKeyword}
+              onChange={(event) => setAssigneeSearchKeyword(event.target.value)}
+              placeholder="Tìm theo tên user"
+              disabled={isSubmitting || isLoadingUsers}
+            />
+
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs text-gray-500">
+                Hiển thị {filteredUserOptions.length}/{userOptions.length} user
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 px-3 text-xs"
+                onClick={toggleSelectAllFilteredAssignees}
+                disabled={isSubmitting || isLoadingUsers || filteredUserOptions.length === 0}
+              >
+                {allFilteredAssigneesSelected ? "Bỏ chọn user đang lọc" : "Chọn user đang lọc"}
+              </Button>
+            </div>
+
+            {isLoadingUsers && <p className="text-sm text-gray-500">Đang tải danh sách user...</p>}
+
+            {!isLoadingUsers && userOptions.length === 0 && (
+              <p className="text-sm text-gray-500">Không có user nào để gán phụ trách.</p>
+            )}
+
+            {!isLoadingUsers && userOptions.length > 0 && filteredUserOptions.length === 0 && (
+              <p className="text-sm text-gray-500">Không tìm thấy user phù hợp.</p>
+            )}
+
+            {!isLoadingUsers && filteredUserOptions.length > 0 && (
+              <div className="space-y-4">
+                <AssigneeRoleSection
+                  title={formatPermissionName(LEADER_ROLE_NAME)}
+                  users={filteredLeaderOptions}
+                  selectedIds={selectedAssignedUserIds}
+                  onToggle={toggleAssigneeSelection}
+                  disabled={isSubmitting}
+                />
+
+                <AssigneeRoleSection
+                  title={formatPermissionName(WORKER_ROLE_NAME)}
+                  users={filteredWorkerOptions}
+                  selectedIds={selectedAssignedUserIds}
+                  onToggle={toggleAssigneeSelection}
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
+
+            {selectedAssignedUserIds.length > 0 && (
+              <div className="rounded-md border border-dashed border-gray-300 p-2">
+                <p className="text-xs text-gray-500 mb-2">Đang phụ trách</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAssignedUserIds.map((userId) => (
+                    <span
+                      key={userId}
+                      className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700"
+                    >
+                      {userNameById[userId] || userId}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </FormSection>
 
@@ -578,6 +750,57 @@ function FormSection({ title, children }: { title: string; children: React.React
         {title}
       </h3>
       {children}
+    </div>
+  );
+}
+
+function AssigneeRoleSection({
+  title,
+  users,
+  selectedIds,
+  onToggle,
+  disabled,
+}: {
+  title: string;
+  users: UserOption[];
+  selectedIds: string[];
+  onToggle: (userId: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="border border-gray-200 rounded-md overflow-hidden">
+      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-700 uppercase tracking-wider">
+        {title} ({users.length})
+      </div>
+
+      {users.length === 0 ? (
+        <p className="px-3 py-3 text-sm text-gray-500">Không có user phù hợp.</p>
+      ) : (
+        <div className="max-h-52 overflow-y-auto">
+          <table className="w-full">
+            <tbody className="divide-y divide-gray-200">
+              {users.map((user) => {
+                const isChecked = selectedIds.includes(user.id);
+
+                return (
+                  <tr key={user.id} className={isChecked ? "bg-primary-50" : "hover:bg-gray-50"}>
+                    <td className="px-3 py-2 w-10">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => onToggle(user.id)}
+                        disabled={disabled}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">{user.label}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

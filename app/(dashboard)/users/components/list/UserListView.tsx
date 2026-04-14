@@ -10,6 +10,7 @@ import { UserSearch } from "./UserSearch";
 import { UserTable } from "./UserTable";
 import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { useToast } from "@/components/ui/ToastProvider";
+import { formatPermissionName } from "@/lib/utils";
 
 const PAGE_SIZE = "500";
 
@@ -48,7 +49,7 @@ export function UserListView() {
 
             const rolesMap: Record<string, string[]> = {};
             for (const row of rows) {
-                rolesMap[row.id] = (row.user_permisions ?? []).map((up) => up.permision.name);
+                rolesMap[row.id] = (row.user_permisions ?? []).map((up) => formatPermissionName(up.permision.name));
             }
 
             setUsers(rows.map(mapApiRowToProfile));

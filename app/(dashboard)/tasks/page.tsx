@@ -8,12 +8,22 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/ToastProvider";
 import { jobsService } from "@/services/jobs";
+import { statusesService } from "@/services/statuses";
 import { usersService } from "@/services/users";
 import { customersService } from "@/services/customers";
-import { JobApiRow, JobTimeRange, CreateJobPayload, UpdateJobPayload, UserApiRow, CustomerApiRow } from "@/types/api";
+import {
+  JobApiRow,
+  JobTimeRange,
+  CreateJobPayload,
+  UpdateJobPayload,
+  UserApiRow,
+  CustomerApiRow,
+  StatusApiRow,
+} from "@/types/api";
 import {
   FiPlus,
   FiSearch,
+  FiEye,
   FiBriefcase,
   FiTrash2,
   FiEdit2,
@@ -25,6 +35,8 @@ import {
 interface JobFormData {
   job_name: string;
   content: string;
+  note: string;
+  progress: string;
   job_time: { start?: string; end?: string };
   performer_uuid: string;
   customer_uuid: string;
@@ -34,16 +46,98 @@ interface JobFormData {
 const emptyFormData: JobFormData = {
   job_name: "",
   content: "",
+  note: "",
+  progress: "",
   job_time: {},
   performer_uuid: "",
   customer_uuid: "",
   status_id: "",
 };
 
+const toDateTimeLocal = (value?: string | null): string => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const normalizeJobStatuses = (statuses: StatusApiRow[]): StatusApiRow[] => {
+  const filteredStatuses = statuses.filter((status) => {
+    const type = (status.type ?? "").toLowerCase();
+    const code = (status.code ?? "").toLowerCase();
+    return type.includes("job") || code.includes("job");
+  });
+
+  return filteredStatuses.length > 0 ? filteredStatuses : statuses;
+};
+
+const getStatusVariant = (statusCode?: string | null, statusName?: string | null): "default" | "success" | "warning" | "danger" | "info" => {
+  // Thử map từ code trước
+  if (statusCode) {
+    const normalizedCode = statusCode.toLowerCase();
+
+    if (normalizedCode.includes("done") || normalizedCode.includes("success") || normalizedCode.includes("completed")) {
+      return "success";
+    }
+
+    if (normalizedCode.includes("cancel") || normalizedCode.includes("reject") || normalizedCode.includes("failed")) {
+      return "danger";
+    }
+
+    if (normalizedCode.includes("progress") || normalizedCode.includes("doing") || normalizedCode.includes("processing")) {
+      return "info";
+    }
+
+    if (normalizedCode.includes("pending") || normalizedCode.includes("todo") || normalizedCode.includes("new")) {
+      return "warning";
+    }
+  }
+
+  // Fallback: map từ status name
+  if (statusName) {
+    const normalizedName = statusName.toLowerCase();
+
+    if (normalizedName.includes("hoàn thành") || normalizedName.includes("thành công") || normalizedName.includes("xong")) {
+      return "success";
+    }
+
+    if (normalizedName.includes("hủy") || normalizedName.includes("từ chối") || normalizedName.includes("thất bại")) {
+      return "danger";
+    }
+
+    if (normalizedName.includes("chờ") || normalizedName.includes("chưa") || normalizedName.includes("mới")) {
+      return "warning";
+    }
+
+    if (normalizedName.includes("đang") || normalizedName.includes("thực hiện") || normalizedName.includes("xử lý")) {
+      return "info";
+    }
+  }
+
+  return "default";
+};
+
+const buildCustomerLabel = (customer: CustomerApiRow) => {
+  const fullName = customer.full_name?.trim();
+  if (fullName) {
+    return fullName;
+  }
+
+  const displayName = `${customer.last_name ?? ""} ${customer.first_name ?? ""}`.trim();
+  return displayName || customer.email || customer.id;
+};
+
 export default function TasksPage() {
   const [jobs, setJobs] = useState<JobApiRow[]>([]);
   const [users, setUsers] = useState<UserApiRow[]>([]);
+  const [adminUsers, setAdminUsers] = useState<UserApiRow[]>([]);
   const [customers, setCustomers] = useState<CustomerApiRow[]>([]);
+  const [statuses, setStatuses] = useState<StatusApiRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -66,37 +160,91 @@ export default function TasksPage() {
     }
   }, [toast]);
 
-  const loadUsers = useCallback(async () => {
+  const loadReferenceData = useCallback(async () => {
     try {
-      const [usersRes, customersRes] = await Promise.all([
+      const [usersRes, adminUsersRes, customersRes] = await Promise.all([
         usersService.getUsers({ pageSize: "500" }),
+        usersService.getAdminUsers({ pageSize: "500" }),
         customersService.getCustomers({ pageSize: "500" }),
       ]);
+
+      let statusesRes;
+      try {
+        statusesRes = await statusesService.getStatuses({
+          pageSize: "500",
+          filters: JSON.stringify({ type: "job" }),
+        });
+      } catch {
+        statusesRes = await statusesService.getStatuses({ pageSize: "500" });
+      }
+
       setUsers(usersRes.responseData?.rows ?? []);
+      setAdminUsers(adminUsersRes.responseData?.rows ?? []);
       setCustomers(customersRes.responseData?.rows ?? []);
+      setStatuses(normalizeJobStatuses(statusesRes.responseData?.rows ?? []));
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Không thể tải danh sách người dùng/khách hàng.";
+      const msg = error instanceof Error ? error.message : "Không thể tải dữ liệu tham chiếu.";
       toast.error("Tải dữ liệu thất bại", msg);
     }
   }, [toast]);
 
   useEffect(() => {
     loadJobs();
-    loadUsers();
-  }, [loadJobs, loadUsers]);
+    loadReferenceData();
+  }, [loadJobs, loadReferenceData]);
 
-  const filteredJobs = jobs.filter((job) =>
-    job.job_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    job.content.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredJobs = jobs.filter((job) => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return true;
+    }
 
-  const getUserName = (uuid: string | null) => {
-    if (!uuid) return null;
-    const user = users.find((u) => u.id === uuid);
-    if (user) return user.full_name || user.email;
-    const customer = customers.find((c) => c.id === uuid);
-    if (customer) return customer.full_name || `${customer.last_name} ${customer.first_name}`.trim() || customer.email || uuid.slice(0, 8) + "...";
-    return uuid.slice(0, 8) + "...";
+    const statusName = job.status?.name ?? "";
+    const note = job.note ?? "";
+
+    return [job.job_name, job.content, note, statusName].some((fieldValue) =>
+      fieldValue.toLowerCase().includes(normalizedQuery),
+    );
+  });
+
+  const getUserNameById = (id: string | null | undefined) => {
+    if (!id) return null;
+    const user = users.find((item) => item.id === id);
+    return user ? user.full_name || user.email : id.slice(0, 8) + "...";
+  };
+
+  const getCustomerNameById = (id: string | null | undefined) => {
+    if (!id) return null;
+    const customer = customers.find((item) => item.id === id);
+    return customer ? buildCustomerLabel(customer) : id.slice(0, 8) + "...";
+  };
+
+  const getPerformerLabel = (job: JobApiRow) => {
+    return job.performer?.full_name || job.performer?.email || getUserNameById(job.performer_uuid) || "—";
+  };
+
+  const getCustomerLabel = (job: JobApiRow) => {
+    if (job.customer?.full_name) {
+      return job.customer.full_name;
+    }
+
+    if (job.customer?.last_name || job.customer?.first_name) {
+      return `${job.customer.last_name ?? ""} ${job.customer.first_name ?? ""}`.trim();
+    }
+
+    return job.customer?.email || getCustomerNameById(job.customer_uuid) || "—";
+  };
+
+  const getJobStatus = (job: JobApiRow) => {
+    if (job.status) {
+      return job.status;
+    }
+
+    if (!job.status_id) {
+      return null;
+    }
+
+    return statuses.find((status) => status.id === job.status_id) ?? null;
   };
 
   const getFormTimeFromApi = (jobTime: JobApiRow["job_time"]): { start: string; end: string } => {
@@ -127,10 +275,12 @@ export default function TasksPage() {
     setFormData({
       job_name: job.job_name,
       content: job.content,
-      job_time: { start: jt.start, end: jt.end },
-      performer_uuid: job.performer_uuid ?? "",
-      customer_uuid: job.customer_uuid ?? "",
-      status_id: job.status_id ?? "",
+      note: job.note ?? "",
+      progress: job.progress != null ? String(job.progress) : "",
+      job_time: { start: toDateTimeLocal(jt.start), end: toDateTimeLocal(jt.end) },
+      performer_uuid: job.performer?.id ?? job.performer_uuid ?? "",
+      customer_uuid: job.customer?.id ?? job.customer_uuid ?? "",
+      status_id: job.status?.id ?? job.status_id ?? "",
     });
     setIsFormOpen(true);
   };
@@ -153,12 +303,25 @@ export default function TasksPage() {
       return;
     }
 
+    const rawProgress = formData.progress.trim();
+    let progressValue: number | undefined;
+
+    if (rawProgress) {
+      const numericProgress = Number(rawProgress);
+      if (Number.isNaN(numericProgress) || numericProgress < 0 || numericProgress > 100) {
+        toast.error("Tiến độ không hợp lệ", "Vui lòng nhập tiến độ từ 0 đến 100.");
+        return;
+      }
+      progressValue = numericProgress;
+    }
+
     try {
       if (editingJob) {
-        // Update
         const payload: UpdateJobPayload = {
           job_name: formData.job_name,
           content: formData.content,
+          note: formData.note.trim() || undefined,
+          progress: progressValue,
           job_time: buildPayloadTime(),
           performer_uuid: formData.performer_uuid || undefined,
           customer_uuid: formData.customer_uuid || undefined,
@@ -169,15 +332,17 @@ export default function TasksPage() {
         setJobs((prev) => prev.map((j) => (j.id === editingJob.id ? { ...j, ...updated } : j)));
         toast.success("Cập nhật thành công", `Công việc "${formData.job_name}" đã được cập nhật.`);
       } else {
-        // Create
-        const payload: CreateJobPayload[] = [{
-          job_name: formData.job_name,
-          content: formData.content,
-          job_time: buildPayloadTime(),
-          performer_uuid: formData.performer_uuid || undefined,
-          customer_uuid: formData.customer_uuid || undefined,
-          status_id: formData.status_id || undefined,
-        }];
+        const payload: CreateJobPayload[] = [
+          {
+            job_name: formData.job_name,
+            content: formData.content,
+            note: formData.note.trim() || undefined,
+            progress: progressValue,
+            job_time: buildPayloadTime(),
+            performer_uuid: formData.performer_uuid || undefined,
+            customer_uuid: formData.customer_uuid || undefined,
+          },
+        ];
         const response = await jobsService.createJobs(payload);
         const created = response.responseData ?? [];
         setJobs((prev) => [...created, ...prev]);
@@ -204,9 +369,14 @@ export default function TasksPage() {
   };
 
   const userOptions = users.map((u) => ({ value: u.id, label: u.full_name || u.email }));
-  const customerOptions = customers.map((c) => ({
-    value: c.id,
-    label: c.full_name || `${c.last_name} ${c.first_name}`.trim() || c.email || c.id,
+  const adminUserOptions = adminUsers.map((u) => ({ value: u.id, label: u.full_name || u.email }));
+  const customerOptions = customers.map((customer) => ({
+    value: customer.id,
+    label: buildCustomerLabel(customer),
+  }));
+  const statusOptions = statuses.map((status) => ({
+    value: status.id,
+    label: status.name,
   }));
 
   if (isLoading) {
@@ -268,7 +438,7 @@ export default function TasksPage() {
                   Trạng thái
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ngày tạo
+                  Tiến độ
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Thao tác
@@ -278,11 +448,11 @@ export default function TasksPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {paged.map((job) => {
                 const jt = getFormTimeFromApi(job.job_time);
+                const status = getJobStatus(job);
                 return (
                   <tr
                     key={job.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => openDetail(job)}
+                    className="hover:bg-gray-50"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -310,48 +480,64 @@ export default function TasksPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {job.performer_uuid ? (
+                      {job.performer || job.performer_uuid ? (
                         <div className="flex items-center text-sm text-gray-700">
                           <FiUser className="w-3.5 h-3.5 mr-1 text-gray-400" />
-                          {getUserName(job.performer_uuid)}
+                          {getPerformerLabel(job)}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {job.customer_uuid ? (
+                      {job.customer || job.customer_uuid ? (
                         <div className="flex items-center text-sm text-gray-700">
                           <FiUsers className="w-3.5 h-3.5 mr-1 text-gray-400" />
-                          {getUserName(job.customer_uuid)}
+                          {getCustomerLabel(job)}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {job.status_id ? (
-                        <Badge variant="info">{job.status_id}</Badge>
+                      {status ? (
+                        <Badge variant={getStatusVariant(status.code, status.name)}>{status.name}</Badge>
+                      ) : job.status_id ? (
+                        <Badge variant="default">{job.status_id}</Badge>
                       ) : (
                         <span className="text-sm text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {job.created_at
-                        ? new Date(job.created_at).toLocaleDateString("vi-VN")
-                        : "—"}
+                      {job.progress != null ? `${job.progress}%` : "—"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => openEditForm(job)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openDetail(job);
+                          }}
+                          className="p-1.5 text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                          title="Xem chi tiết"
+                        >
+                          <FiEye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEditForm(job);
+                          }}
                           className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
                           title="Chỉnh sửa"
                         >
                           <FiEdit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDeleteJob(job)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteJob(job);
+                          }}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                           title="Xóa"
                         >
@@ -394,6 +580,7 @@ export default function TasksPage() {
       >
         {selectedJob && (() => {
           const jt = getFormTimeFromApi(selectedJob.job_time);
+          const status = getJobStatus(selectedJob);
           return (
             <div className="space-y-4">
               <div>
@@ -404,6 +591,12 @@ export default function TasksPage() {
                 <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Nội dung</label>
                 <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedJob.content}</p>
               </div>
+              {selectedJob.note && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ghi chú</label>
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedJob.note}</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Thời gian bắt đầu</label>
@@ -422,32 +615,30 @@ export default function TasksPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Người thực hiện</label>
                   <p className="text-sm text-gray-900">
-                    {getUserName(selectedJob.performer_uuid) ?? "Chưa gán"}
+                    {getPerformerLabel(selectedJob)}
                   </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Khách hàng</label>
                   <p className="text-sm text-gray-900">
-                    {getUserName(selectedJob.customer_uuid) ?? "Chưa gán"}
+                    {getCustomerLabel(selectedJob)}
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Trạng thái (status_id)</label>
-                  <p className="text-sm text-gray-900">{selectedJob.status_id ?? "Không có"}</p>
+                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Trạng thái</label>
+                  <p className="text-sm text-gray-900">{status?.name ?? selectedJob.status_id ?? "Không có"}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ngày tạo</label>
-                  <p className="text-sm text-gray-900">
-                    {selectedJob.created_at ? new Date(selectedJob.created_at).toLocaleString("vi-VN") : "—"}
-                  </p>
+                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Tiến độ</label>
+                  <p className="text-sm text-gray-900">{selectedJob.progress != null ? `${selectedJob.progress}%` : "Chưa đặt"}</p>
                 </div>
               </div>
               {selectedJob.created_by && (
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Người tạo</label>
-                  <p className="text-sm text-gray-900">{getUserName(selectedJob.created_by)}</p>
+                  <p className="text-sm text-gray-900">{getUserNameById(selectedJob.created_by) ?? selectedJob.created_by}</p>
                 </div>
               )}
             </div>
@@ -495,6 +686,32 @@ export default function TasksPage() {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+            <textarea
+              value={formData.note}
+              onChange={(e) => setFormData((prev) => ({ ...prev, note: e.target.value }))}
+              placeholder="Nhập ghi chú (nếu có)"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            />
+          </div>
+
+          {editingJob && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tiến độ (%)</label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={formData.progress}
+                onChange={(e) => setFormData((prev) => ({ ...prev, progress: e.target.value }))}
+                placeholder="0 - 100"
+              />
+            </div>
+          )}
+
           {/* job_time: start / end */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -534,7 +751,7 @@ export default function TasksPage() {
               className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
             >
               <option value="">Không chọn</option>
-              {userOptions.map((opt) => (
+              {(editingJob ? userOptions : (adminUserOptions.length ? adminUserOptions : userOptions)).map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
@@ -555,15 +772,20 @@ export default function TasksPage() {
             </select>
           </div>
 
-          {/* status_id */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status ID</label>
-            <Input
-              value={formData.status_id}
-              onChange={(e) => setFormData((prev) => ({ ...prev, status_id: e.target.value }))}
-              placeholder="Nhập status ID (UUID)"
-            />
-          </div>
+          {editingJob && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+              <select
+                value={formData.status_id}
+                onChange={(e) => setFormData((prev) => ({ ...prev, status_id: e.target.value }))}
+                className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+              >
+                {statusOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

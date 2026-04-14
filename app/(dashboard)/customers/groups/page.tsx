@@ -26,6 +26,7 @@ interface UserOption {
 
 const TAG_PAGE_SIZE = "500";
 const LINK_PAGE_SIZE = "5000";
+const SITE_LEADER_PERMISSION_NAME = "SITE LEADER";
 
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -50,7 +51,7 @@ export default function CustomerGroupsPage() {
       const [tagsRes, linksRes, usersRes, userTagsRes] = await Promise.all([
         tagsService.getTags({ currentPage: "1", pageSize: TAG_PAGE_SIZE }),
         customerTagsService.getCustomerTags({ currentPage: "1", pageSize: LINK_PAGE_SIZE }),
-        usersService.getUsers({ currentPage: "1", pageSize: "500" }),
+        usersService.getAdminUsers({ currentPage: "1", pageSize: "500" }),
         userTagsService.getUserTags({ currentPage: "1", pageSize: LINK_PAGE_SIZE }),
       ]);
 
@@ -73,6 +74,12 @@ export default function CustomerGroupsPage() {
       setGroups(nextGroups);
 
       const mappedUsers = (usersRes?.responseData?.rows || [])
+        .filter((user) =>
+          (user.user_permisions || []).some(
+            (permissionItem) =>
+              permissionItem.permision?.name?.trim().toUpperCase() === SITE_LEADER_PERMISSION_NAME,
+          ),
+        )
         .map((user) => ({
           id: user.id,
           label: user.full_name?.trim() || user.email || user.id,

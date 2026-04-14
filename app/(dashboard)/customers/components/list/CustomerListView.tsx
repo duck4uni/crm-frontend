@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { Customer, CustomerStatus } from "@/types/customer";
 import {
   CustomerApiRow,
+  CustomerAssignedUserApiRow,
   CustomerTagApiRow,
   TagApiRow,
 } from "@/types/api";
+import { customerAssignedUsersService } from "@/services/customer-assigned-users";
 import { customerTagsService } from "@/services/customer-tags";
 import { customersService } from "@/services/customers";
 import { tagsService } from "@/services/tags";
-import { usersService } from "@/services/users";
 import { CustomerFilterOption, CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
 import { CustomerTable } from "./CustomerTable";
@@ -28,8 +29,6 @@ interface CustomerListViewProps {
   onCountChange?: (count: number) => void;
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const GROUP_FILTER_PAGE_SIZE = "5000";
 
 const DEFAULT_ALL_GROUP_FILTER: CustomerFilterOption = {
@@ -132,14 +131,64 @@ function mapIsActiveToStatus(isActive?: boolean): CustomerStatus {
   return isActive === false ? CustomerStatus.NOT_CONTACTED : CustomerStatus.REGISTERED;
 }
 
-function mapApiRowToCustomer(row: CustomerApiRow, index: number): Customer {
-  return mapApiRowToCustomerWithAssignee(row, index, {}, {});
+function toAssignedUsersFromCustomer(row: CustomerApiRow): Array<{ id: string; full_name: string }> {
+  const seen = new Set<string>();
+
+  return (row.assigned_users || []).reduce<Array<{ id: string; full_name: string }>>((acc, user) => {
+    const id = typeof user?.id === "string" ? user.id.trim() : "";
+    if (!id || seen.has(id)) {
+      return acc;
+    }
+
+    seen.add(id);
+    acc.push({
+      id,
+      full_name: typeof user.full_name === "string" ? user.full_name.trim() || id : id,
+    });
+    return acc;
+  }, []);
+}
+
+function mapAssignedUsersByCustomerId(
+  rows: CustomerAssignedUserApiRow[],
+): Record<string, Array<{ id: string; full_name: string }>> {
+  return rows.reduce<Record<string, Array<{ id: string; full_name: string }>>>((acc, row) => {
+    const customerId = typeof row.customer_id === "string" ? row.customer_id.trim() : "";
+    const assignedUserId = typeof row.assigned_user_id === "string" ? row.assigned_user_id.trim() : "";
+    if (!customerId || !assignedUserId) {
+      return acc;
+    }
+
+    if (!acc[customerId]) {
+      acc[customerId] = [];
+    }
+
+    if (!acc[customerId].some((user) => user.id === assignedUserId)) {
+      acc[customerId].push({
+        id: assignedUserId,
+        full_name: row.assigned_user?.full_name?.trim() || assignedUserId,
+      });
+    }
+
+    return acc;
+  }, {});
+}
+
+function formatAssigneeLabel(assignedUsers: Array<{ id: string; full_name: string }>): string {
+  if (assignedUsers.length === 0) {
+    return "";
+  }
+
+  return assignedUsers
+    .map((user) => user.full_name?.trim() || user.id)
+    .filter(Boolean)
+    .join(", ");
 }
 
 function mapApiRowToCustomerWithAssignee(
   row: CustomerApiRow,
   index: number,
-  assigneeNameMap: Record<string, string>,
+  assignedUsersByCustomerId: Record<string, Array<{ id: string; full_name: string }>>,
   groupNamesByCustomerId: Record<string, string[]>,
 ): Customer {
   const customerName =
@@ -147,6 +196,11 @@ function mapApiRowToCustomerWithAssignee(
     `${row.last_name || ""} ${row.first_name || ""}`.trim() ||
     row.email ||
     "Khach hang";
+
+  const assignedUsers =
+    assignedUsersByCustomerId[row.id]?.length
+      ? assignedUsersByCustomerId[row.id]
+      : toAssignedUsersFromCustomer(row);
 
   return {
     id: row.id,
@@ -158,9 +212,7 @@ function mapApiRowToCustomerWithAssignee(
     salutation: row.gender?.toLowerCase() === "female" ? "Chị" : "Anh",
     mobilePhone: row.phone || "",
     source: row.website || "",
-    assignee: row.assigned_user_id
-      ? assigneeNameMap[row.assigned_user_id] || row.assigned_user_id
-      : "",
+    assignee: formatAssigneeLabel(assignedUsers),
     relationship: row.note || "",
     lastContactDate: row.updated_at ? new Date(row.updated_at) : undefined,
     createdDate: row.created_at ? new Date(row.created_at) : new Date(),
@@ -172,7 +224,8 @@ function mapApiRowToCustomerWithAssignee(
     first_name: row.first_name,
     last_name: row.last_name,
     full_name: row.full_name || undefined,
-    assigned_user_id: row.assigned_user_id || undefined,
+    assigned_user_id: assignedUsers[0]?.id || row.assigned_user_id || undefined,
+    assigned_users: assignedUsers,
     customer_source_id: row.customer_source_id || undefined,
     // API-matched fields
     type: row.type || undefined,
@@ -249,55 +302,15 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [groupFilters, setGroupFilters] = useState<CustomerFilterOption[]>([DEFAULT_ALL_GROUP_FILTER]);
   const [customerIdsByGroup, setCustomerIdsByGroup] = useState<Record<string, Set<string>>>({});
-  const [groupNamesByCustomerId, setGroupNamesByCustomerId] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
-  const assigneeNameCacheRef = useRef<Record<string, string>>({});
-
-  const resolveAssigneeNameMap = useCallback(async (rows: CustomerApiRow[]) => {
-    const assignedUserIds = Array.from(
-      new Set(
-        rows
-          .map((row) => row.assigned_user_id)
-          .filter(
-            (id): id is string => typeof id === "string" && UUID_PATTERN.test(id),
-          ),
-      ),
-    );
-
-    const missingIds = assignedUserIds.filter(
-      (id) => !assigneeNameCacheRef.current[id],
-    );
-
-    if (missingIds.length > 0) {
-      const fetchedEntries = await Promise.all(
-        missingIds.map(async (id) => {
-          try {
-            const response = await usersService.getUser(id);
-            const fullName = response.responseData?.full_name?.trim();
-            return [id, fullName || id] as const;
-          } catch {
-            return [id, id] as const;
-          }
-        }),
-      );
-
-      assigneeNameCacheRef.current = {
-        ...assigneeNameCacheRef.current,
-        ...Object.fromEntries(fetchedEntries),
-      };
-    }
-
-    return assigneeNameCacheRef.current;
-  }, []);
-
   const loadCustomers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [customersResponse, tagsResponse, customerTagsResponse] = await Promise.all([
+      const [customersResponse, tagsResponse, customerTagsResponse, customerAssignedUsersResponse] = await Promise.all([
         customersService.getCustomers({
           currentPage: "1",
           pageSize: "200",
@@ -310,13 +323,18 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
           currentPage: "1",
           pageSize: GROUP_FILTER_PAGE_SIZE,
         }),
+        customerAssignedUsersService.getCustomerAssignedUsers({
+          currentPage: "1",
+          pageSize: GROUP_FILTER_PAGE_SIZE,
+        }),
       ]);
 
       const data = customersResponse.responseData;
       const rows = data?.rows ?? [];
       const tagRows = tagsResponse.responseData?.rows || [];
       const customerTagRows = customerTagsResponse.responseData?.rows || [];
-      const assigneeNameMap = await resolveAssigneeNameMap(rows);
+      const assignedUserRows = customerAssignedUsersResponse.responseData?.rows || [];
+      const assignedUsersByCustomerId = mapAssignedUsersByCustomerId(assignedUserRows);
       const tagNameById = tagRows.reduce<Record<string, string>>((acc, tag) => {
         acc[tag.id] = tag.name;
         return acc;
@@ -326,7 +344,7 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
         tagNameById,
       );
       const mappedCustomers = rows.map((row, idx) =>
-        mapApiRowToCustomerWithAssignee(row, idx, assigneeNameMap, mappedGroupNamesByCustomerId),
+        mapApiRowToCustomerWithAssignee(row, idx, assignedUsersByCustomerId, mappedGroupNamesByCustomerId),
       );
       const mappedGroupFilters = mapTagRowsToFilters(tagRows);
       const mappedCustomerIdsByGroup = mapCustomerTagRows(customerTagRows);
@@ -334,7 +352,6 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
       setCustomers(mappedCustomers);
       setGroupFilters(mappedGroupFilters);
       setCustomerIdsByGroup(mappedCustomerIdsByGroup);
-      setGroupNamesByCustomerId(mappedGroupNamesByCustomerId);
       setActiveFilter((prev) =>
         prev === "all" || mappedGroupFilters.some((filter) => filter.id === prev) ? prev : "all",
       );
@@ -346,7 +363,7 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [onCountChange, resolveAssigneeNameMap]);
+  }, [onCountChange]);
 
   useEffect(() => {
     void loadCustomers();

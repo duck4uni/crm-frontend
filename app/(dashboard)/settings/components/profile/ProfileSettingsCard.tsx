@@ -2,6 +2,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { formatPermissionName } from "@/lib/utils";
 import { MyInfoResponseData } from "@/types/api";
 
 interface ProfileSettingsCardProps {
@@ -110,7 +111,7 @@ export function ProfileSettingsCard({
                                 <p className="text-xs uppercase tracking-wide text-gray-500">Vai trò</p>
                                 <p className="mt-1 text-sm font-medium text-gray-900">
                                     {profile.user_permisions && profile.user_permisions.length > 0
-                                        ? profile.user_permisions[0].permision.name
+                                        ? formatPermissionName(profile.user_permisions[0].permision.name)
                                         : "Chưa gán vai trò"}
                                 </p>
                             </div>

@@ -24,6 +24,11 @@ export interface Customer {
   last_name?: string;
   full_name?: string;
   assigned_user_id?: string;
+  assigned_user_ids?: string[];
+  assigned_users?: Array<{
+    id: string;
+    full_name: string;
+  }>;
   customer_source_id?: string;
   // API-matched fields
   type?: string;

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { formatDateForInput } from "@/lib/utils";
+import { formatDateForInput, formatPermissionName } from "@/lib/utils";
 import { UserProfile } from "@/types/user";
 
 interface PermissionOption {
@@ -81,7 +81,7 @@ export function UserEditorForm({
     () =>
       permissions
         .filter((permission) => ALLOWED_ROLE_CODES.includes(permission.code))
-        .map((permission) => ({ value: permission.code, label: permission.name })),
+        .map((permission) => ({ value: permission.code, label: formatPermissionName(permission.name) })),
     [permissions],
   );
 

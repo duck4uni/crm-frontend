@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { formatDateForInput } from "@/lib/utils";
+import { formatDateForInput, formatPermissionName } from "@/lib/utils";
 
 interface PermissionOption {
     id: string;
@@ -255,7 +255,7 @@ export function UserFormModal({
                                 options={[
                                     ...permissions
                                         .filter((p) => ALLOWED_ROLE_CODES.includes(p.code))
-                                        .map((p) => ({ value: p.code, label: p.name })),
+                                        .map((p) => ({ value: p.code, label: formatPermissionName(p.name) })),
                                 ]}
                                 disabled={isSubmitting}
                             />
