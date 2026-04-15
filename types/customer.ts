@@ -9,6 +9,8 @@ export interface Customer {
   mobilePhone: string;
   source: string;
   assignee: string;
+  leader_assignee?: string;
+  worker_assignee?: string;
   relationship: string;
   lastContactDate?: Date;
   createdDate: Date;

@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 
 const LEADER_PERMISSION_NAME = "SITE LEADER";
 const WORKER_PERMISSION_NAME = "SITE WORKER";
+type AssigneeRole = "leader" | "worker";
 
 function buildAllowedAssigneeIdSet(users: AdminUserApiRow[]): Set<string> {
   return users.reduce<Set<string>>((acc, user) => {
@@ -41,6 +42,29 @@ function buildAllowedAssigneeIdSet(users: AdminUserApiRow[]): Set<string> {
 
     return acc;
   }, new Set<string>());
+}
+
+function buildAssigneeRolesByUserId(users: AdminUserApiRow[]): Record<string, Set<AssigneeRole>> {
+  return users.reduce<Record<string, Set<AssigneeRole>>>((acc, user) => {
+    const permissionNames = (user.user_permisions || [])
+      .map((item) => item.permision?.name || "")
+      .map((name) => name.trim());
+
+    const roleSet = new Set<AssigneeRole>();
+    if (permissionNames.includes(LEADER_PERMISSION_NAME)) {
+      roleSet.add("leader");
+    }
+
+    if (permissionNames.includes(WORKER_PERMISSION_NAME)) {
+      roleSet.add("worker");
+    }
+
+    if (roleSet.size > 0) {
+      acc[user.id] = roleSet;
+    }
+
+    return acc;
+  }, {});
 }
 
 interface ImportFeedback {
@@ -221,11 +245,25 @@ function formatAssigneeLabel(assignedUsers: Array<{ id: string; full_name: strin
     .join(", ");
 }
 
+function formatAssigneeLabelByRole(
+  assignedUsers: Array<{ id: string; full_name: string }>,
+  assigneeRolesByUserId: Record<string, Set<AssigneeRole>>,
+  role: AssigneeRole,
+): string {
+  const names = assignedUsers
+    .filter((user) => assigneeRolesByUserId[user.id]?.has(role))
+    .map((user) => user.full_name?.trim() || user.id)
+    .filter(Boolean);
+
+  return names.length > 0 ? names.join("\n") : "";
+}
+
 function mapApiRowToCustomerWithAssignee(
   row: CustomerApiRow,
   index: number,
   assignedUsersByCustomerId: Record<string, Array<{ id: string; full_name: string }>>,
   groupNamesByCustomerId: Record<string, string[]>,
+  assigneeRolesByUserId: Record<string, Set<AssigneeRole>>,
   allowedAssigneeIds?: Set<string> | null,
 ): Customer {
   const customerName =
@@ -239,6 +277,9 @@ function mapApiRowToCustomerWithAssignee(
       ? assignedUsersByCustomerId[row.id]
       : toAssignedUsersFromCustomer(row, allowedAssigneeIds);
 
+  const leaderAssignee = formatAssigneeLabelByRole(assignedUsers, assigneeRolesByUserId, "leader");
+  const workerAssignee = formatAssigneeLabelByRole(assignedUsers, assigneeRolesByUserId, "worker");
+
   return {
     id: row.id,
     orderNumber: index + 1,
@@ -250,6 +291,8 @@ function mapApiRowToCustomerWithAssignee(
     mobilePhone: row.phone || "",
     source: row.website || "",
     assignee: formatAssigneeLabel(assignedUsers),
+    leader_assignee: leaderAssignee,
+    worker_assignee: workerAssignee,
     relationship: row.note || "",
     lastContactDate: row.updated_at ? new Date(row.updated_at) : undefined,
     createdDate: row.created_at ? new Date(row.created_at) : new Date(),
@@ -382,7 +425,9 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
       const tagRows = tagsResponse.responseData?.rows || [];
       const customerTagRows = customerTagsResponse.responseData?.rows || [];
       const assignedUserRows = customerAssignedUsersResponse.responseData?.rows || [];
-      const allowedAssigneeIdSet = buildAllowedAssigneeIdSet(adminUsersResponse.responseData?.rows || []);
+      const adminUsers = adminUsersResponse.responseData?.rows || [];
+      const allowedAssigneeIdSet = buildAllowedAssigneeIdSet(adminUsers);
+      const assigneeRolesByUserId = buildAssigneeRolesByUserId(adminUsers);
       const assignedUsersByCustomerId = mapAssignedUsersByCustomerId(assignedUserRows, allowedAssigneeIdSet);
       const tagNameById = tagRows.reduce<Record<string, string>>((acc, tag) => {
         acc[tag.id] = tag.name;
@@ -398,6 +443,7 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
           idx,
           assignedUsersByCustomerId,
           mappedGroupNamesByCustomerId,
+          assigneeRolesByUserId,
           allowedAssigneeIdSet,
         ),
       );

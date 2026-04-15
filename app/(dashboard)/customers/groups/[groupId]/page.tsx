@@ -12,7 +12,7 @@ import { customersService } from "@/services/customers";
 import { tagsService } from "@/services/tags";
 import { usersService } from "@/services/users";
 import { formatPermissionName } from "@/lib/utils";
-import { CustomerApiRow, CustomerAssignedUserApiRow, CustomerTagApiRow } from "@/types/api";
+import { AdminUserApiRow, CustomerApiRow, CustomerAssignedUserApiRow, CustomerTagApiRow } from "@/types/api";
 import { ArrowLeft, Search, Trash2, UserPlus, Users } from "lucide-react";
 
 interface CustomerLookupItem {
@@ -20,7 +20,8 @@ interface CustomerLookupItem {
   customerName: string;
   phone?: string;
   assigneeIds: string[];
-  assigneeName: string;
+  leaderAssigneeName: string;
+  workerAssigneeName: string;
 }
 
 interface GroupMemberItem extends CustomerLookupItem {
@@ -37,6 +38,7 @@ const CUSTOMER_PAGE_SIZE = "1000";
 const LINK_PAGE_SIZE = "5000";
 const LEADER_ROLE_NAME = "SITE LEADER";
 const WORKER_ROLE_NAME = "SITE WORKER";
+type AssigneeRole = "leader" | "worker";
 
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -98,12 +100,53 @@ function resolveAssignedUsersForCustomer(
   }, []);
 }
 
-function toAssigneeDisplayName(assignedUsers: Array<{ id: string; full_name: string }>): string {
-  if (assignedUsers.length === 0) {
-    return "-";
+function buildAssigneeRolesByUserId(users: AdminUserApiRow[]): Record<string, Set<AssigneeRole>> {
+  return users.reduce<Record<string, Set<AssigneeRole>>>((acc, user) => {
+    const permissionNames = (user.user_permisions || [])
+      .map((item) => item.permision?.name || "")
+      .map((name) => name.trim());
+
+    const roleSet = new Set<AssigneeRole>();
+    if (permissionNames.includes(LEADER_ROLE_NAME)) {
+      roleSet.add("leader");
+    }
+
+    if (permissionNames.includes(WORKER_ROLE_NAME)) {
+      roleSet.add("worker");
+    }
+
+    if (roleSet.size > 0) {
+      acc[user.id] = roleSet;
+    }
+
+    return acc;
+  }, {});
+}
+
+function toAssigneeDisplayNameByRole(
+  assignedUsers: Array<{ id: string; full_name: string }>,
+  assigneeRolesByUserId: Record<string, Set<AssigneeRole>>,
+  role: AssigneeRole,
+): string {
+  const names = assignedUsers
+    .filter((user) => assigneeRolesByUserId[user.id]?.has(role))
+    .map((user) => user.full_name || user.id)
+    .filter(Boolean);
+
+  return names.length > 0 ? names.join("\n") : "-";
+}
+
+function splitAssigneeLines(value?: string): string[] {
+  if (!value || value === "-") {
+    return ["-"];
   }
 
-  return assignedUsers.map((user) => user.full_name || user.id).filter(Boolean).join(", ");
+  const lines = value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return lines.length > 0 ? lines : ["-"];
 }
 
 export default function CustomerGroupDetailPage() {
@@ -134,6 +177,7 @@ export default function CustomerGroupDetailPage() {
     (
       row: CustomerApiRow,
       assignedUsersByCustomerId: Record<string, Array<{ id: string; full_name: string }>>,
+      assigneeRolesByUserId: Record<string, Set<AssigneeRole>>,
     ): CustomerLookupItem => {
       const assignedUsers = resolveAssignedUsersForCustomer(row, assignedUsersByCustomerId);
 
@@ -142,7 +186,8 @@ export default function CustomerGroupDetailPage() {
         customerName: toCustomerName(row),
         phone: row.phone || undefined,
         assigneeIds: assignedUsers.map((user) => user.id),
-        assigneeName: toAssigneeDisplayName(assignedUsers),
+        leaderAssigneeName: toAssigneeDisplayNameByRole(assignedUsers, assigneeRolesByUserId, "leader"),
+        workerAssigneeName: toAssigneeDisplayNameByRole(assignedUsers, assigneeRolesByUserId, "worker"),
       };
     },
     [],
@@ -184,7 +229,10 @@ export default function CustomerGroupDetailPage() {
 
       setGroupName(group.name || "Nhóm khách hàng");
 
-      const mappedUserOptions = (usersRes.responseData?.rows || [])
+      const adminUsers = usersRes.responseData?.rows || [];
+      const assigneeRolesByUserId = buildAssigneeRolesByUserId(adminUsers);
+
+      const mappedUserOptions = adminUsers
         .map((user) => {
           const permissionNames = (user.user_permisions || [])
             .map((item) => item.permision?.name || "")
@@ -212,7 +260,9 @@ export default function CustomerGroupDetailPage() {
       const assignedUsersByCustomerId = mapAssignedUsersByCustomerId(
         customerAssignedUsersRes.responseData?.rows || [],
       );
-      const mappedAllCustomers = rows.map((row) => mapCustomerRow(row, assignedUsersByCustomerId));
+      const mappedAllCustomers = rows.map((row) =>
+        mapCustomerRow(row, assignedUsersByCustomerId, assigneeRolesByUserId),
+      );
       setAllCustomers(mappedAllCustomers);
 
       const allById = new Map(mappedAllCustomers.map((item) => [item.id, item]));
@@ -235,7 +285,7 @@ export default function CustomerGroupDetailPage() {
         const validMissingRows = missingRows.filter((row): row is CustomerApiRow => Boolean(row));
         if (validMissingRows.length > 0) {
           validMissingRows.forEach((row) => {
-            allById.set(row.id, mapCustomerRow(row, assignedUsersByCustomerId));
+            allById.set(row.id, mapCustomerRow(row, assignedUsersByCustomerId, assigneeRolesByUserId));
           });
         }
       }
@@ -250,7 +300,8 @@ export default function CustomerGroupDetailPage() {
               customerName: "Khách hàng",
               phone: undefined,
               assigneeIds: [],
-              assigneeName: "-",
+              leaderAssigneeName: "-",
+              workerAssigneeName: "-",
             };
           }
 
@@ -299,6 +350,10 @@ export default function CustomerGroupDetailPage() {
   const selectedRemoveSet = useMemo(() => new Set(selectedToRemove), [selectedToRemove]);
   const userNameById = useMemo(
     () => Object.fromEntries(userOptions.map((option) => [option.id, option.label])),
+    [userOptions],
+  );
+  const userRolesById = useMemo(
+    () => Object.fromEntries(userOptions.map((option) => [option.id, option.role])),
     [userOptions],
   );
   const editingAssigneeCustomer = useMemo(
@@ -496,15 +551,21 @@ export default function CustomerGroupDetailPage() {
     const customerId = editingAssigneeCustomer.id;
     setAssigningCustomerId(customerId);
     try {
-      await customerAssignedUsersService.setCustomerAssignedUsers({
-        customer_id: customerId,
-        assigned_user_ids: assigneeDraftIds,
-      });
+      await customerAssignedUsersService.syncCustomerAssignedUsers(customerId, assigneeDraftIds);
 
-      const assigneeName =
-        assigneeDraftIds.length > 0
-          ? assigneeDraftIds.map((id) => userNameById[id] || id).filter(Boolean).join(", ")
-          : "-";
+      const leaderAssigneeName =
+        assigneeDraftIds
+          .filter((id) => userRolesById[id] === LEADER_ROLE_NAME)
+          .map((id) => userNameById[id] || id)
+          .filter(Boolean)
+          .join("\n") || "-";
+
+      const workerAssigneeName =
+        assigneeDraftIds
+          .filter((id) => userRolesById[id] === WORKER_ROLE_NAME)
+          .map((id) => userNameById[id] || id)
+          .filter(Boolean)
+          .join("\n") || "-";
 
       setMembers((prev) =>
         prev.map((member) =>
@@ -512,7 +573,8 @@ export default function CustomerGroupDetailPage() {
             ? {
                 ...member,
                 assigneeIds: assigneeDraftIds,
-                assigneeName,
+                leaderAssigneeName,
+                workerAssigneeName,
               }
             : member,
         ),
@@ -524,7 +586,8 @@ export default function CustomerGroupDetailPage() {
             ? {
                 ...customer,
                 assigneeIds: assigneeDraftIds,
-                assigneeName,
+                leaderAssigneeName,
+                workerAssigneeName,
               }
             : customer,
         ),
@@ -564,7 +627,7 @@ export default function CustomerGroupDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-6">
         <Card className="overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2 flex-wrap bg-gray-50">
             <div>
@@ -589,13 +652,14 @@ export default function CustomerGroupDetailPage() {
           </div>
 
           <div className="max-h-[560px] overflow-y-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left w-10 sticky top-0 z-20 bg-gray-50" />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 z-20 bg-gray-50">Tên khách hàng</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 z-20 bg-gray-50">Người phụ trách</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24 sticky top-0 z-20 bg-gray-50">Thao tác</th>
+                  <th className="px-4 py-3 text-left w-12 sticky top-0 z-20 bg-gray-50" />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[26%] sticky top-0 z-20 bg-gray-50">Tên khách hàng</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[26%] sticky top-0 z-20 bg-gray-50">Leader</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[24%] sticky top-0 z-20 bg-gray-50">Worker</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[24%] sticky top-0 z-20 bg-gray-50">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -613,32 +677,49 @@ export default function CustomerGroupDetailPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      <div className="font-medium">{member.customerName}</div>
-                      <div className="text-xs text-gray-500">{member.phone || "-"}</div>
+                      <div className="font-medium truncate" title={member.customerName}>{member.customerName}</div>
+                      <div className="text-xs text-gray-500 truncate" title={member.phone || "-"}>{member.phone || "-"}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 align-top">
+                      <div className="space-y-1">
+                        {splitAssigneeLines(member.leaderAssigneeName || "-").map((line, index) => (
+                          <p key={`${member.id}-leader-${index}`} className="whitespace-nowrap">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 align-top">
+                      <div className="space-y-1">
+                        {splitAssigneeLines(member.workerAssigneeName || "-").map((line, index) => (
+                          <p key={`${member.id}-worker-${index}`} className="whitespace-nowrap">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="space-y-2">
-                        <p className="text-sm text-gray-700">{member.assigneeName || "-"}</p>
+                      <div className="flex items-center gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
+                          className="p-2"
                           onClick={() => openAssigneeEditor(member)}
                           disabled={isSaving || assigningCustomerId === member.id}
+                          title="Phân người phụ trách"
                         >
-                          Phân người phụ trách
+                          <Users className="w-4 h-4" />
                         </Button>
+                        <button
+                          onClick={() => void handleRemoveSingleCustomer(member.customerTagId)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Xóa khách khỏi nhóm"
+                          disabled={isSaving}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => void handleRemoveSingleCustomer(member.customerTagId)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Xóa khách khỏi nhóm"
-                        disabled={isSaving}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </td>
                   </tr>
                 ))}
@@ -758,12 +839,13 @@ export default function CustomerGroupDetailPage() {
           </div>
 
           <div className="max-h-[560px] overflow-y-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left w-10 sticky top-0 z-20 bg-gray-50" />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 z-20 bg-gray-50">Tên khách hàng</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 z-20 bg-gray-50">Người phụ trách</th>
+                  <th className="px-4 py-3 text-left w-12 sticky top-0 z-20 bg-gray-50" />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[40%] sticky top-0 z-20 bg-gray-50">Tên khách hàng</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[30%] sticky top-0 z-20 bg-gray-50">Leader</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[30%] sticky top-0 z-20 bg-gray-50">Worker</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -778,10 +860,27 @@ export default function CustomerGroupDetailPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      <div className="font-medium">{customer.customerName}</div>
-                      <div className="text-xs text-gray-500">{customer.phone || "-"}</div>
+                      <div className="font-medium truncate" title={customer.customerName}>{customer.customerName}</div>
+                      <div className="text-xs text-gray-500 truncate" title={customer.phone || "-"}>{customer.phone || "-"}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{customer.assigneeName}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 align-top">
+                      <div className="space-y-1">
+                        {splitAssigneeLines(customer.leaderAssigneeName || "-").map((line, index) => (
+                          <p key={`${customer.id}-leader-${index}`} className="whitespace-nowrap">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 align-top">
+                      <div className="space-y-1">
+                        {splitAssigneeLines(customer.workerAssigneeName || "-").map((line, index) => (
+                          <p key={`${customer.id}-worker-${index}`} className="whitespace-nowrap">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

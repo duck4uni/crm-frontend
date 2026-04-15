@@ -29,6 +29,7 @@ import { CustomerEditorForm } from "../components/forms/CustomerEditorForm";
 
 const LEADER_PERMISSION_NAME = "SITE LEADER";
 const WORKER_PERMISSION_NAME = "SITE WORKER";
+type AssigneeRole = "leader" | "worker";
 
 function buildAllowedAssigneeIdSet(users: AdminUserApiRow[]): Set<string> {
   return users.reduce<Set<string>>((acc, user) => {
@@ -57,6 +58,29 @@ function filterAssignedUsersByAllowedIds(
   }
 
   return users.filter((user) => allowedAssigneeIds.has(user.id));
+}
+
+function buildAssigneeRolesByUserId(users: AdminUserApiRow[]): Record<string, Set<AssigneeRole>> {
+  return users.reduce<Record<string, Set<AssigneeRole>>>((acc, user) => {
+    const permissionNames = (user.user_permisions || [])
+      .map((item) => item.permision?.name || "")
+      .map((name) => name.trim());
+
+    const roleSet = new Set<AssigneeRole>();
+    if (permissionNames.includes(LEADER_PERMISSION_NAME)) {
+      roleSet.add("leader");
+    }
+
+    if (permissionNames.includes(WORKER_PERMISSION_NAME)) {
+      roleSet.add("worker");
+    }
+
+    if (roleSet.size > 0) {
+      acc[user.id] = roleSet;
+    }
+
+    return acc;
+  }, {});
 }
 
 type CustomerTab = "detail" | "chat" | "work";
@@ -225,15 +249,31 @@ function resolveAssignedUsers(
   }, []);
 }
 
+function formatAssignedUsersByRole(
+  assignedUsers: Array<{ id: string; full_name: string }>,
+  assigneeRolesByUserId: Record<string, Set<AssigneeRole>>,
+  role: AssigneeRole,
+): string {
+  const names = assignedUsers
+    .filter((user) => assigneeRolesByUserId[user.id]?.has(role))
+    .map((user) => user.full_name || user.id)
+    .filter(Boolean);
+
+  return names.length > 0 ? names.join(", ") : "";
+}
+
 function mapApiRowToCustomerDetail(
   row: CustomerApiRow,
   assignedUsers: Array<{ id: string; full_name: string }>,
+  assigneeRolesByUserId: Record<string, Set<AssigneeRole>>,
   groupNames: string[],
 ): Customer {
   const customerName =
     row.full_name || `${row.last_name || ""} ${row.first_name || ""}`.trim() || row.email || "Khach hang";
 
   const assigneeName = assignedUsers.map((user) => user.full_name || user.id).filter(Boolean).join(", ");
+  const leaderAssignee = formatAssignedUsersByRole(assignedUsers, assigneeRolesByUserId, "leader");
+  const workerAssignee = formatAssignedUsersByRole(assignedUsers, assigneeRolesByUserId, "worker");
 
   return {
     id: row.id,
@@ -246,6 +286,8 @@ function mapApiRowToCustomerDetail(
     mobilePhone: row.phone || "",
     source: row.website || "",
     assignee: assigneeName,
+    leader_assignee: leaderAssignee,
+    worker_assignee: workerAssignee,
     relationship: row.note || "",
     lastContactDate: row.updated_at ? new Date(row.updated_at) : undefined,
     createdDate: row.created_at ? new Date(row.created_at) : new Date(),
@@ -394,10 +436,12 @@ export default function CustomerDetailPage() {
         customerAssignedUsersResponse.responseData?.rows || [],
       );
 
-      const allowedAssigneeIdSet = buildAllowedAssigneeIdSet(adminUsersResponse.responseData?.rows || []);
+      const adminUsers = adminUsersResponse.responseData?.rows || [];
+      const allowedAssigneeIdSet = buildAllowedAssigneeIdSet(adminUsers);
+      const assigneeRolesByUserId = buildAssigneeRolesByUserId(adminUsers);
       const filteredAssignedUsers = filterAssignedUsersByAllowedIds(assignedUsers, allowedAssigneeIdSet);
 
-      setCustomer(mapApiRowToCustomerDetail(row, filteredAssignedUsers, groupNames));
+      setCustomer(mapApiRowToCustomerDetail(row, filteredAssignedUsers, assigneeRolesByUserId, groupNames));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Không thể tải chi tiết khách hàng.";
       toast.error("Tải dữ liệu thất bại", message);
@@ -522,7 +566,7 @@ export default function CustomerDetailPage() {
     () => [
       { id: "detail", label: "Chi tiết khách" },
       { id: "chat", label: "Lịch sử chat" },
-      { id: "work", label: "Lịch sử công việc" },
+      { id: "work", label: "Lịch sử chăm sóc" },
     ],
     [],
   );
@@ -543,10 +587,7 @@ export default function CustomerDetailPage() {
     }
 
     try {
-      await customerAssignedUsersService.setCustomerAssignedUsers({
-        customer_id: customerId,
-        assigned_user_ids: selectedAssignedUserIds,
-      });
+      await customerAssignedUsersService.syncCustomerAssignedUsers(customerId, selectedAssignedUserIds);
 
       const normalizedNextGroupIds = Array.from(new Set(groupIds.filter(Boolean)));
       const existingLinksResponse = await customerTagsService.getCustomerTagsByCustomerId(customerId, {
@@ -760,7 +801,8 @@ function CustomerDetailSection({ customer, onEdit }: { customer: Customer; onEdi
           <InfoItem label="Email" value={customer.email || "-"} />
           <InfoItem label="Địa chỉ" value={customer.address || "-"} className="md:col-span-2" />
           <InfoItem label="Website" value={customer.website || "-"} />
-          <InfoItem label="Người phụ trách" value={customer.assignee || "-"} />
+          <InfoItem label="Leader" value={customer.leader_assignee || "-"} />
+          <InfoItem label="Worker" value={customer.worker_assignee || "-"} />
         </div>
       </Section>
 

@@ -13,6 +13,7 @@ import { statusesService } from "@/services/statuses";
 import { usersService } from "@/services/users";
 import { customersService } from "@/services/customers";
 import {
+  AdminUserApiRow,
   JobApiRow,
   JobTimeRange,
   CreateJobPayload,
@@ -131,10 +132,18 @@ const buildCustomerLabel = (customer: CustomerApiRow) => {
   return displayName || customer.email || customer.id;
 };
 
+const WORKER_PERMISSION_NAME = "SITE WORKER";
+
+const hasWorkerPermission = (user: AdminUserApiRow): boolean => {
+  return (user.user_permisions || []).some(
+    (permission) => permission.permision?.name?.trim().toUpperCase() === WORKER_PERMISSION_NAME,
+  );
+};
+
 export default function TasksPage() {
   const [jobs, setJobs] = useState<JobApiRow[]>([]);
   const [users, setUsers] = useState<UserApiRow[]>([]);
-  const [adminUsers, setAdminUsers] = useState<UserApiRow[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUserApiRow[]>([]);
   const [customers, setCustomers] = useState<CustomerApiRow[]>([]);
   const [statuses, setStatuses] = useState<StatusApiRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -178,8 +187,10 @@ export default function TasksPage() {
         statusesRes = await statusesService.getStatuses({ pageSize: "500" });
       }
 
+      const adminUserRows = adminUsersRes.responseData?.rows ?? [];
+
       setUsers(usersRes.responseData?.rows ?? []);
-      setAdminUsers(adminUsersRes.responseData?.rows ?? []);
+      setAdminUsers(adminUserRows.filter(hasWorkerPermission));
       setCustomers(customersRes.responseData?.rows ?? []);
       setStatuses(normalizeJobStatuses(statusesRes.responseData?.rows ?? []));
     } catch (error) {
@@ -209,7 +220,7 @@ export default function TasksPage() {
 
   const getUserNameById = (id: string | null | undefined) => {
     if (!id) return null;
-    const user = users.find((item) => item.id === id);
+    const user = users.find((item) => item.id === id) || adminUsers.find((item) => item.id === id);
     return user ? user.full_name || user.email : id.slice(0, 8) + "...";
   };
 
@@ -363,8 +374,7 @@ export default function TasksPage() {
     });
   };
 
-  const userOptions = users.map((u) => ({ value: u.id, label: u.full_name || u.email }));
-  const adminUserOptions = adminUsers.map((u) => ({ value: u.id, label: u.full_name || u.email }));
+  const performerOptions = adminUsers.map((u) => ({ value: u.id, label: u.full_name || u.email }));
   const customerOptions = customers.map((customer) => ({
     value: customer.id,
     label: buildCustomerLabel(customer),
@@ -721,7 +731,7 @@ export default function TasksPage() {
               className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
             >
               <option value="">Không chọn</option>
-              {(editingJob ? userOptions : (adminUserOptions.length ? adminUserOptions : userOptions)).map((opt) => (
+              {performerOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>

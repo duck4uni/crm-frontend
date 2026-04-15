@@ -22,9 +22,11 @@ const GENDER_LABELS: Record<string, string> = {
   Other: "Khác",
 };
 
-const ASSIGNEE_LABELS: Record<string, string> = {
-  "Getfly Admin": "Quản trị viên Getfly",
-};
+function splitAssigneeLines(value?: string): string[] {
+  if (!value || value === "-") return ["-"];
+  const lines = value.split("\n").map(item => item.trim()).filter(Boolean);
+  return lines.length > 0 ? lines : ["-"];
+}
 
 export function CustomerTable({
   customers,
@@ -65,7 +67,8 @@ export function CustomerTable({
               <TableHeader label="Tên khách hàng" field="customerName" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <TableHeader label="Giới tính" field="gender" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <TableHeader label="Số điện thoại" field="mobilePhone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Người phụ trách" field="assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+              <TableHeader label="Leader" field="leader_assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+              <TableHeader label="Worker" field="worker_assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <TableHeader label="Ngày tạo" field="createdDate" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Thao tác</th>
             </tr>
@@ -125,8 +128,9 @@ interface CustomerTableRowProps {
 
 function CustomerTableRow({ customer, onView, onEdit, onDelete }: CustomerTableRowProps) {
   const gender = GENDER_LABELS[customer.gender] ?? customer.gender;
-  const assignee = ASSIGNEE_LABELS[customer.assignee] ?? customer.assignee;
   const phone = customer.mobilePhone || customer.phone || "-";
+  const leaderAssignee = customer.leader_assignee || "-";
+  const workerAssignee = customer.worker_assignee || "-";
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
@@ -138,7 +142,24 @@ function CustomerTableRow({ customer, onView, onEdit, onDelete }: CustomerTableR
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">{gender}</td>
       <td className="px-4 py-4 text-sm text-gray-900">{phone}</td>
-      <td className="px-4 py-4 text-sm text-gray-600">{assignee || "-"}</td>
+      <td className="px-4 py-4 text-sm text-gray-600 align-top">
+        <div className="space-y-1">
+          {splitAssigneeLines(leaderAssignee).map((line, index) => (
+            <p key={`${customer.id}-leader-${index}`} className="whitespace-nowrap">
+              {line}
+            </p>
+          ))}
+        </div>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600 align-top">
+        <div className="space-y-1">
+          {splitAssigneeLines(workerAssignee).map((line, index) => (
+            <p key={`${customer.id}-worker-${index}`} className="whitespace-nowrap">
+              {line}
+            </p>
+          ))}
+        </div>
+      </td>
       <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
         {formatDateVN(customer.createdDate)}
       </td>

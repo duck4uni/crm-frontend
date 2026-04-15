@@ -424,7 +424,7 @@ export default function UserDetailPage() {
     () => [
       { id: "detail", label: "Thông tin chi tiết" },
       { id: "activity", label: "Lịch sử hoạt động" },
-      { id: "work", label: "Lịch sử công việc" },
+      { id: "work", label: "Lịch sử chăm sóc" },
     ],
     [],
   );
