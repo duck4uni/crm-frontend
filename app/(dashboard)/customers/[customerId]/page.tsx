@@ -17,6 +17,7 @@ import { jobsService } from "@/services/jobs";
 import { tagsService } from "@/services/tags";
 import { usersService } from "@/services/users";
 import {
+  AdminUserApiRow,
   CustomerApiRow,
   CustomerAssignedUserApiRow,
   JobApiRow,
@@ -25,28 +26,64 @@ import {
 import { Customer, CustomerStatus } from "@/types/customer";
 import { CustomerEditorForm } from "../components/forms/CustomerEditorForm";
 
+const LEADER_PERMISSION_NAME = "SITE LEADER";
+const WORKER_PERMISSION_NAME = "SITE WORKER";
+
+function buildAllowedAssigneeIdSet(users: AdminUserApiRow[]): Set<string> {
+  return users.reduce<Set<string>>((acc, user) => {
+    const permissionNames = (user.user_permisions || [])
+      .map((item) => item.permision?.name || "")
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+    if (
+      permissionNames.includes(LEADER_PERMISSION_NAME) ||
+      permissionNames.includes(WORKER_PERMISSION_NAME)
+    ) {
+      acc.add(user.id);
+    }
+
+    return acc;
+  }, new Set<string>());
+}
+
+function filterAssignedUsersByAllowedIds(
+  users: Array<{ id: string; full_name: string }>,
+  allowedAssigneeIds: Set<string>,
+): Array<{ id: string; full_name: string }> {
+  if (allowedAssigneeIds.size === 0) {
+    return [];
+  }
+
+  return users.filter((user) => allowedAssigneeIds.has(user.id));
+}
+
 type CustomerTab = "detail" | "chat" | "work";
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function splitCustomerName(fullName: string): { firstName: string; lastName: string } {
-  const normalized = normalizeWhitespace(fullName);
+function normalizeLoose(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
-  if (!normalized) {
-    return { firstName: "Khach", lastName: "Hang" };
+function mapCustomerTypeToApi(type?: string): string {
+  const normalized = normalizeLoose(type || "");
+
+  if (!normalized || normalized === "individual" || normalized === "ca nhan") {
+    return "Cá nhân";
   }
 
-  const parts = normalized.split(" ");
-  if (parts.length === 1) {
-    return { firstName: parts[0], lastName: parts[0] };
+  if (normalized === "company" || normalized === "doanh nghiep") {
+    return "Doanh nghiệp";
   }
 
-  const firstName = parts.pop() || "Khach";
-  const lastName = parts.join(" ") || firstName;
-
-  return { firstName, lastName };
+  return (type || "Cá nhân").trim();
 }
 
 function formatDateForApi(date?: Date): string | undefined {
@@ -59,11 +96,15 @@ function formatDateForApi(date?: Date): string | undefined {
 
 function mapCustomerGenderToApi(gender?: Customer["gender"]): string | undefined {
   if (gender === "Male") {
-    return "male";
+    return "Nam";
   }
 
   if (gender === "Female") {
-    return "female";
+    return "Nữ";
+  }
+
+  if (gender === "Other") {
+    return "Khác";
   }
 
   return undefined;
@@ -108,14 +149,15 @@ function resolveAssignedUserIds(data: Partial<Customer>): string[] {
 }
 
 function mapFormToUpdatePayload(data: Partial<Customer>): UpdateCustomerPayload {
-  const fullName = normalizeWhitespace(data.customerName || "");
-  const { firstName, lastName } = splitCustomerName(fullName);
+  const firstName = normalizeWhitespace(String(data.first_name || ""));
+  const lastName = normalizeWhitespace(String(data.last_name || ""));
+  const fullName = normalizeWhitespace(`${lastName} ${firstName}`);
 
   return {
     first_name: firstName,
     last_name: lastName,
     description: normalizeWhitespace(data.description || "") || undefined,
-    type: data.type || "individual",
+    type: mapCustomerTypeToApi(data.type),
     email: normalizeWhitespace(data.email || "") || undefined,
     phone: (data.phone || "").trim() || undefined,
     address: normalizeWhitespace(data.address || "") || undefined,
@@ -214,7 +256,7 @@ function mapApiRowToCustomerDetail(
     first_name: row.first_name,
     last_name: row.last_name,
     full_name: row.full_name || undefined,
-    assigned_user_id: assignedUsers[0]?.id || row.assigned_user_id || undefined,
+    assigned_user_id: assignedUsers[0]?.id || undefined,
     assigned_users: assignedUsers,
     customer_source_id: row.customer_source_id || undefined,
     type: row.type || undefined,
@@ -306,7 +348,13 @@ export default function CustomerDetailPage() {
 
     setIsLoading(true);
     try {
-      const [customerResponse, tagsResponse, customerTagsResponse, customerAssignedUsersResponse] = await Promise.all([
+      const [
+        customerResponse,
+        tagsResponse,
+        customerTagsResponse,
+        customerAssignedUsersResponse,
+        adminUsersResponse,
+      ] = await Promise.all([
         customersService.getCustomer(customerId),
         tagsService.getTags({ currentPage: "1", pageSize: "5000" }),
         customerTagsService.getCustomerTagsByCustomerId(customerId, {
@@ -317,6 +365,7 @@ export default function CustomerDetailPage() {
           currentPage: "1",
           pageSize: "5000",
         }),
+        usersService.getAdminUsers({ currentPage: "1", pageSize: "500" }),
       ]);
 
       const row = customerResponse.responseData;
@@ -343,7 +392,10 @@ export default function CustomerDetailPage() {
         customerAssignedUsersResponse.responseData?.rows || [],
       );
 
-      setCustomer(mapApiRowToCustomerDetail(row, assignedUsers, groupNames));
+      const allowedAssigneeIdSet = buildAllowedAssigneeIdSet(adminUsersResponse.responseData?.rows || []);
+      const filteredAssignedUsers = filterAssignedUsersByAllowedIds(assignedUsers, allowedAssigneeIdSet);
+
+      setCustomer(mapApiRowToCustomerDetail(row, filteredAssignedUsers, groupNames));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Không thể tải chi tiết khách hàng.";
       toast.error("Tải dữ liệu thất bại", message);

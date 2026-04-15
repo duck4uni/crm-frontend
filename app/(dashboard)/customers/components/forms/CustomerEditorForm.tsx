@@ -33,6 +33,30 @@ interface CustomerEditorFormProps {
   onCancel?: () => void;
 }
 
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function buildCustomerNameFromParts(firstName: string, lastName: string): string {
+  return normalizeWhitespace(`${lastName} ${firstName}`);
+}
+
+function splitCustomerName(fullName: string): { firstName: string; lastName: string } {
+  const normalized = normalizeWhitespace(fullName);
+  if (!normalized) {
+    return { firstName: "", lastName: "" };
+  }
+
+  const parts = normalized.split(" ");
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: "" };
+  }
+
+  const firstName = parts.pop() || "";
+  const lastName = parts.join(" ") || "";
+  return { firstName, lastName };
+}
+
 function normalizeCustomerType(value?: string): "individual" | "company" {
   return value?.trim().toLowerCase() === "company" ? "company" : "individual";
 }
@@ -56,6 +80,8 @@ function toAssignedUserIds(data?: Partial<Customer> | null): string[] {
 function buildDefaultFormData(): Partial<Customer> {
   return {
     customerName: "",
+    first_name: "",
+    last_name: "",
     email: "",
     phone: "",
     gender: "Male",
@@ -79,12 +105,23 @@ function mergeInitialData(initialData?: Partial<Customer> | null): Partial<Custo
     return buildDefaultFormData();
   }
 
+  const rawFirstName = typeof initialData.first_name === "string" ? initialData.first_name : "";
+  const rawLastName = typeof initialData.last_name === "string" ? initialData.last_name : "";
+  const fallbackCustomerName = initialData.customerName || initialData.full_name || "";
+  const splitFromFallback = splitCustomerName(fallbackCustomerName);
+
+  const firstName = normalizeWhitespace(rawFirstName) || splitFromFallback.firstName;
+  const lastName = normalizeWhitespace(rawLastName) || splitFromFallback.lastName;
+  const customerName = buildCustomerNameFromParts(firstName, lastName) || normalizeWhitespace(fallbackCustomerName);
+
   return {
     ...buildDefaultFormData(),
     ...initialData,
     gender: initialData.gender || "Male",
     type: normalizeCustomerType(initialData.type),
-    customerName: initialData.customerName || "",
+    customerName,
+    first_name: firstName,
+    last_name: lastName,
     email: initialData.email || "",
     phone: initialData.phone || "",
     address: initialData.address || "",
@@ -118,6 +155,14 @@ export function CustomerEditorForm({
   const [assigneeSearchKeyword, setAssigneeSearchKeyword] = useState("");
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  const allowedAssigneeIdSet = useMemo(() => {
+    if (userOptions.length === 0) {
+      return null;
+    }
+
+    return new Set(userOptions.map((user) => user.id));
+  }, [userOptions]);
 
   useEffect(() => {
     setFormData(mergeInitialData(initialData));
@@ -228,7 +273,17 @@ export function CustomerEditorForm({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
-    if (name === "type") {
+    if (name === "first_name" || name === "last_name") {
+      setFormData((prev) => {
+        const next = { ...prev, [name]: value };
+        const firstName = typeof next.first_name === "string" ? next.first_name : "";
+        const lastName = typeof next.last_name === "string" ? next.last_name : "";
+        return {
+          ...next,
+          customerName: buildCustomerNameFromParts(firstName, lastName),
+        };
+      });
+    } else if (name === "type") {
       setFormData((prev) => ({ ...prev, type: normalizeCustomerType(value) }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -250,8 +305,8 @@ export function CustomerEditorForm({
   const validate = (): boolean => {
     const nextErrors: Record<string, string> = {};
 
-    if (!formData.customerName?.trim()) {
-      nextErrors.customerName = "Tên khách hàng là bắt buộc";
+    if (!String(formData.first_name || "").trim()) {
+      nextErrors.first_name = "Tên khách hàng là bắt buộc";
     }
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
@@ -276,11 +331,15 @@ export function CustomerEditorForm({
     setIsSubmitting(true);
     try {
       const normalizedAssignedUserIds = toAssignedUserIds(formData);
+      const filteredAssignedUserIds = allowedAssigneeIdSet
+        ? normalizedAssignedUserIds.filter((id) => allowedAssigneeIdSet.has(id))
+        : normalizedAssignedUserIds;
 
       await onSubmit(
         {
           ...formData,
-          assigned_user_ids: normalizedAssignedUserIds,
+          assigned_user_id: filteredAssignedUserIds[0] || "",
+          assigned_user_ids: filteredAssignedUserIds,
         },
         selectedGroupIds,
       );
@@ -297,7 +356,10 @@ export function CustomerEditorForm({
     );
   };
 
-  const selectedAssignedUserIds = useMemo(() => toAssignedUserIds(formData), [formData]);
+  const selectedAssignedUserIds = useMemo(() => {
+    const ids = toAssignedUserIds(formData);
+    return allowedAssigneeIdSet ? ids.filter((id) => allowedAssigneeIdSet.has(id)) : ids;
+  }, [allowedAssigneeIdSet, formData]);
 
   const toggleAssigneeSelection = (userId: string) => {
     setFormData((prev) => {
@@ -418,14 +480,22 @@ export function CustomerEditorForm({
       <FormSection title="Thông tin cơ bản">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
-            label="Tên khách hàng *"
-            name="customerName"
-            value={formData.customerName || ""}
+            label="Họ và tên đệm"
+            name="last_name"
+            value={String(formData.last_name || "")}
             onChange={handleChange}
-            error={errors.customerName}
-            placeholder="Nhập tên khách hàng"
+            error={errors.last_name}
+            placeholder="VD: Nguyễn Văn"
             disabled={isSubmitting}
-            className="md:col-span-2"
+          />
+          <Input
+            label="Tên *"
+            name="first_name"
+            value={String(formData.first_name || "")}
+            onChange={handleChange}
+            error={errors.first_name}
+            placeholder="VD: A"
+            disabled={isSubmitting}
           />
           <Select
             label="Loại khách hàng"

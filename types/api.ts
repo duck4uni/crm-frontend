@@ -312,6 +312,7 @@ export interface CreateCustomerPayload {
   note?: string;
   full_name?: string;
   assigned_user_id?: string;
+  created_at?: string;
   is_active?: boolean;
 }
 
@@ -336,7 +337,7 @@ export interface UpdateCustomerPayload {
   tax_code?: string;
   note?: string;
   full_name?: string;
-  assigned_user_id?: string;
+  assigned_user_id?: string | null;
   is_active?: boolean;
 }
 

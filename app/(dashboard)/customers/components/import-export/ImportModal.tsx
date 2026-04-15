@@ -227,8 +227,9 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                                 Hướng dẫn nhập dữ liệu
                             </h4>
                             <ul className="text-sm text-gray-700 space-y-1">
-                                <li>• File phải có các cột: Tên KH, Số điện thoại, Email (bắt buộc)</li>
-                                <li>• Các cột tùy chọn: Địa chỉ, Người phụ trách, Trạng thái, Ghi chú</li>
+                                <li>• Bắt buộc: Họ và tên đệm, Tên, Loại khách hàng, Mô tả</li>
+                                <li>• Bắt buộc để trống: Nguồn khách hàng, Phân loại khách hàng</li>
+                                <li>• Các cột còn lại là tùy chọn (nếu có trong file mẫu)</li>
                                 <li>• Mỗi dòng là một khách hàng</li>
                                 <li>• Tối đa 1000 khách hàng mỗi lần nhập</li>
                             </ul>

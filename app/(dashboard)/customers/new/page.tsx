@@ -16,22 +16,26 @@ function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function splitCustomerName(fullName: string): { firstName: string; lastName: string } {
-  const normalized = normalizeWhitespace(fullName);
+function normalizeLoose(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
-  if (!normalized) {
-    return { firstName: "Khach", lastName: "Hang" };
+function mapCustomerTypeToApi(type?: string): string {
+  const normalized = normalizeLoose(type || "");
+
+  if (!normalized || normalized === "individual" || normalized === "ca nhan") {
+    return "Cá nhân";
   }
 
-  const parts = normalized.split(" ");
-  if (parts.length === 1) {
-    return { firstName: parts[0], lastName: parts[0] };
+  if (normalized === "company" || normalized === "doanh nghiep") {
+    return "Doanh nghiệp";
   }
 
-  const firstName = parts.pop() || "Khach";
-  const lastName = parts.join(" ") || firstName;
-
-  return { firstName, lastName };
+  return (type || "Cá nhân").trim();
 }
 
 function formatDateForApi(date?: Date): string | undefined {
@@ -44,11 +48,15 @@ function formatDateForApi(date?: Date): string | undefined {
 
 function mapCustomerGenderToApi(gender?: Customer["gender"]): string | undefined {
   if (gender === "Male") {
-    return "male";
+    return "Nam";
   }
 
   if (gender === "Female") {
-    return "female";
+    return "Nữ";
+  }
+
+  if (gender === "Other") {
+    return "Khác";
   }
 
   return undefined;
@@ -79,14 +87,15 @@ function resolveAssignedUserIds(data: Partial<Customer>): string[] {
 }
 
 function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload {
-  const fullName = normalizeWhitespace(data.customerName || "");
-  const { firstName, lastName } = splitCustomerName(fullName);
+  const firstName = normalizeWhitespace(String(data.first_name || ""));
+  const lastName = normalizeWhitespace(String(data.last_name || ""));
+  const fullName = normalizeWhitespace(`${lastName} ${firstName}`);
 
   return {
     first_name: firstName,
     last_name: lastName,
     description: normalizeWhitespace(data.description || "") || `Khach hang ${fullName || "moi"}`,
-    type: data.type || "individual",
+    type: mapCustomerTypeToApi(data.type),
     email: normalizeWhitespace(data.email || "") || undefined,
     phone: (data.phone || "").trim() || undefined,
     address: normalizeWhitespace(data.address || "") || undefined,
@@ -98,6 +107,7 @@ function mapFormToCreatePayload(data: Partial<Customer>): CreateCustomerPayload 
     company_establish_date: formatDateForApi(data.company_establish_date),
     tax_code: data.tax_code || undefined,
     major: data.major || undefined,
+    created_at: new Date().toISOString(),
     is_active: data.is_active ?? mapStatusToIsActive(data.status),
   };
 }
@@ -114,6 +124,10 @@ export default function NewCustomerPage() {
     if (!createdCustomerId) {
       throw new Error("Không nhận được mã khách hàng sau khi tạo.");
     }
+
+    await customersService.updateCustomer(createdCustomerId, {
+      assigned_user_id: assignedUserIds[0] || null,
+    });
 
     if (assignedUserIds.length > 0) {
       await customerAssignedUsersService.setCustomerAssignedUsers({

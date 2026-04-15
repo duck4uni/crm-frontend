@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Customer, CustomerStatus } from "@/types/customer";
 import {
+  AdminUserApiRow,
   CustomerApiRow,
   CustomerAssignedUserApiRow,
   CustomerTagApiRow,
@@ -13,11 +14,33 @@ import { customerAssignedUsersService } from "@/services/customer-assigned-users
 import { customerTagsService } from "@/services/customer-tags";
 import { customersService } from "@/services/customers";
 import { tagsService } from "@/services/tags";
+import { usersService } from "@/services/users";
 import { CustomerFilterOption, CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
 import { CustomerTable } from "./CustomerTable";
 import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { useToast } from "@/components/ui/ToastProvider";
+
+const LEADER_PERMISSION_NAME = "SITE LEADER";
+const WORKER_PERMISSION_NAME = "SITE WORKER";
+
+function buildAllowedAssigneeIdSet(users: AdminUserApiRow[]): Set<string> {
+  return users.reduce<Set<string>>((acc, user) => {
+    const permissionNames = (user.user_permisions || [])
+      .map((item) => item.permision?.name || "")
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+    if (
+      permissionNames.includes(LEADER_PERMISSION_NAME) ||
+      permissionNames.includes(WORKER_PERMISSION_NAME)
+    ) {
+      acc.add(user.id);
+    }
+
+    return acc;
+  }, new Set<string>());
+}
 
 interface ImportFeedback {
   success: number;
@@ -131,12 +154,19 @@ function mapIsActiveToStatus(isActive?: boolean): CustomerStatus {
   return isActive === false ? CustomerStatus.NOT_CONTACTED : CustomerStatus.REGISTERED;
 }
 
-function toAssignedUsersFromCustomer(row: CustomerApiRow): Array<{ id: string; full_name: string }> {
+function toAssignedUsersFromCustomer(
+  row: CustomerApiRow,
+  allowedAssigneeIds?: Set<string> | null,
+): Array<{ id: string; full_name: string }> {
   const seen = new Set<string>();
 
   return (row.assigned_users || []).reduce<Array<{ id: string; full_name: string }>>((acc, user) => {
     const id = typeof user?.id === "string" ? user.id.trim() : "";
     if (!id || seen.has(id)) {
+      return acc;
+    }
+
+    if (allowedAssigneeIds && !allowedAssigneeIds.has(id)) {
       return acc;
     }
 
@@ -151,11 +181,16 @@ function toAssignedUsersFromCustomer(row: CustomerApiRow): Array<{ id: string; f
 
 function mapAssignedUsersByCustomerId(
   rows: CustomerAssignedUserApiRow[],
+  allowedAssigneeIds?: Set<string> | null,
 ): Record<string, Array<{ id: string; full_name: string }>> {
   return rows.reduce<Record<string, Array<{ id: string; full_name: string }>>>((acc, row) => {
     const customerId = typeof row.customer_id === "string" ? row.customer_id.trim() : "";
     const assignedUserId = typeof row.assigned_user_id === "string" ? row.assigned_user_id.trim() : "";
     if (!customerId || !assignedUserId) {
+      return acc;
+    }
+
+    if (allowedAssigneeIds && !allowedAssigneeIds.has(assignedUserId)) {
       return acc;
     }
 
@@ -190,6 +225,7 @@ function mapApiRowToCustomerWithAssignee(
   index: number,
   assignedUsersByCustomerId: Record<string, Array<{ id: string; full_name: string }>>,
   groupNamesByCustomerId: Record<string, string[]>,
+  allowedAssigneeIds?: Set<string> | null,
 ): Customer {
   const customerName =
     row.full_name ||
@@ -200,7 +236,7 @@ function mapApiRowToCustomerWithAssignee(
   const assignedUsers =
     assignedUsersByCustomerId[row.id]?.length
       ? assignedUsersByCustomerId[row.id]
-      : toAssignedUsersFromCustomer(row);
+      : toAssignedUsersFromCustomer(row, allowedAssigneeIds);
 
   return {
     id: row.id,
@@ -224,7 +260,7 @@ function mapApiRowToCustomerWithAssignee(
     first_name: row.first_name,
     last_name: row.last_name,
     full_name: row.full_name || undefined,
-    assigned_user_id: assignedUsers[0]?.id || row.assigned_user_id || undefined,
+    assigned_user_id: assignedUsers[0]?.id || undefined,
     assigned_users: assignedUsers,
     customer_source_id: row.customer_source_id || undefined,
     // API-matched fields
@@ -310,7 +346,13 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
   const loadCustomers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [customersResponse, tagsResponse, customerTagsResponse, customerAssignedUsersResponse] = await Promise.all([
+      const [
+        customersResponse,
+        tagsResponse,
+        customerTagsResponse,
+        customerAssignedUsersResponse,
+        adminUsersResponse,
+      ] = await Promise.all([
         customersService.getCustomers({
           currentPage: "1",
           pageSize: "200",
@@ -327,6 +369,10 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
           currentPage: "1",
           pageSize: GROUP_FILTER_PAGE_SIZE,
         }),
+        usersService.getAdminUsers({
+          currentPage: "1",
+          pageSize: "500",
+        }),
       ]);
 
       const data = customersResponse.responseData;
@@ -334,7 +380,8 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
       const tagRows = tagsResponse.responseData?.rows || [];
       const customerTagRows = customerTagsResponse.responseData?.rows || [];
       const assignedUserRows = customerAssignedUsersResponse.responseData?.rows || [];
-      const assignedUsersByCustomerId = mapAssignedUsersByCustomerId(assignedUserRows);
+      const allowedAssigneeIdSet = buildAllowedAssigneeIdSet(adminUsersResponse.responseData?.rows || []);
+      const assignedUsersByCustomerId = mapAssignedUsersByCustomerId(assignedUserRows, allowedAssigneeIdSet);
       const tagNameById = tagRows.reduce<Record<string, string>>((acc, tag) => {
         acc[tag.id] = tag.name;
         return acc;
@@ -344,7 +391,13 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
         tagNameById,
       );
       const mappedCustomers = rows.map((row, idx) =>
-        mapApiRowToCustomerWithAssignee(row, idx, assignedUsersByCustomerId, mappedGroupNamesByCustomerId),
+        mapApiRowToCustomerWithAssignee(
+          row,
+          idx,
+          assignedUsersByCustomerId,
+          mappedGroupNamesByCustomerId,
+          allowedAssigneeIdSet,
+        ),
       );
       const mappedGroupFilters = mapTagRowsToFilters(tagRows);
       const mappedCustomerIdsByGroup = mapCustomerTagRows(customerTagRows);
