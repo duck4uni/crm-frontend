@@ -6,6 +6,7 @@ import { ArrowLeft, MessageCircle, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { Tabs } from "@/components/ui/Tabs";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatDateVNDateOnly } from "@/lib/utils";
@@ -327,6 +328,7 @@ export default function CustomerDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
+  const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
 
   const customerId = params.customerId;
   const initialTab = (searchParams.get("tab") as CustomerTab) || "detail";
@@ -583,27 +585,25 @@ export default function CustomerDetailPage() {
     await loadCustomer();
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!customer) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa khách hàng \"${customer.customerName}\"? Hành động này không thể hoàn tác.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await customersService.deleteCustomer(customer.id);
-      toast.success("Xóa thành công", `Khách hàng \"${customer.customerName}\" đã bị xóa.`);
-      router.push("/customers");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Không thể xóa khách hàng.";
-      toast.error("Xóa thất bại", message);
-    }
+    requestDeleteConfirmation({
+      title: "Xóa khách hàng",
+      description: `Bạn có chắc chắn muốn xóa khách hàng "${customer.customerName}"? Hành động này không thể hoàn tác.`,
+      onConfirm: async () => {
+        try {
+          await customersService.deleteCustomer(customer.id);
+          toast.success("Xóa thành công", `Khách hàng "${customer.customerName}" đã bị xóa.`);
+          router.push("/customers");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Không thể xóa khách hàng.";
+          toast.error("Xóa thất bại", message);
+        }
+      },
+    });
   };
 
   if (isLoading || !customer) {
@@ -708,7 +708,6 @@ export default function CustomerDetailPage() {
                           <p className="text-sm font-semibold text-gray-900">{item.job_name}</p>
                           <div className="flex items-center gap-2">
                             <Badge variant={getJobStatusVariant(statusName)}>{statusName}</Badge>
-                            {item.progress != null && <Badge variant="warning">{item.progress}%</Badge>}
                           </div>
                         </div>
                         <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
@@ -732,6 +731,7 @@ export default function CustomerDetailPage() {
           </div>
         </CardContent>
       </Card>
+      <DeleteConfirmationDialog />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { useToast } from "@/components/ui/ToastProvider";
 import { customersService } from "@/services/customers";
 import { customerTagsService } from "@/services/customer-tags";
@@ -46,6 +47,7 @@ export function CustomerGroupModal({
   onAssignmentChanged,
 }: CustomerGroupModalProps) {
   const toast = useToast();
+  const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
 
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -254,36 +256,34 @@ export function CustomerGroupModal({
     }
   };
 
-  const handleDeleteGroup = async (group: CustomerGroup) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa nhóm "${group.name}"? Tất cả liên kết khách hàng trong nhóm này sẽ bị xóa.`,
-    );
+  const handleDeleteGroup = (group: CustomerGroup) => {
+    requestDeleteConfirmation({
+      title: "Xóa nhóm",
+      description: `Bạn có chắc chắn muốn xóa nhóm "${group.name}"? Tất cả liên kết khách hàng trong nhóm này sẽ bị xóa.`,
+      onConfirm: async () => {
+        setIsSaving(true);
+        try {
+          const customerTags = await getCustomerTagsByTagId(group.id);
+          if (customerTags.length > 0) {
+            await Promise.all(customerTags.map((customerTag) => customerTagsService.deleteCustomerTag(customerTag.id)));
+          }
 
-    if (!confirmed) {
-      return;
-    }
+          await tagsService.deleteTag(group.id);
 
-    setIsSaving(true);
-    try {
-      const customerTags = await getCustomerTagsByTagId(group.id);
-      if (customerTags.length > 0) {
-        await Promise.all(customerTags.map((customerTag) => customerTagsService.deleteCustomerTag(customerTag.id)));
-      }
+          if (selectedGroupId === group.id) {
+            setSelectedGroupId(null);
+          }
 
-      await tagsService.deleteTag(group.id);
-
-      if (selectedGroupId === group.id) {
-        setSelectedGroupId(null);
-      }
-
-      toast.success("Xóa nhóm thành công", `Đã xóa nhóm "${group.name}".`);
-      await onAssignmentChanged?.();
-      await loadGroupData();
-    } catch (error) {
-      toast.error("Xóa nhóm thất bại", toApiError(error, "Không thể xóa nhóm khách hàng."));
-    } finally {
-      setIsSaving(false);
-    }
+          toast.success("Xóa nhóm thành công", `Đã xóa nhóm "${group.name}".`);
+          await onAssignmentChanged?.();
+          await loadGroupData();
+        } catch (error) {
+          toast.error("Xóa nhóm thất bại", toApiError(error, "Không thể xóa nhóm khách hàng."));
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
 
   const handleAssignSelectedCustomers = async () => {
@@ -393,7 +393,8 @@ export function CustomerGroupModal({
   };
 
   return (
-    <Modal
+    <>
+      <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Quản lý nhóm khách hàng"
@@ -419,7 +420,7 @@ export function CustomerGroupModal({
           </Button>
         </div>
       }
-    >
+      >
       <div className="space-y-4">
         <div className="text-sm text-gray-600">
           Đã chọn <span className="font-semibold text-gray-900">{selectedCount}</span> khách hàng trong danh sách.
@@ -601,6 +602,8 @@ export function CustomerGroupModal({
           </div>
         )}
       </div>
-    </Modal>
+      </Modal>
+      <DeleteConfirmationDialog />
+    </>
   );
 }

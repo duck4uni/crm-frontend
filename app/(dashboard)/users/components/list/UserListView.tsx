@@ -9,6 +9,7 @@ import { UserFilters } from "./UserFilters";
 import { UserSearch } from "./UserSearch";
 import { UserTable } from "./UserTable";
 import { ListPageLayout } from "@/components/ui/ListPageLayout";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatPermissionName } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ export function UserListView() {
     const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
     const [isLoading, setIsLoading] = useState(true);
     const toast = useToast();
+    const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
 
     const loadUsers = useCallback(async () => {
         setIsLoading(true);
@@ -121,6 +123,16 @@ export function UserListView() {
         }
     };
 
+    const handleRequestDeleteUser = (user: UserProfile) => {
+        requestDeleteConfirmation({
+            title: "Xóa người dùng",
+            description: `Bạn có chắc chắn muốn xóa người dùng "${user.full_name}"? Hành động này không thể hoàn tác.`,
+            onConfirm: async () => {
+                await handleDeleteUser(user);
+            },
+        });
+    };
+
     const handleExport = async () => {
         try {
             const blob = await usersService.exportUsers();
@@ -148,35 +160,38 @@ export function UserListView() {
     }
 
     return (
-        <ListPageLayout
-            items={filteredUsers}
-            isLoading={isLoading}
-            loadingText="Đang tải danh sách người dùng..."
-            resetPageKey={`${activeFilter}|${searchQuery}`}
-            renderFilters={
-                <UserFilters
-                    activeFilter={activeFilter}
-                    onFilterChange={setActiveFilter}
-                    counts={filterCounts}
-                />
-            }
-            renderSearch={
-                <UserSearch
-                    searchQuery={searchQuery}
-                    onSearchChange={setSearchQuery}
-                    onAddUser={handleAddUser}
-                    onExport={handleExport}
-                />
-            }
-            renderTable={(paged) => (
-                <UserTable
-                    users={paged}
-                    userRolesByUser={userRolesByUser}
-                    onUserClick={handleUserClick}
-                    onUserEdit={handleEditUser}
-                    onUserDelete={(user) => { void handleDeleteUser(user); }}
-                />
-            )}
-        />
+        <>
+            <ListPageLayout
+                items={filteredUsers}
+                isLoading={isLoading}
+                loadingText="Đang tải danh sách người dùng..."
+                resetPageKey={`${activeFilter}|${searchQuery}`}
+                renderFilters={
+                    <UserFilters
+                        activeFilter={activeFilter}
+                        onFilterChange={setActiveFilter}
+                        counts={filterCounts}
+                    />
+                }
+                renderSearch={
+                    <UserSearch
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        onAddUser={handleAddUser}
+                        onExport={handleExport}
+                    />
+                }
+                renderTable={(paged) => (
+                    <UserTable
+                        users={paged}
+                        userRolesByUser={userRolesByUser}
+                        onUserClick={handleUserClick}
+                        onUserEdit={handleEditUser}
+                        onUserDelete={handleRequestDeleteUser}
+                    />
+                )}
+            />
+            <DeleteConfirmationDialog />
+        </>
     );
 }

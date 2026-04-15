@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { Select } from "@/components/ui/Select";
 import { useToast } from "@/components/ui/ToastProvider";
 import { customerTagsService } from "@/services/customer-tags";
@@ -140,6 +141,8 @@ export default function CustomerGroupsPage() {
     void loadGroups();
   }, [loadGroups]);
 
+  const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
+
   const filteredGroups = useMemo(() => {
     if (!searchQuery.trim()) {
       return groups;
@@ -169,35 +172,33 @@ export default function CustomerGroupsPage() {
     }
   };
 
-  const handleDeleteGroup = async (group: GroupItem) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa nhóm \"${group.name}\"? Mọi liên kết khách hàng thuộc nhóm sẽ bị xóa.`,
-    );
+  const handleDeleteGroup = (group: GroupItem) => {
+    requestDeleteConfirmation({
+      title: "Xóa nhóm",
+      description: `Bạn có chắc chắn muốn xóa nhóm "${group.name}"? Mọi liên kết khách hàng thuộc nhóm sẽ bị xóa.`,
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          const linksRes = await customerTagsService.getCustomerTagsByTagId(group.id, {
+            currentPage: "1",
+            pageSize: LINK_PAGE_SIZE,
+          });
 
-    if (!confirmed) {
-      return;
-    }
+          const links = linksRes.responseData?.rows || [];
+          if (links.length > 0) {
+            await Promise.all(links.map((link) => customerTagsService.deleteCustomerTag(link.id)));
+          }
 
-    setIsLoading(true);
-    try {
-      const linksRes = await customerTagsService.getCustomerTagsByTagId(group.id, {
-        currentPage: "1",
-        pageSize: LINK_PAGE_SIZE,
-      });
-
-      const links = linksRes.responseData?.rows || [];
-      if (links.length > 0) {
-        await Promise.all(links.map((link) => customerTagsService.deleteCustomerTag(link.id)));
-      }
-
-      await tagsService.deleteTag(group.id);
-      toast.success("Xóa nhóm thành công", `Đã xóa nhóm \"${group.name}\".`);
-      await loadGroups();
-    } catch (error) {
-      toast.error("Xóa nhóm thất bại", toErrorMessage(error, "Không thể xóa nhóm khách hàng."));
-    } finally {
-      setIsLoading(false);
-    }
+          await tagsService.deleteTag(group.id);
+          toast.success("Xóa nhóm thành công", `Đã xóa nhóm \"${group.name}\".`);
+          await loadGroups();
+        } catch (error) {
+          toast.error("Xóa nhóm thất bại", toErrorMessage(error, "Không thể xóa nhóm khách hàng."));
+        } finally {
+          setIsLoading(false);
+        }
+      },
+    });
   };
 
   return (
@@ -342,6 +343,7 @@ export default function CustomerGroupsPage() {
       {isLoading && (
         <p className="text-sm text-gray-500">Đang tải danh sách nhóm khách hàng...</p>
       )}
+      <DeleteConfirmationDialog />
     </div>
   );
 }

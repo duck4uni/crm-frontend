@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Tabs } from "@/components/ui/Tabs";
-import { useDialog } from "@/components/ui/Dialog";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { formatDateVN, formatDateVNDateOnly } from "@/lib/utils";
 import { userHistoryService } from "@/services/user-history";
 import {
@@ -45,7 +45,7 @@ export function UserDetailModal({
     onEdit,
     onDelete,
 }: UserDetailModalProps) {
-    const { showDialog, DialogComponent } = useDialog();
+    const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
     const [activeTab, setActiveTab] = useState<DetailTab>("detail");
@@ -111,12 +111,9 @@ export function UserDetailModal({
     };
 
     const handleDelete = () => {
-        showDialog({
-            type: "danger",
+        requestDeleteConfirmation({
             title: "Xóa người dùng",
             description: `Bạn có chắc chắn muốn xóa người dùng "${user.full_name}"? Hành động này không thể hoàn tác.`,
-            confirmText: "Xóa",
-            cancelText: "Hủy",
             onConfirm: () => {
                 onDelete?.(user);
             },
@@ -160,7 +157,7 @@ export function UserDetailModal({
         >
             <div className="space-y-6">
                 <div>
-                    <Tabs tabs={tabs} activeTab={activeTab} onChange={(tabId) => setActiveTab(tabId as DetailTab)} />
+                <DeleteConfirmationDialog />
                 </div>
 
                 {activeTab === "detail" && (
@@ -265,7 +262,7 @@ export function UserDetailModal({
                 )}
             </div>
 
-            <DialogComponent />
+            <DeleteConfirmationDialog />
         </Modal>
     );
 }

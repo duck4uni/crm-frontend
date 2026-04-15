@@ -17,6 +17,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { Tabs } from "@/components/ui/Tabs";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatDateVN, formatDateVNDateOnly } from "@/lib/utils";
@@ -213,6 +214,7 @@ export default function UserDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
+  const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
 
   const userId = params.userId;
   const requestedTab = searchParams.get("tab") as UserTab | null;
@@ -451,27 +453,25 @@ export default function UserDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!user) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa người dùng "${user.full_name}"? Hành động này không thể hoàn tác.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await usersService.deleteUser(user.id);
-      toast.success("Xóa thành công", `Người dùng "${user.full_name}" đã bị xóa.`);
-      router.push("/users");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Không thể xóa người dùng.";
-      toast.error("Xóa thất bại", message);
-    }
+    requestDeleteConfirmation({
+      title: "Xóa người dùng",
+      description: `Bạn có chắc chắn muốn xóa người dùng "${user.full_name}"? Hành động này không thể hoàn tác.`,
+      onConfirm: async () => {
+        try {
+          await usersService.deleteUser(user.id);
+          toast.success("Xóa thành công", `Người dùng "${user.full_name}" đã bị xóa.`);
+          router.push("/users");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Không thể xóa người dùng.";
+          toast.error("Xóa thất bại", message);
+        }
+      },
+    });
   };
 
   if (isLoading || !user) {
@@ -601,6 +601,7 @@ export default function UserDetailPage() {
           </div>
         </CardContent>
       </Card>
+      <DeleteConfirmationDialog />
     </div>
   );
 }

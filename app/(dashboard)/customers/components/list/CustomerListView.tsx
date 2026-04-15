@@ -19,6 +19,7 @@ import { CustomerFilterOption, CustomerFilters } from "./CustomerFilters";
 import { CustomerSearch } from "./CustomerSearch";
 import { CustomerTable } from "./CustomerTable";
 import { ListPageLayout } from "@/components/ui/ListPageLayout";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { useToast } from "@/components/ui/ToastProvider";
 
 const LEADER_PERMISSION_NAME = "SITE LEADER";
@@ -340,6 +341,7 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
   const [customerIdsByGroup, setCustomerIdsByGroup] = useState<Record<string, Set<string>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
+  const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
@@ -497,6 +499,16 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
     }
   };
 
+  const handleRequestDeleteCustomer = (customer: Customer) => {
+    requestDeleteConfirmation({
+      title: "Xóa khách hàng",
+      description: `Bạn có chắc chắn muốn xóa khách hàng "${customer.customerName}"? Hành động này không thể hoàn tác.`,
+      onConfirm: async () => {
+        await handleDeleteCustomer(customer);
+      },
+    });
+  };
+
   const handleExport = async () => {
     try {
       const blob = await customersService.exportCustomers();
@@ -586,10 +598,11 @@ export function CustomerListView({ onCountChange }: CustomerListViewProps) {
             customers={paged}
             onCustomerClick={handleCustomerClick}
             onCustomerEdit={handleEditCustomer}
-            onCustomerDelete={(customer) => { void handleDeleteCustomer(customer); }}
+            onCustomerDelete={handleRequestDeleteCustomer}
           />
         )}
       />
+      <DeleteConfirmationDialog />
     </div>
   );
 }

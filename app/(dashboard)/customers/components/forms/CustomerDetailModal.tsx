@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { useDialog } from "@/components/ui/Dialog";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { formatDateVNDateOnly } from "@/lib/utils";
 import {
     FiPhone,
@@ -47,7 +47,7 @@ export function CustomerDetailModal({
     onEdit,
     onDelete,
 }: CustomerDetailModalProps) {
-    const { showDialog, DialogComponent } = useDialog();
+    const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
 
     if (!customer) return null;
 
@@ -56,12 +56,9 @@ export function CustomerDetailModal({
     };
 
     const handleDelete = () => {
-        showDialog({
-            type: "danger",
+        requestDeleteConfirmation({
             title: "Xóa khách hàng",
             description: `Bạn có chắc chắn muốn xóa khách hàng "${customer.customerName}"? Hành động này không thể hoàn tác.`,
-            confirmText: "Xóa",
-            cancelText: "Hủy",
             onConfirm: () => {
                 onDelete?.(customer);
             },
@@ -197,7 +194,7 @@ export function CustomerDetailModal({
                     </div>
                 </Section>
             </div>
-            <DialogComponent />
+            <DeleteConfirmationDialog />
         </Modal>
     );
 }

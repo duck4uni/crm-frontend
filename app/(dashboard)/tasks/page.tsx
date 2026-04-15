@@ -6,6 +6,7 @@ import { ListPageLayout } from "@/components/ui/ListPageLayout";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { useToast } from "@/components/ui/ToastProvider";
 import { jobsService } from "@/services/jobs";
 import { statusesService } from "@/services/statuses";
@@ -36,7 +37,6 @@ interface JobFormData {
   job_name: string;
   content: string;
   note: string;
-  progress: string;
   job_time: { start?: string; end?: string };
   performer_uuid: string;
   customer_uuid: string;
@@ -47,7 +47,6 @@ const emptyFormData: JobFormData = {
   job_name: "",
   content: "",
   note: "",
-  progress: "",
   job_time: {},
   performer_uuid: "",
   customer_uuid: "",
@@ -146,6 +145,7 @@ export default function TasksPage() {
   const [selectedJob, setSelectedJob] = useState<JobApiRow | null>(null);
   const [formData, setFormData] = useState<JobFormData>(emptyFormData);
   const toast = useToast();
+  const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
 
   const loadJobs = useCallback(async () => {
     setIsLoading(true);
@@ -276,7 +276,6 @@ export default function TasksPage() {
       job_name: job.job_name,
       content: job.content,
       note: job.note ?? "",
-      progress: job.progress != null ? String(job.progress) : "",
       job_time: { start: toDateTimeLocal(jt.start), end: toDateTimeLocal(jt.end) },
       performer_uuid: job.performer?.id ?? job.performer_uuid ?? "",
       customer_uuid: job.customer?.id ?? job.customer_uuid ?? "",
@@ -303,25 +302,12 @@ export default function TasksPage() {
       return;
     }
 
-    const rawProgress = formData.progress.trim();
-    let progressValue: number | undefined;
-
-    if (rawProgress) {
-      const numericProgress = Number(rawProgress);
-      if (Number.isNaN(numericProgress) || numericProgress < 0 || numericProgress > 100) {
-        toast.error("Tiến độ không hợp lệ", "Vui lòng nhập tiến độ từ 0 đến 100.");
-        return;
-      }
-      progressValue = numericProgress;
-    }
-
     try {
       if (editingJob) {
         const payload: UpdateJobPayload = {
           job_name: formData.job_name,
           content: formData.content,
           note: formData.note.trim() || undefined,
-          progress: progressValue,
           job_time: buildPayloadTime(),
           performer_uuid: formData.performer_uuid || undefined,
           customer_uuid: formData.customer_uuid || undefined,
@@ -337,7 +323,6 @@ export default function TasksPage() {
             job_name: formData.job_name,
             content: formData.content,
             note: formData.note.trim() || undefined,
-            progress: progressValue,
             job_time: buildPayloadTime(),
             performer_uuid: formData.performer_uuid || undefined,
             customer_uuid: formData.customer_uuid || undefined,
@@ -366,6 +351,16 @@ export default function TasksPage() {
       const msg = error instanceof Error ? error.message : "Không thể xóa công việc.";
       toast.error("Xóa thất bại", msg);
     }
+  };
+
+  const handleRequestDeleteJob = (job: JobApiRow) => {
+    requestDeleteConfirmation({
+      title: "Xóa công việc",
+      description: `Bạn có chắc chắn muốn xóa công việc "${job.job_name}"? Hành động này không thể hoàn tác.`,
+      onConfirm: async () => {
+        await handleDeleteJob(job);
+      },
+    });
   };
 
   const userOptions = users.map((u) => ({ value: u.id, label: u.full_name || u.email }));
@@ -437,9 +432,6 @@ export default function TasksPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tiến độ
-                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Thao tác
                 </th>
@@ -508,9 +500,6 @@ export default function TasksPage() {
                         <span className="text-sm text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {job.progress != null ? `${job.progress}%` : "—"}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
@@ -536,7 +525,7 @@ export default function TasksPage() {
                         <button
                           onClick={(event) => {
                             event.stopPropagation();
-                            handleDeleteJob(job);
+                            handleRequestDeleteJob(job);
                           }}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                           title="Xóa"
@@ -630,10 +619,6 @@ export default function TasksPage() {
                   <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Trạng thái</label>
                   <p className="text-sm text-gray-900">{status?.name ?? selectedJob.status_id ?? "Không có"}</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Tiến độ</label>
-                  <p className="text-sm text-gray-900">{selectedJob.progress != null ? `${selectedJob.progress}%` : "Chưa đặt"}</p>
-                </div>
               </div>
               {selectedJob.created_by && (
                 <div>
@@ -696,21 +681,6 @@ export default function TasksPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
             />
           </div>
-
-          {editingJob && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tiến độ (%)</label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                value={formData.progress}
-                onChange={(e) => setFormData((prev) => ({ ...prev, progress: e.target.value }))}
-                placeholder="0 - 100"
-              />
-            </div>
-          )}
 
           {/* job_time: start / end */}
           <div className="grid grid-cols-2 gap-4">
@@ -788,6 +758,7 @@ export default function TasksPage() {
           )}
         </div>
       </Modal>
+      <DeleteConfirmationDialog />
     </div>
   );
 }
