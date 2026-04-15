@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -110,6 +110,9 @@ export default function CustomerGroupDetailPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const router = useRouter();
   const toast = useToast();
+
+  const assigneeEditorRef = useRef<HTMLDivElement | null>(null);
+  const assigneeSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const [groupName, setGroupName] = useState("");
   const [allCustomers, setAllCustomers] = useState<CustomerLookupItem[]>([]);
@@ -302,6 +305,60 @@ export default function CustomerGroupDetailPage() {
     () => members.find((member) => member.id === editingAssigneeCustomerId) || null,
     [editingAssigneeCustomerId, members],
   );
+
+  const findScrollableParent = useCallback((node: HTMLElement | null): HTMLElement | null => {
+    if (!node) return null;
+    let parent: HTMLElement | null = node.parentElement;
+    while (parent) {
+      try {
+        const style = getComputedStyle(parent);
+        const overflowY = style.overflowY;
+        if ((overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && parent.scrollHeight > parent.clientHeight) {
+          return parent;
+        }
+      } catch {
+        // ignore cross-origin or other errors
+      }
+      parent = parent.parentElement;
+    }
+
+    return document.scrollingElement as HTMLElement | null;
+  }, []);
+
+  const scrollToEditor = useCallback((node: HTMLElement) => {
+    const scrollParent = findScrollableParent(node) || (document.scrollingElement as HTMLElement | null);
+    if (!scrollParent || scrollParent === document.scrollingElement || scrollParent === document.body || scrollParent === document.documentElement) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => assigneeSearchInputRef.current?.focus(), 120);
+      return;
+    }
+
+    const nodeRect = node.getBoundingClientRect();
+    const parentRect = (scrollParent as HTMLElement).getBoundingClientRect();
+    const offsetTop = nodeRect.top - parentRect.top + (scrollParent as HTMLElement).scrollTop;
+    (scrollParent as HTMLElement).scrollTo({ top: Math.max(0, offsetTop - 8), behavior: "smooth" });
+    setTimeout(() => assigneeSearchInputRef.current?.focus(), 200);
+  }, [findScrollableParent]);
+
+  useEffect(() => {
+    if (!editingAssigneeCustomer) return;
+
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = assigneeEditorRef.current;
+        if (el) {
+          scrollToEditor(el);
+        }
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [editingAssigneeCustomer, scrollToEditor]);
 
   const filteredAssigneeOptions = useMemo(() => {
     const keyword = assigneeSearchKeyword.trim().toLowerCase();
@@ -594,7 +651,7 @@ export default function CustomerGroupDetailPage() {
           </div>
 
           {editingAssigneeCustomer && (
-            <div className="border-t border-gray-200 p-4 space-y-3 bg-white">
+            <div ref={assigneeEditorRef} className="border-t border-gray-200 p-4 space-y-3 bg-white">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
@@ -628,6 +685,7 @@ export default function CustomerGroupDetailPage() {
               </div>
 
               <Input
+                ref={assigneeSearchInputRef}
                 value={assigneeSearchKeyword}
                 onChange={(event) => setAssigneeSearchKeyword(event.target.value)}
                 placeholder="Tìm theo tên user"
