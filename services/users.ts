@@ -28,7 +28,7 @@ const USERS_CUSTOMER_COUNT_ENDPOINT = "/api/v1.0/users/customerCount";
 const USERS_CUSTOMER_TAG_STAT_ENDPOINT = "/api/v1.0/users/customerTagStatistic";
 const USERS_EXPORT_ENDPOINT = "/api/v1.0/users/export";
 const USERS_IMPORT_ENDPOINT = "/api/v1.0/users/import";
-const USERS_ADMIN_ENDPOINT = "/api/v1.0/users/admin";
+const USERS_ADMIN_ENDPOINT = "/api/v1.0/users/my_emloyee";
 
 export const usersService = {
     async getMyInfo(): Promise<GetMyInfoResponse> {

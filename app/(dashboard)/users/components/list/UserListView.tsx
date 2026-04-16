@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { UserProfile } from "@/types/user";
 import { AdminUserApiRow } from "@/types/api";
@@ -42,31 +42,47 @@ export function UserListView() {
     const toast = useToast();
     const { requestDeleteConfirmation, DeleteConfirmationDialog } = useDeleteConfirmation();
 
-    const loadUsers = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const usersRes = await usersService.getAdminUsers({ pageSize: PAGE_SIZE });
-
-            const rows = usersRes.responseData?.rows ?? [];
-
-            const rolesMap: Record<string, string[]> = {};
-            for (const row of rows) {
-                rolesMap[row.id] = (row.user_permisions ?? []).map((up) => formatPermissionName(up.permision.name));
-            }
-
-            setUsers(rows.map(mapApiRowToProfile));
-            setUserRolesByUser(rolesMap);
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : "Không thể tải danh sách người dùng.";
-            toast.error("Tải dữ liệu thất bại", msg);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
     useEffect(() => {
+        let isCancelled = false;
+
+        const loadUsers = async () => {
+            setIsLoading(true);
+            try {
+                const usersRes = await usersService.getAdminUsers({ pageSize: PAGE_SIZE });
+
+                if (isCancelled) {
+                    return;
+                }
+
+                const rows = usersRes.responseData?.rows ?? [];
+
+                const rolesMap: Record<string, string[]> = {};
+                for (const row of rows) {
+                    rolesMap[row.id] = (row.user_permisions ?? []).map((up) => formatPermissionName(up.permision.name));
+                }
+
+                setUsers(rows.map(mapApiRowToProfile));
+                setUserRolesByUser(rolesMap);
+            } catch (error) {
+                if (isCancelled) {
+                    return;
+                }
+
+                const msg = error instanceof Error ? error.message : "Không thể tải danh sách người dùng.";
+                toast.error("Tải dữ liệu thất bại", msg);
+            } finally {
+                if (!isCancelled) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
         void loadUsers();
-    }, [loadUsers]);
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [toast]);
 
     // Calculate filter counts
     const filterCounts = useMemo(() => {
