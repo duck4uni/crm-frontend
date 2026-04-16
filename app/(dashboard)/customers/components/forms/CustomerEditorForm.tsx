@@ -363,10 +363,14 @@ export function CustomerEditorForm({
 
   const toggleAssigneeSelection = (userId: string) => {
     setFormData((prev) => {
-      const currentIds = toAssignedUserIds(prev);
+      const currentIds = Array.isArray(prev.assigned_user_ids)
+        ? (prev.assigned_user_ids as string[])
+        : [];
 
       return {
         ...prev,
+        assigned_users: [],
+        assigned_user_id: "",
         assigned_user_ids: currentIds.includes(userId)
           ? currentIds.filter((id) => id !== userId)
           : [...currentIds, userId],
@@ -399,7 +403,9 @@ export function CustomerEditorForm({
 
   const toggleSelectAllFilteredAssignees = () => {
     setFormData((prev) => {
-      const currentIds = new Set(toAssignedUserIds(prev));
+      const currentIds = new Set(
+        Array.isArray(prev.assigned_user_ids) ? (prev.assigned_user_ids as string[]) : [],
+      );
 
       if (allFilteredAssigneesSelected) {
         filteredUserOptions.forEach((user) => currentIds.delete(user.id));
@@ -409,6 +415,8 @@ export function CustomerEditorForm({
 
       return {
         ...prev,
+        assigned_users: [],
+        assigned_user_id: "",
         assigned_user_ids: Array.from(currentIds),
       };
     });

@@ -259,12 +259,9 @@ export function Sidebar({ isOpen }: SidebarProps) {
                 >
                   <Icon className="h-5 w-5 shrink-0 mr-3" />
                   <span className="flex-1 truncate text-left">{item.name}</span>
-                  <FiChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 transition-transform duration-200",
-                      isExpanded && "rotate-180",
-                    )}
-                  />
+                  {!isExpanded && (
+                    <FiChevronDown className="h-4 w-4 shrink-0" />
+                  )}
                 </button>
 
                 {/* Children */}
