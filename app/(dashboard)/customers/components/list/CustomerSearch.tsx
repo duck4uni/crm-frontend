@@ -8,21 +8,14 @@ import {
   Plus
 } from "lucide-react";
 import { ImportModal } from "../import-export/ImportModal";
+import { ImportFeedback } from "../../types";
 
 interface CustomerSearchProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onAddCustomer: () => void;
   onExport: () => void;
-  onImport: (data: any[], file?: File) => Promise<{
-    success: number;
-    failed: number;
-    errors: string[];
-  } | void> | {
-    success: number;
-    failed: number;
-    errors: string[];
-  } | void;
+  onImport: (data: unknown[], file?: File) => Promise<ImportFeedback | void> | ImportFeedback | void;
 }
 
 export function CustomerSearch({

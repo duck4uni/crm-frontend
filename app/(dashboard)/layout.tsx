@@ -21,7 +21,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!hasAuthSession()) {
-      router.replace("/login");
+      router.replace("/auth/login");
       return;
     }
 

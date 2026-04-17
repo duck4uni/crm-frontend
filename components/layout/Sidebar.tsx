@@ -163,7 +163,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
         toast.warning("Không thể xác nhận đăng xuất", message);
       } finally {
         clearAuthSession();
-        router.replace("/login");
+        router.replace("/auth/login");
       }
     });
   };

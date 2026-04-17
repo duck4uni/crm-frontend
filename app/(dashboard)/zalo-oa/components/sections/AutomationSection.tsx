@@ -58,9 +58,9 @@ export function AutomationSection() {
       prev.map((rule) =>
         rule.id === ruleId
           ? {
-              ...rule,
-              isActive: !rule.isActive,
-            }
+            ...rule,
+            isActive: !rule.isActive,
+          }
           : rule,
       ),
     );
@@ -71,9 +71,9 @@ export function AutomationSection() {
       prev.map((rule) =>
         rule.id === ruleId
           ? {
-              ...rule,
-              lastRun: new Date().toLocaleString("vi-VN", { hour12: false }),
-            }
+            ...rule,
+            lastRun: new Date().toLocaleString("vi-VN", { hour12: false }),
+          }
           : rule,
       ),
     );
@@ -224,11 +224,10 @@ export function AutomationSection() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleToggleRule(rule.id)}
-                        className={`p-1 rounded transition-colors ${
-                          rule.isActive
+                        className={`p-1 rounded transition-colors ${rule.isActive
                             ? "text-green-600 hover:bg-green-50"
                             : "text-gray-400 hover:bg-gray-100"
-                        }`}
+                          }`}
                         title={rule.isActive ? "Tắt" : "Bật"}
                       >
                         <FiToggleLeft className="w-4 h-4" />

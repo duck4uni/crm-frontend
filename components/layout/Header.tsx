@@ -55,9 +55,9 @@ export function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
   const handleLogout = async () => {
     try {
       await authService.logout();
-    } catch {}
+    } catch { }
     clearAuthSession();
-    router.replace("/login");
+    router.replace("/auth/login");
   };
 
   useEffect(() => {

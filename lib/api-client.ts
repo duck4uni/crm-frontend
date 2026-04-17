@@ -98,7 +98,7 @@ class ApiClient {
       return;
     }
 
-    window.location.href = "/login";
+    window.location.href = "/auth/login";
   }
 
   private async request<T>(

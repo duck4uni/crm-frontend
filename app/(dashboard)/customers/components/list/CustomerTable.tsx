@@ -62,29 +62,29 @@ export function CustomerTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <TableHeader label="Tên khách hàng" field="customerName" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Giới tính" field="gender" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Số điện thoại" field="mobilePhone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Leader" field="leader_assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Worker" field="worker_assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <TableHeader label="Ngày tạo" field="createdDate" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {sortedCustomers.map((customer) => (
-              <CustomerTableRow
-                key={customer.id}
-                customer={customer}
-                onView={onCustomerClick}
-                onEdit={onCustomerEdit}
-                onDelete={onCustomerDelete}
-              />
-            ))}
-          </tbody>
-        </table>
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <TableHeader label="Tên khách hàng" field="customerName" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+            <TableHeader label="Giới tính" field="gender" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+            <TableHeader label="Số điện thoại" field="mobilePhone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+            <TableHeader label="Leader" field="leader_assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+            <TableHeader label="Worker" field="worker_assignee" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+            <TableHeader label="Ngày tạo" field="createdDate" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {sortedCustomers.map((customer) => (
+            <CustomerTableRow
+              key={customer.id}
+              customer={customer}
+              onView={onCustomerClick}
+              onEdit={onCustomerEdit}
+              onDelete={onCustomerDelete}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -73,23 +73,23 @@ export function UserTable({ users, userRolesByUser = {}, onUserClick, onUserEdit
                 <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                         <TableHeader label="Họ tên" field="full_name" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Email" field="email" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Số điện thoại" field="phone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vai trò</th>
-                            <TableHeader label="Trạng thái" field="is_active" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Ngày tạo" field="created_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Thao tác</th>
-                        </tr>
-                    </thead>
+                        <TableHeader label="Email" field="email" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                        <TableHeader label="Số điện thoại" field="phone" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vai trò</th>
+                        <TableHeader label="Trạng thái" field="is_active" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                        <TableHeader label="Ngày tạo" field="created_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Thao tác</th>
+                    </tr>
+                </thead>
                 <tbody className="divide-y divide-gray-200">
                     {sortedUsers.map((user) => (
                         <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-4">
                                 <div className="flex items-center space-x-3">
-                                        <Avatar name={user.full_name} src={user.avatar} />
-                                        <span className="text-sm font-medium text-gray-900">{user.full_name}</span>
-                                    </div>
-                                </td>
+                                    <Avatar name={user.full_name} src={user.avatar} />
+                                    <span className="text-sm font-medium text-gray-900">{user.full_name}</span>
+                                </div>
+                            </td>
                             <td className="px-4 py-4 text-sm text-gray-600">{user.email}</td>
                             <td className="px-4 py-4 text-sm text-gray-900">{user.phone || "-"}</td>
                             <td className="px-4 py-4">{renderRoleBadges(user.id)}</td>
