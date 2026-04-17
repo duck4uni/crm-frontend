@@ -27,8 +27,8 @@ export function UserFilters({ activeFilter, onFilterChange, counts }: UserFilter
                         key={filter.id}
                         onClick={() => onFilterChange(filter.id as "all" | "active" | "inactive")}
                         className={`flex items-center space-x-2 px-3 py-1.5 rounded transition-all whitespace-nowrap ${isActive
-                                ? `${filter.activeBgColor} ${filter.activeTextColor} shadow-md`
-                                : `${filter.bgColor} ${filter.textColor} opacity-90 hover:opacity-100 hover:shadow`
+                            ? `${filter.activeBgColor} ${filter.activeTextColor} shadow-md`
+                            : `${filter.bgColor} ${filter.textColor} opacity-90 hover:opacity-100 hover:shadow`
                             }`}
                     >
                         <span className="text-sm font-medium">{filter.label}</span>

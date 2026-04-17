@@ -52,12 +52,12 @@ export function NotificationTable({ notifications, onNotificationClick }: Notifi
                 <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                         <TableHeader label="Tiêu đề" field="title" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Danh mục" field="category" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Trạng thái" field="has_user_read" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <TableHeader label="Ngày nhận" field="created_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-24">Thao tác</th>
-                        </tr>
-                    </thead>
+                        <TableHeader label="Danh mục" field="category" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                        <TableHeader label="Trạng thái" field="has_user_read" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                        <TableHeader label="Ngày nhận" field="created_at" onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-24">Thao tác</th>
+                    </tr>
+                </thead>
                 <tbody className="divide-y divide-gray-200">
                     {sortedNotifications.map((notification) => (
                         <tr
@@ -66,42 +66,42 @@ export function NotificationTable({ notifications, onNotificationClick }: Notifi
                         >
                             <td className="px-4 py-4">
                                 <div className="flex items-center space-x-3">
-                                        {!notification.has_user_read && (
-                                            <div className="w-2 h-2 bg-primary-600 rounded-full flex-shrink-0" />
-                                        )}
-                                        <div>
-                                            <p className={`text-sm ${!notification.has_user_read ? "font-semibold" : "font-medium"} text-gray-900`}>
-                                                {notification.title}
-                                            </p>
-                                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{notification.content}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    {(() => {
-                                        const config = CATEGORY_CONFIG[notification.category];
-                                        return config ? <Badge variant={config.variant}>{config.label}</Badge> : notification.category;
-                                    })()}
-                                </td>
-                                <td className="px-4 py-4">
-                                    {notification.has_user_read ? (
-                                        <Badge variant="success">Đã đọc</Badge>
-                                    ) : (
-                                        <Badge variant="warning">Chưa đọc</Badge>
+                                    {!notification.has_user_read && (
+                                        <div className="w-2 h-2 bg-primary-600 rounded-full flex-shrink-0" />
                                     )}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
-                                    {formatDateVN(notification.created_at)}
-                                </td>
-                                <td className="px-4 py-4">
-                                    <button
-                                        onClick={() => onNotificationClick?.(notification)}
-                                        className="p-1.5 text-primary-600 hover:bg-primary-50 rounded transition-colors"
-                                        title="Xem chi tiết"
-                                    >
-                                        <FiEye className="w-4 h-4" />
-                                    </button>
-                                </td>
+                                    <div>
+                                        <p className={`text-sm ${!notification.has_user_read ? "font-semibold" : "font-medium"} text-gray-900`}>
+                                            {notification.title}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{notification.content}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td className="px-4 py-4">
+                                {(() => {
+                                    const config = CATEGORY_CONFIG[notification.category];
+                                    return config ? <Badge variant={config.variant}>{config.label}</Badge> : notification.category;
+                                })()}
+                            </td>
+                            <td className="px-4 py-4">
+                                {notification.has_user_read ? (
+                                    <Badge variant="success">Đã đọc</Badge>
+                                ) : (
+                                    <Badge variant="warning">Chưa đọc</Badge>
+                                )}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-pre-line">
+                                {formatDateVN(notification.created_at)}
+                            </td>
+                            <td className="px-4 py-4">
+                                <button
+                                    onClick={() => onNotificationClick?.(notification)}
+                                    className="p-1.5 text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                                    title="Xem chi tiết"
+                                >
+                                    <FiEye className="w-4 h-4" />
+                                </button>
+                            </td>
                         </tr>
                     ))}
                 </tbody>

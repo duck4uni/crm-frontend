@@ -21,7 +21,6 @@ export function ReportModal({ isOpen, onClose, reportType }: ReportModalProps) {
     const toast = useToast();
 
     const handleExport = () => {
-        // Simulate export
         toast.success(
             "Xuất báo cáo thành công",
             `Báo cáo ${reportType === "journey" ? "hành trình" : "tỷ lệ chuyển đổi"} đã được tải xuống`

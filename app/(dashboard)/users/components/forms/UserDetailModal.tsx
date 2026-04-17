@@ -157,7 +157,7 @@ export function UserDetailModal({
         >
             <div className="space-y-6">
                 <div>
-                <DeleteConfirmationDialog />
+                    <DeleteConfirmationDialog />
                 </div>
 
                 {activeTab === "detail" && (

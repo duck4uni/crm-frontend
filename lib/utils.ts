@@ -106,3 +106,69 @@ export function formatPermissionName(permissionName?: string | null): string {
 
   return PERMISSION_DISPLAY_NAME_MAP[normalized.toUpperCase()] || normalized;
 }
+
+export function normalizeWhitespace(value?: string): string {
+  return (value || "").replace(/\s+/g, " ").trim();
+}
+
+export function normalizeLoose(value?: string): string {
+  return normalizeWhitespace(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export function formatDateToApi(date?: Date): string | undefined {
+  if (!date) {
+    return undefined;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export type StatusVariant = "default" | "success" | "warning" | "danger" | "info";
+
+export function getStatusVariantFromName(statusName?: string | null): StatusVariant {
+  const normalized = (statusName || "").toLowerCase();
+
+  if (
+    normalized.includes("hoàn thành") ||
+    normalized.includes("thành công") ||
+    normalized.includes("xong")
+  ) {
+    return "success";
+  }
+
+  if (
+    normalized.includes("hủy") ||
+    normalized.includes("từ chối") ||
+    normalized.includes("thất bại")
+  ) {
+    return "danger";
+  }
+
+  if (
+    normalized.includes("chờ") ||
+    normalized.includes("chưa") ||
+    normalized.includes("mới")
+  ) {
+    return "warning";
+  }
+
+  if (
+    normalized.includes("đang") ||
+    normalized.includes("thực hiện") ||
+    normalized.includes("xử lý")
+  ) {
+    return "info";
+  }
+
+  return "default";
+}
