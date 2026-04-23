@@ -11,9 +11,11 @@ export interface OaConnection {
 
 export interface OaConnectionFormState {
   oaName: string;
-  oaOfficialId: string;
-  owner: string;
+  appId: string;
+  secretKey: string;
 }
+
+export type OaConnectStep = "form" | "connecting" | "success" | "error";
 
 export interface ZaloConversation {
   id: string;

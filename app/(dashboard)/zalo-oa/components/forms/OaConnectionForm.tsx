@@ -1,11 +1,13 @@
 "use client";
 
+// This component is superseded by ZaloOaAddModal which handles the full OAuth flow.
+// Kept for reference only.
+
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { FiLink2 } from "react-icons/fi";
-import { leaderOptions, OaConnectionFormState } from "@/types/zalo-oa";
+import { OaConnectionFormState } from "@/types/zalo-oa";
 
 interface OaConnectionFormProps {
   form: OaConnectionFormState;
@@ -27,16 +29,16 @@ export function OaConnectionForm({ form, onChange, onCreateConnection }: OaConne
           placeholder="Ví dụ: Điện Lạnh Quận 7"
         />
         <Input
-          label="OA Official ID"
-          value={form.oaOfficialId}
-          onChange={(event) => onChange({ ...form, oaOfficialId: event.target.value })}
-          placeholder="OA_123456"
+          label="App ID"
+          value={form.appId}
+          onChange={(event) => onChange({ ...form, appId: event.target.value })}
+          placeholder="4463534486333155530"
         />
-        <Select
-          label="Người phụ trách"
-          value={form.owner}
-          options={leaderOptions}
-          onChange={(event) => onChange({ ...form, owner: event.target.value })}
+        <Input
+          label="Secret Key"
+          value={form.secretKey}
+          onChange={(event) => onChange({ ...form, secretKey: event.target.value })}
+          placeholder="Secret key từ Zalo Developers"
         />
         <div className="flex items-end">
           <Button className="w-full" onClick={onCreateConnection}>

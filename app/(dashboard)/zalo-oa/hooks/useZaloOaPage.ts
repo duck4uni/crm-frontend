@@ -7,6 +7,7 @@ import {
 } from "@/mock-data/zalo-oa";
 import type {
     OaConnection,
+    OaConnectionFormState,
     ZaloConversation,
     ZaloChatMessage,
     AutoConfig,
@@ -31,7 +32,7 @@ export function useZaloOaPage() {
     const [conversations, setConversations] = useState<ZaloConversation[]>(mockConversations);
     const [messagesByConversation, setMessagesByConversation] =
         useState<Record<string, ZaloChatMessage[]>>(mockConversationMessages);
-    const [connections] = useState<OaConnection[]>(initialConnections);
+    const [connections, setConnections] = useState<OaConnection[]>(initialConnections);
     const [autoConfigs, setAutoConfigs] = useState<AutoConfig[]>(mockAutoConfigs);
     const [configForm, setConfigForm] = useState<AutoConfigFormState>(initialConfigForm);
     const [selectedOaFilter, setSelectedOaFilter] = useState("all");
@@ -106,6 +107,20 @@ export function useZaloOaPage() {
         setSettingsOpen(true);
     };
 
+    const handleAddConnection = (form: OaConnectionFormState, _authCode: string) => {
+        const newConnection: OaConnection = {
+            id: `oa-${Date.now()}`,
+            oaName: form.oaName,
+            oaOfficialId: form.appId,
+            owner: "owner",
+            followers: 0,
+            syncedCustomers: 0,
+            isActive: true,
+            lastSyncAt: new Date().toLocaleString("vi-VN", { hour12: false }),
+        };
+        setConnections((prev) => [newConnection, ...prev]);
+    };
+
     const openConfigForm = () => {
         setSettingsOpen(false);
         setConfigFormOpen(true);
@@ -172,6 +187,7 @@ export function useZaloOaPage() {
         selectedMessages,
         filteredConversations,
         handleAddConfig,
+        handleAddConnection,
         openSettings,
         openConfigForm,
         handleSendMockMessage,
