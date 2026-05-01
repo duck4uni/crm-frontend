@@ -11,6 +11,11 @@ export const metadata: Metadata = {
     icon: "/logo-w.png",
     apple: "/logo-w.png",
   },
+  verification: {
+    other: {
+      "zalo-platform-site-verification": "PlhW3kpgJ5GqdiD9z9LbK1Fhua__dJOGC3Sm",
+    },
+  },
 };
 
 export default function RootLayout({
