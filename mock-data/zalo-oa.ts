@@ -10,6 +10,8 @@ export const initialConnections: OaConnection[] = [
     syncedCustomers: 1142,
     isActive: true,
     lastSyncAt: "08/04/2026 09:12",
+    status: "connected",
+    tokenExpiredAt: "2026-05-08T09:12:00.000Z",
   },
   {
     id: "oa-02",
@@ -20,6 +22,8 @@ export const initialConnections: OaConnection[] = [
     syncedCustomers: 604,
     isActive: false,
     lastSyncAt: "07/04/2026 22:18",
+    status: "expired",
+    tokenExpiredAt: "2026-04-12T22:18:00.000Z",
   },
 ];
 

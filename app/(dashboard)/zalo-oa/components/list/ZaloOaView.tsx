@@ -33,6 +33,7 @@ export function ZaloOaView() {
         selectedMessages,
         filteredConversations,
         handleAddConfig,
+        handleAddConnection,
         openSettings,
         openConfigForm,
         handleSendMockMessage,
@@ -82,6 +83,7 @@ export function ZaloOaView() {
                     settingsOpen={settingsOpen}
                     onClose={() => setSettingsOpen(false)}
                     connections={connections}
+                    onAddConnection={handleAddConnection}
                 />
 
                 <ZaloConfigFormDrawer

@@ -31,7 +31,7 @@ export function useZaloOaPage() {
     const [conversations, setConversations] = useState<ZaloConversation[]>(mockConversations);
     const [messagesByConversation, setMessagesByConversation] =
         useState<Record<string, ZaloChatMessage[]>>(mockConversationMessages);
-    const [connections] = useState<OaConnection[]>(initialConnections);
+    const [connections, setConnections] = useState<OaConnection[]>(initialConnections);
     const [autoConfigs, setAutoConfigs] = useState<AutoConfig[]>(mockAutoConfigs);
     const [configForm, setConfigForm] = useState<AutoConfigFormState>(initialConfigForm);
     const [selectedOaFilter, setSelectedOaFilter] = useState("all");
@@ -106,6 +106,16 @@ export function useZaloOaPage() {
         setSettingsOpen(true);
     };
 
+    const handleAddConnection = (connection: OaConnection) => {
+        setConnections((prev) => {
+            const exists = prev.some((c) => c.oaOfficialId === connection.oaOfficialId);
+            if (exists) {
+                return prev.map((c) => (c.oaOfficialId === connection.oaOfficialId ? { ...c, ...connection } : c));
+            }
+            return [connection, ...prev];
+        });
+    };
+
     const openConfigForm = () => {
         setSettingsOpen(false);
         setConfigFormOpen(true);
@@ -172,6 +182,7 @@ export function useZaloOaPage() {
         selectedMessages,
         filteredConversations,
         handleAddConfig,
+        handleAddConnection,
         openSettings,
         openConfigForm,
         handleSendMockMessage,
