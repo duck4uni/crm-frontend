@@ -1,3 +1,5 @@
+export type OaConnectionStatus = "connected" | "expired" | "revoked" | "disconnected";
+
 export interface OaConnection {
   id: string;
   oaName: string;
@@ -7,15 +9,63 @@ export interface OaConnection {
   syncedCustomers: number;
   isActive: boolean;
   lastSyncAt: string;
+  status?: OaConnectionStatus;
+  tokenExpiredAt?: string;
 }
 
-export interface OaConnectionFormState {
-  oaName: string;
-  appId: string;
-  secretKey: string;
+export type OaConnectStep =
+  | "idle"
+  | "connecting"
+  | "exchanging"
+  | "success"
+  | "templates"
+  | "send"
+  | "sent"
+  | "error";
+
+export type ZbsTemplateStatus =
+  | "draft"
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "inactive";
+
+export interface ZbsTemplateParam {
+  name: string;
+  type: "string" | "number" | "datetime";
+  required: boolean;
+  sample: string;
 }
 
-export type OaConnectStep = "form" | "connecting" | "success" | "error";
+export interface ZbsTemplate {
+  id: string;
+  oaId: string;
+  templateId: string;
+  templateCode: string;
+  templateName: string;
+  templateType: string;
+  status: ZbsTemplateStatus;
+  previewContent: string;
+  params: ZbsTemplateParam[];
+  lastSyncedAt: string;
+}
+
+export interface ZbsSendByPhoneRequest {
+  oaId: string;
+  templateCode: string;
+  phone: string;
+  templateData: Record<string, string>;
+  trackingId: string;
+}
+
+export interface ZbsSendByPhoneResult {
+  msgId: string;
+  trackingId: string;
+  status: "pending" | "success" | "failed";
+  sentAt: string;
+  quotaRemaining?: number;
+  errorMessage?: string;
+}
 
 export interface ZaloConversation {
   id: string;

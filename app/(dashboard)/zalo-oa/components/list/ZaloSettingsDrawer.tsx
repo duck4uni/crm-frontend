@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { FiChevronRight, FiLink } from "react-icons/fi";
-import type { OaConnection, OaConnectionFormState } from "@/types/zalo-oa";
+import type { OaConnection } from "@/types/zalo-oa";
 import { ZaloOaAddModal } from "../forms/ZaloOaAddModal";
 
 interface ZaloSettingsDrawerProps {
     settingsOpen: boolean;
     onClose: () => void;
     connections: OaConnection[];
-    onAddConnection: (form: OaConnectionFormState, authCode: string) => void;
+    onAddConnection: (connection: OaConnection) => void;
 }
 
 export function ZaloSettingsDrawer({ settingsOpen, onClose, connections, onAddConnection }: ZaloSettingsDrawerProps) {
@@ -67,9 +67,8 @@ export function ZaloSettingsDrawer({ settingsOpen, onClose, connections, onAddCo
             <ZaloOaAddModal
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onConnected={(form, authCode) => {
-                    onAddConnection(form, authCode);
-                    setModalOpen(false);
+                onConnected={(connection) => {
+                    onAddConnection(connection);
                 }}
             />
         </>

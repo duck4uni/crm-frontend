@@ -7,7 +7,6 @@ import {
 } from "@/mock-data/zalo-oa";
 import type {
     OaConnection,
-    OaConnectionFormState,
     ZaloConversation,
     ZaloChatMessage,
     AutoConfig,
@@ -107,18 +106,14 @@ export function useZaloOaPage() {
         setSettingsOpen(true);
     };
 
-    const handleAddConnection = (form: OaConnectionFormState, _authCode: string) => {
-        const newConnection: OaConnection = {
-            id: `oa-${Date.now()}`,
-            oaName: form.oaName,
-            oaOfficialId: form.appId,
-            owner: "owner",
-            followers: 0,
-            syncedCustomers: 0,
-            isActive: true,
-            lastSyncAt: new Date().toLocaleString("vi-VN", { hour12: false }),
-        };
-        setConnections((prev) => [newConnection, ...prev]);
+    const handleAddConnection = (connection: OaConnection) => {
+        setConnections((prev) => {
+            const exists = prev.some((c) => c.oaOfficialId === connection.oaOfficialId);
+            if (exists) {
+                return prev.map((c) => (c.oaOfficialId === connection.oaOfficialId ? { ...c, ...connection } : c));
+            }
+            return [connection, ...prev];
+        });
     };
 
     const openConfigForm = () => {
