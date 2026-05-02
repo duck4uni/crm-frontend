@@ -10,10 +10,19 @@ function CallbackHandler() {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     const error = searchParams.get("error");
+    const oaId = searchParams.get("oa_id");
+
+    console.group("[Zalo OA Callback]");
+    console.log("authorization_code:", code);
+    console.log("state:", state);
+    console.log("oa_id:", oaId);
+    console.log("error:", error);
+    console.log("full url:", window.location.href);
+    console.groupEnd();
 
     if (window.opener) {
       window.opener.postMessage(
-        { type: "ZALO_OA_OAUTH_CALLBACK", code, state, error },
+        { type: "ZALO_OA_OAUTH_CALLBACK", code, state, error, oaId },
         window.location.origin,
       );
       window.close();

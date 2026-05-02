@@ -70,6 +70,10 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "ZALO_OA_OAUTH_CALLBACK") return;
 
+      console.group("[Zalo OA Modal] nhận postMessage từ popup");
+      console.log("payload:", event.data);
+      console.groupEnd();
+
       if (event.data.error) {
         setStep("error");
         setErrorMsg("Người dùng từ chối cấp quyền hoặc có lỗi xảy ra.");
@@ -86,10 +90,12 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
       try {
         const tokenResult = await exchangeAuthorizationCode(event.data.code);
         const connection = buildOaConnectionFromToken(tokenResult);
+        console.log("[Zalo OA Modal] connection sau khi đổi token:", connection);
         setConnectedOa(connection);
         setStep("success");
         onConnected(connection);
       } catch (err) {
+        console.error("[Zalo OA Modal] exchange thất bại:", err);
         setStep("error");
         setErrorMsg(err instanceof Error ? err.message : "Không đổi được token. Vui lòng thử lại.");
       }
@@ -114,10 +120,33 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
     const state = `oa_${Date.now()}`;
     const url = buildZaloOAuthUrl({ appId, redirectUri, state });
 
+    console.group("[Zalo OA Modal] startOAuth");
+    console.log("redirect_uri:", redirectUri);
+    console.log("state:", state);
+    console.log("oauth_url:", url);
+    console.groupEnd();
+
     const popup = window.open(url, "zalo_oa_oauth", "width=600,height=700,scrollbars=yes");
     if (!popup) {
       setStep("error");
       setErrorMsg("Trình duyệt đã chặn popup. Vui lòng cho phép popup và thử lại.");
+    }
+  };
+
+  const handleMockOAuth = async () => {
+    setErrorMsg("");
+    setStep("exchanging");
+    const fakeCode = `dev_mock_code_${Date.now()}`;
+    console.log("[Zalo OA Modal] DEV MOCK: bypass popup, dùng code giả:", fakeCode);
+    try {
+      const tokenResult = await exchangeAuthorizationCode(fakeCode);
+      const connection = buildOaConnectionFromToken(tokenResult);
+      setConnectedOa(connection);
+      setStep("success");
+      onConnected(connection);
+    } catch (err) {
+      setStep("error");
+      setErrorMsg(err instanceof Error ? err.message : "Mock thất bại.");
     }
   };
 
@@ -321,7 +350,7 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-1">
+              <div className="flex justify-end gap-2 pt-1 flex-wrap">
                 <button
                   onClick={onClose}
                   disabled={isBusy}
@@ -329,6 +358,16 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
                 >
                   Hủy
                 </button>
+                {process.env.NODE_ENV !== "production" && (
+                  <button
+                    onClick={handleMockOAuth}
+                    disabled={isBusy}
+                    title="Dev only: bỏ qua popup Zalo, mock 1 OA đã kết nối để test luồng template/gửi tin"
+                    className="flex items-center gap-2 rounded-lg border border-dashed border-amber-400 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-60"
+                  >
+                    🧪 Mock kết nối (dev)
+                  </button>
+                )}
                 <button
                   onClick={handleStartOAuth}
                   disabled={isBusy}

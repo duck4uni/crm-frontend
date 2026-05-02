@@ -34,9 +34,14 @@ export interface ExchangeOaTokenResult {
 // authorization_code for OA access_token + refresh_token and returns OA info.
 // Replace with a real fetch when backend is ready.
 export async function exchangeAuthorizationCode(authCode: string): Promise<ExchangeOaTokenResult> {
+  console.group("[Zalo OA] exchangeAuthorizationCode");
+  console.log("authorization_code:", authCode);
+
   await new Promise((resolve) => setTimeout(resolve, 800));
 
   if (!authCode) {
+    console.warn("authCode rỗng — throw error");
+    console.groupEnd();
     throw new Error("Authorization code rỗng.");
   }
 
@@ -44,7 +49,7 @@ export async function exchangeAuthorizationCode(authCode: string): Promise<Excha
   const tokenExpiredAt = new Date(Date.now() + expiresIn * 1000).toISOString();
   const stamp = Date.now().toString().slice(-12);
 
-  return {
+  const result: ExchangeOaTokenResult = {
     oaId: stamp,
     oaName: `OA mới ${stamp.slice(-4)}`,
     accessToken: `mock_access_${stamp}`,
@@ -53,6 +58,12 @@ export async function exchangeAuthorizationCode(authCode: string): Promise<Excha
     tokenExpiredAt,
     status: "connected",
   };
+
+  console.log("token result (mock):", result);
+  console.log("👉 Khi backend sẵn, thay hàm này bằng fetch POST /api/zalo/oauth/callback với { code: authCode }");
+  console.groupEnd();
+
+  return result;
 }
 
 // Simulates GET /api/zalo/templates?oaId={oaId}
