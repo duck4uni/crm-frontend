@@ -5,6 +5,62 @@ import {
     StatusApiRow,
 } from "@/types/api";
 import { getStatusVariantFromName, type StatusVariant } from "@/lib/utils";
+import type { SubJob } from "../types";
+
+const SUB_JOBS_STORAGE_KEY = "crm.tasks.subJobs.v1";
+
+type SubJobsStore = Record<string, SubJob[]>;
+
+const readSubJobsStore = (): SubJobsStore => {
+    if (typeof window === "undefined") return {};
+    try {
+        const raw = window.localStorage.getItem(SUB_JOBS_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return typeof parsed === "object" && parsed ? (parsed as SubJobsStore) : {};
+    } catch {
+        return {};
+    }
+};
+
+const writeSubJobsStore = (store: SubJobsStore) => {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(SUB_JOBS_STORAGE_KEY, JSON.stringify(store));
+    } catch {
+        // ignore quota errors
+    }
+};
+
+export const loadSubJobsForJob = (jobId: string): SubJob[] => {
+    const store = readSubJobsStore();
+    const list = store[jobId] ?? [];
+    return list.map((item) => {
+        const legacyOwner = (item as unknown as { owner?: string }).owner;
+        const ownerIds = Array.isArray(item.owner_ids)
+            ? item.owner_ids
+            : legacyOwner
+                ? [legacyOwner]
+                : [];
+        return { ...item, owner_ids: ownerIds };
+    });
+};
+
+export const saveSubJobsForJob = (jobId: string, subJobs: SubJob[]): void => {
+    const store = readSubJobsStore();
+    if (subJobs.length === 0) {
+        delete store[jobId];
+    } else {
+        store[jobId] = subJobs;
+    }
+    writeSubJobsStore(store);
+};
+
+export const computeSubJobsProgress = (subJobs: SubJob[]): number => {
+    if (subJobs.length === 0) return 0;
+    const done = subJobs.filter((s) => s.status === "done").length;
+    return Math.round((done / subJobs.length) * 100);
+};
 
 const WORKER_PERMISSION_NAME = "SITE WORKER";
 

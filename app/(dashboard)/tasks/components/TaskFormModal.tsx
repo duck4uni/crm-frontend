@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { JobFormData } from "../types";
+import { SubJobTimeline } from "./SubJobTimeline";
 
 type SelectOption = {
     value: string;
@@ -147,6 +148,14 @@ export function TaskFormModal({
                         </select>
                     </div>
                 )}
+
+                <div className="pt-2 border-t border-gray-100">
+                    <SubJobTimeline
+                        subJobs={formData.sub_jobs}
+                        onChange={(next) => onChange({ ...formData, sub_jobs: next })}
+                        userOptions={performerOptions}
+                    />
+                </div>
             </div>
         </Modal>
     );

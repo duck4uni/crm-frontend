@@ -20,7 +20,9 @@ import {
     buildCustomerLabel,
     getFormTimeFromApi,
     hasWorkerPermission,
+    loadSubJobsForJob,
     normalizeJobStatuses,
+    saveSubJobsForJob,
     toDateTimeLocal,
 } from "../utils/tasksHelpers";
 
@@ -161,6 +163,7 @@ export function useTasksPage() {
             performer_uuid: job.performer?.id ?? job.performer_uuid ?? "",
             customer_uuid: job.customer?.id ?? job.customer_uuid ?? "",
             status_id: job.status?.id ?? job.status_id ?? "",
+            sub_jobs: loadSubJobsForJob(job.id),
         });
         setIsFormOpen(true);
     }, []);
@@ -206,6 +209,7 @@ export function useTasksPage() {
                 const response = await jobsService.updateJob(editingJob.id, payload);
                 const updated = response.responseData;
                 setJobs((prev) => prev.map((j) => (j.id === editingJob.id ? { ...j, ...updated } : j)));
+                saveSubJobsForJob(editingJob.id, formData.sub_jobs);
                 toastRef.current.success("Cập nhật thành công", `Công việc "${formData.job_name}" đã được cập nhật.`);
             } else {
                 const payload: CreateJobPayload[] = [
@@ -220,6 +224,9 @@ export function useTasksPage() {
                 ];
                 const response = await jobsService.createJobs(payload);
                 const created = response.responseData ?? [];
+                if (created[0] && formData.sub_jobs.length > 0) {
+                    saveSubJobsForJob(created[0].id, formData.sub_jobs);
+                }
                 setJobs((prev) => [...created, ...prev]);
                 toastRef.current.success("Tạo thành công", `Công việc "${formData.job_name}" đã được tạo.`);
             }
@@ -236,6 +243,7 @@ export function useTasksPage() {
         try {
             await jobsService.deleteJob(job.id);
             setJobs((prev) => prev.filter((j) => j.id !== job.id));
+            saveSubJobsForJob(job.id, []);
             toastRef.current.success("Xóa thành công", `Công việc "${job.job_name}" đã bị xóa.`);
         } catch (error) {
             const msg = error instanceof Error ? error.message : "Không thể xóa công việc.";

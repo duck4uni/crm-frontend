@@ -10,6 +10,8 @@ export interface Campaign {
   status: CampaignStatus;
   sent: number;
   failed: number;
+  templateCode?: string;
+  templateName?: string;
 }
 
 export interface CampaignFormState {
@@ -18,6 +20,7 @@ export interface CampaignFormState {
   segment: string;
   scheduledAt: string;
   message: string;
+  templateCode: string;
 }
 
 export const statusVariant: Record<CampaignStatus, "default" | "info" | "warning" | "success"> = {
