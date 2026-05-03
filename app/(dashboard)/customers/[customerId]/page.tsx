@@ -7,6 +7,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { CustomerEditorForm } from "../components/forms/CustomerEditorForm";
 import { CustomerChatTab } from "./components/CustomerChatTab";
 import { CustomerDetailSection } from "./components/CustomerDetailSection";
+import { CustomerMediaTab } from "./components/CustomerMediaTab";
 import { CustomerWorkTab } from "./components/CustomerWorkTab";
 import { CustomerTab, useCustomerDetailPage } from "./hooks/useCustomerDetailPage";
 
@@ -89,6 +90,8 @@ export default function CustomerDetailPage() {
                                 assignerNameById={assignerNameById}
                             />
                         )}
+
+                        {activeTab === "media" && <CustomerMediaTab customerId={customer.id} />}
                     </div>
                 </CardContent>
             </Card>
