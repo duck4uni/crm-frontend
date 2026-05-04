@@ -32,6 +32,7 @@ export function ZaloOaView() {
         selectedOaName,
         selectedMessages,
         filteredConversations,
+        isLoadingConversations,
         handleAddConfig,
         handleAddConnection,
         openSettings,
@@ -57,6 +58,7 @@ export function ZaloOaView() {
                     setSelectedConvId(conversationId);
                     setActiveTab("tuong-tac");
                 }}
+                isLoadingConversations={isLoadingConversations}
             />
 
             <div className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 min-w-0">

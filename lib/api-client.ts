@@ -9,8 +9,7 @@ import {
   RefreshAccessTokenResponse,
 } from "@/types/api";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 const AUTH_REFRESH_ENDPOINT = "/api/v1.0/auth/genNewAccessToken";
 const AUTH_LOGIN_ENDPOINT = "/api/v1.0/auth/login";
 const AUTH_REGISTER_ENDPOINT = "/api/v1.0/auth/register";
@@ -94,7 +93,10 @@ class ApiClient {
       return;
     }
 
-    if (endpoint === AUTH_LOGIN_ENDPOINT || endpoint === AUTH_REGISTER_ENDPOINT) {
+    if (
+      endpoint === AUTH_LOGIN_ENDPOINT ||
+      endpoint === AUTH_REGISTER_ENDPOINT
+    ) {
       return;
     }
 
@@ -112,7 +114,10 @@ class ApiClient {
     try {
       const response = await fetch(url, {
         ...options,
-        headers: this.getRequestHeaders(options?.headers, accessToken || undefined),
+        headers: this.getRequestHeaders(
+          options?.headers,
+          accessToken || undefined,
+        ),
       });
 
       if (
@@ -197,7 +202,11 @@ class ApiClient {
     });
   }
 
-  async upload<T>(endpoint: string, file: File, fieldName = "file"): Promise<T> {
+  async upload<T>(
+    endpoint: string,
+    file: File,
+    fieldName = "file",
+  ): Promise<T> {
     const formData = new FormData();
     formData.append(fieldName, file);
     const accessToken = getAccessToken();
@@ -213,7 +222,9 @@ class ApiClient {
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        error.message || `HTTP error! status: ${response.status}`,
+      );
     }
     return await response.json();
   }

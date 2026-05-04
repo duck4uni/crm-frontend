@@ -89,7 +89,7 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
 
       setStep("exchanging");
       try {
-        const tokenResult = await exchangeAuthorizationCode(event.data.code);
+        const tokenResult = await exchangeAuthorizationCode(event.data.code, event.data.oaId);
         const connection = buildOaConnectionFromToken(tokenResult);
         console.log("[Zalo OA Modal] connection sau khi đổi token:", connection);
         setConnectedOa(connection);
