@@ -22,7 +22,7 @@ A modern, feature-rich CRM (Customer Relationship Management) system built with 
 - **Date Handling:** date-fns
 
 ## Project Structure
-
+ 
 ```
 crm-frontend/
 ├── app/                          # Next.js App Router
