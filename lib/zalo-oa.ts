@@ -336,13 +336,202 @@ export async function fetchMessages(
   console.log("[Zalo] conversation response:", json);
   if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
 
-  const messages: any[] = json.data?.messages ?? json.data?.items ?? [];
-  return messages.map((item) => ({
-    id: String(item.msg_id ?? item.message_id ?? ""),
-    conversationId: userId,
-    sender: item.src === 1 ? "agent" : "customer",
-    content: item.message ?? item.content ?? "",
-    // v2.0 uses `time`, v3.0 uses `send_time`
-    timestamp: formatZaloTimestamp(item.time ?? item.send_time ?? item.timestamp),
-  }));
+  const messages: { msg_id?: string | number; message_id?: string | number; src?: number; message?: string; content?: string; time?: number; send_time?: number; timestamp?: number; type?: string; url?: string; thumb?: string; file_name?: string }[] = json.data?.messages ?? json.data?.items ?? [];
+  return messages.map((item) => {
+    const id = String(item.msg_id ?? item.message_id ?? "");
+    const messageType: ZaloChatMessage["messageType"] =
+      item.type === "image" || item.type === "photo" ? "image"
+      : item.type === "file" ? "file"
+      : "text";
+    return {
+      id,
+      conversationId: userId,
+      sender: (item.src === 1 ? "agent" : "customer") as ZaloChatMessage["sender"],
+      content: item.message ?? item.content ?? "",
+      timestamp: formatZaloTimestamp(item.time ?? item.send_time ?? item.timestamp),
+      messageType,
+      sendStatus: "sent" as const,
+      zaloMessageId: id,
+      attachmentUrl: messageType !== "text" ? item.url || item.thumb : undefined,
+      attachmentName: messageType === "file" ? item.file_name : undefined,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Send Message helpers (theo Tai_lieu_gui_tin_nhan_Zalo_OA_API.docx)
+// ─────────────────────────────────────────────────────────────────────
+
+export class ZaloApiError extends Error {
+  code: string;
+  zaloErrorCode?: number;
+  zaloMessage?: string;
+
+  constructor(message: string, code: string, zaloErrorCode?: number, zaloMessage?: string) {
+    super(message);
+    this.name = "ZaloApiError";
+    this.code = code;
+    this.zaloErrorCode = zaloErrorCode;
+    this.zaloMessage = zaloMessage;
+  }
+}
+
+/** Map Zalo error code → mã lỗi nội bộ + message tiếng Việt theo §8.2 */
+function mapZaloError(zaloErrorCode: number | undefined, zaloMessage?: string): ZaloApiError {
+  switch (zaloErrorCode) {
+    case -212:
+      return new ZaloApiError(
+        "App chưa đăng ký quyền API. Vui lòng liên hệ admin để cấp quyền.",
+        "ZALO_APP_NOT_REGISTERED_API",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    case -224:
+      return new ZaloApiError(
+        "OA chưa đủ gói để gửi loại tin này.",
+        "OA_PACKAGE_NOT_ELIGIBLE",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    case -213:
+    case -216:
+      return new ZaloApiError(
+        "Khách hàng không đủ điều kiện nhận tin tư vấn (đã quá 48h chưa tương tác).",
+        "USER_NOT_ELIGIBLE",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    case -32: // token expired
+      return new ZaloApiError(
+        "Access token đã hết hạn, vui lòng kết nối lại OA.",
+        "TOKEN_EXPIRED",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    default:
+      return new ZaloApiError(
+        zaloMessage || "Gửi tin thất bại.",
+        "ZALO_API_ERROR",
+        zaloErrorCode,
+        zaloMessage,
+      );
+  }
+}
+
+interface SendMessageResult {
+  msgId: string;
+  sentAt: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+}
+
+async function postZaloApi(url: string, accessToken: string, body: object): Promise<SendMessageResult> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-oa-access-token": accessToken,
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  console.log(`[Zalo Send] ${url} response:`, json);
+
+  if (!res.ok || !json.success) {
+    const err = json.error || {};
+    throw mapZaloError(err.zaloErrorCode, err.message || err.zaloMessage);
+  }
+
+  return {
+    msgId: json.data?.message_id || json.data?.msg_id || "",
+    sentAt: json.data?.sentAt || new Date().toISOString(),
+    attachmentUrl: json.data?.attachmentUrl,
+    attachmentName: json.data?.attachmentName,
+  };
+}
+
+async function postMultipartZaloApi(
+  url: string,
+  accessToken: string,
+  formData: FormData,
+): Promise<SendMessageResult> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "x-oa-access-token": accessToken,
+    },
+    body: formData,
+  });
+  const json = await res.json();
+  console.log(`[Zalo Send Multipart] ${url} response:`, json);
+
+  if (!res.ok || !json.success) {
+    const err = json.error || {};
+    throw mapZaloError(err.zaloErrorCode, err.message || err.zaloMessage);
+  }
+
+  return {
+    msgId: json.data?.message_id || json.data?.msg_id || "",
+    sentAt: json.data?.sentAt || new Date().toISOString(),
+    attachmentUrl: json.data?.attachmentUrl,
+    attachmentName: json.data?.attachmentName,
+  };
+}
+
+export interface SendTextParams {
+  accessToken: string;
+  userId: string;
+  text: string;
+}
+
+export async function sendTextMessage(params: SendTextParams): Promise<SendMessageResult> {
+  return postZaloApi("/api/zalo/messages/text", params.accessToken, {
+    userId: params.userId,
+    text: params.text,
+  });
+}
+
+export interface SendImageParams {
+  accessToken: string;
+  userId: string;
+  file: File;
+  text?: string;
+}
+
+export async function sendImageMessage(params: SendImageParams): Promise<SendMessageResult> {
+  const fd = new FormData();
+  fd.append("file", params.file);
+  fd.append("userId", params.userId);
+  if (params.text) fd.append("text", params.text);
+  return postMultipartZaloApi("/api/zalo/messages/image", params.accessToken, fd);
+}
+
+export interface SendFileParams {
+  accessToken: string;
+  userId: string;
+  file: File;
+  text?: string;
+}
+
+export async function sendFileMessage(params: SendFileParams): Promise<SendMessageResult> {
+  const fd = new FormData();
+  fd.append("file", params.file);
+  fd.append("userId", params.userId);
+  if (params.text) fd.append("text", params.text);
+  return postMultipartZaloApi("/api/zalo/messages/file", params.accessToken, fd);
+}
+
+export interface SendQuoteParams {
+  accessToken: string;
+  userId: string;
+  text: string;
+  quoteMessageId: string;
+}
+
+export async function sendQuoteMessage(params: SendQuoteParams): Promise<SendMessageResult> {
+  return postZaloApi("/api/zalo/messages/quote", params.accessToken, {
+    userId: params.userId,
+    text: params.text,
+    quoteMessageId: params.quoteMessageId,
+  });
 }

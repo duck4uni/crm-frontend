@@ -42,7 +42,13 @@ export function ZaloOaView() {
         setCustomDays,
         openSettings,
         openConfigForm,
-        handleSendMockMessage,
+        handleSendText,
+        handleSendImage,
+        handleSendFile,
+        handleRetryMessage,
+        replyingTo,
+        handleStartQuote,
+        handleCancelQuote,
     } = useZaloOaPage();
 
     return (
@@ -78,7 +84,13 @@ export function ZaloOaView() {
                         selectedMessages={selectedMessages}
                         chatComposerValue={chatComposerValue}
                         onChatComposerValueChange={setChatComposerValue}
-                        onSendMessage={handleSendMockMessage}
+                        onSendText={handleSendText}
+                        onSendImage={handleSendImage}
+                        onSendFile={handleSendFile}
+                        onRetryMessage={handleRetryMessage}
+                        replyingTo={replyingTo}
+                        onStartQuote={handleStartQuote}
+                        onCancelQuote={handleCancelQuote}
                     />
                 ) : (
                     <ZaloAutoConfigPanel

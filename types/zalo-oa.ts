@@ -82,12 +82,31 @@ export interface ZaloConversation {
 
 export type ZaloChatSender = "customer" | "agent" | "system";
 
+export type ZaloMessageType = "text" | "image" | "file" | "quote";
+
+export type ZaloSendStatus = "pending" | "sent" | "failed";
+
+export interface ZaloQuotePreview {
+  sender: ZaloChatSender;
+  content: string;
+  messageType?: ZaloMessageType;
+}
+
 export interface ZaloChatMessage {
   id: string;
   conversationId: string;
   sender: ZaloChatSender;
   content: string;
   timestamp: string;
+  messageType?: ZaloMessageType;
+  sendStatus?: ZaloSendStatus;
+  errorMessage?: string;
+  zaloMessageId?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentSize?: number;
+  quoteMessageId?: string;
+  quotePreview?: ZaloQuotePreview;
 }
 
 export interface AutoConfig {
