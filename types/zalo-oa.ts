@@ -11,6 +11,7 @@ export interface OaConnection {
   lastSyncAt: string;
   status?: OaConnectionStatus;
   tokenExpiredAt?: string;
+  accessToken?: string;
 }
 
 export type OaConnectStep =

@@ -1,5 +1,7 @@
 import type {
   OaConnection,
+  ZaloChatMessage,
+  ZaloConversation,
   ZbsSendByPhoneRequest,
   ZbsSendByPhoneResult,
   ZbsTemplate,
@@ -47,44 +49,55 @@ export const DEV_CAPTURED_OAUTH = {
   capturedAt: "2026-05-02",
 } as const;
 
-// Simulates calling backend `/api/zalo/oauth/callback` which exchanges
-// authorization_code for OA access_token + refresh_token and returns OA info.
-// Replace with a real fetch when backend is ready.
-export async function exchangeAuthorizationCode(authCode: string): Promise<ExchangeOaTokenResult> {
+export async function exchangeAuthorizationCode(
+  authCode: string,
+  oaId?: string,
+): Promise<ExchangeOaTokenResult> {
   console.group("[Zalo OA] exchangeAuthorizationCode");
   console.log("authorization_code:", authCode);
 
-  await new Promise((resolve) => setTimeout(resolve, 800));
-
   if (!authCode) {
-    console.warn("authCode rỗng — throw error");
+    console.warn("authCode rỗng");
     console.groupEnd();
     throw new Error("Authorization code rỗng.");
   }
 
-  // Nếu đang dùng captured code (test local) thì trả về OA thật đã capture
-  const useCaptured = authCode === DEV_CAPTURED_OAUTH.authorizationCode;
-  const oaId = useCaptured ? DEV_CAPTURED_OAUTH.oaId : Date.now().toString().slice(-12);
-  const oaName = useCaptured ? DEV_CAPTURED_OAUTH.oaName : `OA mới ${oaId.slice(-4)}`;
+  // Dev mock path: dùng captured code để test local không cần popup Zalo
+  if (authCode === DEV_CAPTURED_OAUTH.authorizationCode) {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const devToken = process.env.NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN || "";
+    const expiresIn = 90000;
+    const result: ExchangeOaTokenResult = {
+      oaId: DEV_CAPTURED_OAUTH.oaId,
+      oaName: DEV_CAPTURED_OAUTH.oaName,
+      accessToken: devToken || `mock_access_${DEV_CAPTURED_OAUTH.oaId}`,
+      refreshToken: `mock_refresh_${DEV_CAPTURED_OAUTH.oaId}`,
+      expiresIn,
+      tokenExpiredAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      status: "connected",
+    };
+    console.log("token result (dev mock):", result);
+    console.groupEnd();
+    return result;
+  }
 
-  const expiresIn = 90000;
-  const tokenExpiredAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+  // Real OAuth path: exchange code → access_token via server-side route
+  console.log("real OAuth — calling /api/zalo/oauth/callback ...");
+  const res = await fetch("/api/zalo/oauth/callback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: authCode, oaId }),
+  });
 
-  const result: ExchangeOaTokenResult = {
-    oaId,
-    oaName,
-    accessToken: `mock_access_${oaId}`,
-    refreshToken: `mock_refresh_${oaId}`,
-    expiresIn,
-    tokenExpiredAt,
-    status: "connected",
-  };
-
-  console.log("token result (mock):", result);
-  console.log("👉 Khi backend sẵn, thay hàm này bằng fetch POST /api/zalo/oauth/callback với { code: authCode }");
+  const data = await res.json();
+  console.log("token exchange result:", data);
   console.groupEnd();
 
-  return result;
+  if (!res.ok) {
+    throw new Error(data.error || "Token exchange thất bại.");
+  }
+
+  return data as ExchangeOaTokenResult;
 }
 
 // Simulates GET /api/zalo/templates?oaId={oaId}
@@ -209,5 +222,79 @@ export function buildOaConnectionFromToken(result: ExchangeOaTokenResult): OaCon
     lastSyncAt: new Date().toLocaleString("vi-VN", { hour12: false }),
     status: result.status,
     tokenExpiredAt: result.tokenExpiredAt,
+    accessToken: result.accessToken,
   };
+}
+
+function formatZaloTimestamp(ms?: number): string {
+  if (!ms) return "";
+  const d = new Date(ms);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  if (isToday) return time;
+  const day = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  return `${day} ${time}`;
+}
+
+export async function fetchConversations(
+  accessToken: string,
+  oaInternalId: string,
+  offset = 0,
+  count = 15,
+): Promise<ZaloConversation[]> {
+  const data = JSON.stringify({
+    offset,
+    count,
+    last_interaction_period: "WITHIN_7_DAYS",
+    is_follower: "true",
+  });
+  const res = await fetch(`/api/zalo/conversations?data=${encodeURIComponent(data)}`, {
+    headers: { "x-oa-access-token": accessToken },
+  });
+  if (!res.ok) throw new Error(`Conversations fetch failed: ${res.status}`);
+  const json = await res.json();
+  console.log("[Zalo] user/getlist response:", json);
+  if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
+
+  // v3.0 user/getlist: data.users[]
+  const users: any[] = json.data?.users ?? [];
+  return users.map((item) => ({
+    id: String(item.user_id ?? ""),
+    oaId: oaInternalId,
+    name: item.display_name || `Zalo-${item.user_id ?? ""}`,
+    avatar: item.avatar || undefined,
+    customerPhone: undefined,
+    lastMessage: "",
+    timestamp: item.last_interaction_date ?? "",
+    unreadCount: 0,
+  }));
+}
+
+export async function fetchMessages(
+  accessToken: string,
+  // In v2.0 this is the follower's uid (user_id), stored as conversation id
+  userId: string,
+  offset = 0,
+  count = 20,
+): Promise<ZaloChatMessage[]> {
+  // v2.0 takes `user_id`, not `conversation_id`
+  const data = JSON.stringify({ user_id: userId, offset, count });
+  const res = await fetch(`/api/zalo/messages?data=${encodeURIComponent(data)}`, {
+    headers: { "x-oa-access-token": accessToken },
+  });
+  if (!res.ok) throw new Error(`Messages fetch failed: ${res.status}`);
+  const json = await res.json();
+  console.log("[Zalo] conversation response:", json);
+  if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
+
+  const messages: any[] = json.data?.messages ?? json.data?.items ?? [];
+  return messages.map((item) => ({
+    id: String(item.msg_id ?? item.message_id ?? ""),
+    conversationId: userId,
+    sender: item.src === 1 ? "agent" : "customer",
+    content: item.message ?? item.content ?? "",
+    // v2.0 uses `time`, v3.0 uses `send_time`
+    timestamp: formatZaloTimestamp(item.time ?? item.send_time ?? item.timestamp),
+  }));
 }

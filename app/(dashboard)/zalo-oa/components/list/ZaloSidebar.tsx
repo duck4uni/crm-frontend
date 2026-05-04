@@ -18,6 +18,7 @@ interface ZaloSidebarProps {
     filteredConversations: ZaloConversation[];
     selectedConvId: string | null;
     onSelectConversation: (conversationId: string) => void;
+    isLoadingConversations?: boolean;
 }
 
 export function ZaloSidebar({
@@ -33,6 +34,7 @@ export function ZaloSidebar({
     filteredConversations,
     selectedConvId,
     onSelectConversation,
+    isLoadingConversations = false,
 }: ZaloSidebarProps) {
     return (
         <div className="w-[320px] flex-shrink-0 flex flex-col bg-white border-r border-gray-200">
@@ -103,16 +105,25 @@ export function ZaloSidebar({
             </div>
 
             <div className="flex-1 overflow-y-auto min-h-0">
-                {filteredConversations.map((conv) => (
-                    <ConversationRow
-                        key={conv.id}
-                        conv={conv}
-                        isActive={selectedConvId === conv.id && activeTab === "tuong-tac"}
-                        onClick={() => onSelectConversation(conv.id)}
-                    />
-                ))}
-                {filteredConversations.length === 0 && (
-                    <p className="text-center text-sm text-gray-400 py-10">Không tìm thấy</p>
+                {isLoadingConversations ? (
+                    <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-primary-500" />
+                        Đang tải hội thoại...
+                    </div>
+                ) : (
+                    <>
+                        {filteredConversations.map((conv) => (
+                            <ConversationRow
+                                key={conv.id}
+                                conv={conv}
+                                isActive={selectedConvId === conv.id && activeTab === "tuong-tac"}
+                                onClick={() => onSelectConversation(conv.id)}
+                            />
+                        ))}
+                        {filteredConversations.length === 0 && (
+                            <p className="text-center text-sm text-gray-400 py-10">Không tìm thấy</p>
+                        )}
+                    </>
                 )}
             </div>
         </div>
