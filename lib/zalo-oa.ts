@@ -237,16 +237,38 @@ function formatZaloTimestamp(ms?: number): string {
   return `${day} ${time}`;
 }
 
+interface ZaloUserDetail {
+  display_name?: string;
+  avatar?: string;
+  shared_info?: { phone?: string; name?: string };
+  tags_and_notes_info?: { tag_names?: string[] };
+}
+
+async function fetchUserDetail(accessToken: string, userId: string): Promise<ZaloUserDetail> {
+  try {
+    const res = await fetch(`/api/zalo/user/detail?user_id=${encodeURIComponent(userId)}`, {
+      headers: { "x-oa-access-token": accessToken },
+    });
+    if (!res.ok) return {};
+    const json = await res.json();
+    if (json.error !== 0) return {};
+    return json.data as ZaloUserDetail;
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchConversations(
   accessToken: string,
   oaInternalId: string,
   offset = 0,
   count = 15,
+  period = "L30D",
 ): Promise<ZaloConversation[]> {
   const data = JSON.stringify({
     offset,
     count,
-    last_interaction_period: "WITHIN_7_DAYS",
+    last_interaction_period: period,
     is_follower: "true",
   });
   const res = await fetch(`/api/zalo/conversations?data=${encodeURIComponent(data)}`, {
@@ -257,18 +279,29 @@ export async function fetchConversations(
   console.log("[Zalo] user/getlist response:", json);
   if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
 
-  // v3.0 user/getlist: data.users[]
   const users: any[] = json.data?.users ?? [];
-  return users.map((item) => ({
-    id: String(item.user_id ?? ""),
-    oaId: oaInternalId,
-    name: item.display_name || `Zalo-${item.user_id ?? ""}`,
-    avatar: item.avatar || undefined,
-    customerPhone: undefined,
-    lastMessage: "",
-    timestamp: item.last_interaction_date ?? "",
-    unreadCount: 0,
-  }));
+  if (users.length === 0) return [];
+
+  // Fetch detail for each user in parallel; failures fall back to empty detail
+  const details = await Promise.allSettled(
+    users.map((u) => fetchUserDetail(accessToken, String(u.user_id ?? ""))),
+  );
+
+  return users.map((item, i) => {
+    const detail = details[i].status === "fulfilled" ? details[i].value : {};
+    const userId = String(item.user_id ?? "");
+    return {
+      id: userId,
+      oaId: oaInternalId,
+      name: detail.display_name || `Zalo-${userId}`,
+      avatar: detail.avatar || undefined,
+      customerPhone: detail.shared_info?.phone,
+      tags: detail.tags_and_notes_info?.tag_names ?? [],
+      lastMessage: "",
+      timestamp: "",
+      unreadCount: 0,
+    };
+  });
 }
 
 export async function fetchMessages(

@@ -9,6 +9,18 @@ import type {
 } from "@/types/zalo-oa";
 
 export type ActiveTab = "tuong-tac" | "cau-hinh";
+export type PeriodPreset = "TODAY" | "YESTERDAY" | "L7D" | "L30D" | "CUSTOM";
+
+const fmtDate = (d: Date) =>
+    `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, "0")}_${String(d.getDate()).padStart(2, "0")}`;
+
+function buildZaloPeriod(preset: PeriodPreset, customDays: number): string {
+    if (preset !== "CUSTOM") return preset;
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - customDays);
+    return `${fmtDate(from)}:${fmtDate(today)}`;
+}
 
 const initialConfigForm: AutoConfigFormState = {
     oaId: "",
@@ -89,6 +101,9 @@ export function useZaloOaPage() {
     const [connections, setConnections] = useState<OaConnection[]>([]);
     const [autoConfigs, setAutoConfigs] = useState<AutoConfig[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+    const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("L30D");
+    const [customDays, setCustomDays] = useState(90);
+    const zaloPeriod = useMemo(() => buildZaloPeriod(periodPreset, customDays), [periodPreset, customDays]);
 
     useEffect(() => {
         setConnections(loadConnectionsFromStorage());
@@ -108,7 +123,7 @@ export function useZaloOaPage() {
 
         Promise.all(
             activeOas.map((oa) =>
-                fetchConversations(oa.accessToken!, oa.id).catch((err) => {
+                fetchConversations(oa.accessToken!, oa.id, 0, 15, zaloPeriod).catch((err) => {
                     console.error(`[Zalo] fetch conversations for OA ${oa.oaName}:`, err);
                     return [] as ZaloConversation[];
                 }),
@@ -123,7 +138,7 @@ export function useZaloOaPage() {
         return () => {
             cancelled = true;
         };
-    }, [connections]);
+    }, [connections, zaloPeriod]);
 
     const [configForm, setConfigForm] = useState<AutoConfigFormState>(initialConfigForm);
     const [selectedOaFilter, setSelectedOaFilter] = useState("all");
@@ -237,6 +252,10 @@ export function useZaloOaPage() {
         });
     };
 
+    const handleRemoveConnection = (id: string) => {
+        setConnections((prev) => prev.filter((c) => c.id !== id));
+    };
+
     const openConfigForm = () => {
         setSettingsOpen(false);
         setConfigFormOpen(true);
@@ -305,6 +324,11 @@ export function useZaloOaPage() {
         isLoadingConversations,
         handleAddConfig,
         handleAddConnection,
+        handleRemoveConnection,
+        periodPreset,
+        setPeriodPreset,
+        customDays,
+        setCustomDays,
         openSettings,
         openConfigForm,
         handleSendMockMessage,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useZaloOaPage } from "../../hooks/useZaloOaPage";
+import { useZaloOaPage, type PeriodPreset } from "../../hooks/useZaloOaPage";
 import { ZaloAutoConfigPanel } from "./ZaloAutoConfigPanel";
 import { ZaloConfigFormDrawer } from "./ZaloConfigFormDrawer";
 import { ZaloInteractionPanel } from "./ZaloInteractionPanel";
@@ -35,6 +35,11 @@ export function ZaloOaView() {
         isLoadingConversations,
         handleAddConfig,
         handleAddConnection,
+        handleRemoveConnection,
+        periodPreset,
+        setPeriodPreset,
+        customDays,
+        setCustomDays,
         openSettings,
         openConfigForm,
         handleSendMockMessage,
@@ -59,6 +64,10 @@ export function ZaloOaView() {
                     setActiveTab("tuong-tac");
                 }}
                 isLoadingConversations={isLoadingConversations}
+                periodPreset={periodPreset}
+                onPeriodPresetChange={(p: PeriodPreset) => setPeriodPreset(p)}
+                customDays={customDays}
+                onCustomDaysChange={setCustomDays}
             />
 
             <div className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 min-w-0">
@@ -86,6 +95,7 @@ export function ZaloOaView() {
                     onClose={() => setSettingsOpen(false)}
                     connections={connections}
                     onAddConnection={handleAddConnection}
+                    onRemoveConnection={handleRemoveConnection}
                 />
 
                 <ZaloConfigFormDrawer

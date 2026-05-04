@@ -40,6 +40,18 @@ export function ConversationRow({ conv, isActive, onClick }: ConversationRowProp
                     </p>
                     <span className="text-[10px] text-gray-400 flex-shrink-0 mt-0.5">{conv.timestamp}</span>
                 </div>
+                {conv.tags && conv.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                        {conv.tags.map((tag) => (
+                            <span
+                                key={tag}
+                                className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-medium leading-none"
+                            >
+                                {tag}
+                            </span>
+                        ))}
+                    </div>
+                )}
                 {conv.lastMessage && (
                     <p className="text-xs text-gray-500 truncate mt-0.5">{conv.lastMessage}</p>
                 )}

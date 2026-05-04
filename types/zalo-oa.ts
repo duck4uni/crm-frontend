@@ -74,6 +74,7 @@ export interface ZaloConversation {
   name: string;
   avatar?: string;
   customerPhone?: string;
+  tags?: string[];
   lastMessage: string;
   timestamp: string;
   unreadCount: number;

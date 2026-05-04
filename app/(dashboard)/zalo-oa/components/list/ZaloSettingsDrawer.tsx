@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FiChevronRight, FiLink } from "react-icons/fi";
+import { FiChevronRight, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import type { OaConnection } from "@/types/zalo-oa";
 import { ZaloOaAddModal } from "../forms/ZaloOaAddModal";
 
@@ -10,9 +10,10 @@ interface ZaloSettingsDrawerProps {
     onClose: () => void;
     connections: OaConnection[];
     onAddConnection: (connection: OaConnection) => void;
+    onRemoveConnection: (id: string) => void;
 }
 
-export function ZaloSettingsDrawer({ settingsOpen, onClose, connections, onAddConnection }: ZaloSettingsDrawerProps) {
+export function ZaloSettingsDrawer({ settingsOpen, onClose, connections, onAddConnection, onRemoveConnection }: ZaloSettingsDrawerProps) {
     const [modalOpen, setModalOpen] = useState(false);
 
     return (
@@ -50,15 +51,22 @@ export function ZaloSettingsDrawer({ settingsOpen, onClose, connections, onAddCo
                             <p className="flex-1 text-sm text-gray-800 truncate min-w-0">
                                 {conn.oaName} - {conn.oaOfficialId}
                             </p>
-                            <button
-                                className={`flex-shrink-0 p-1.5 rounded-md transition-colors ${conn.isActive
-                                        ? "text-primary-600 hover:bg-primary-50"
-                                        : "text-gray-400 hover:bg-gray-100"
-                                    }`}
-                                title={conn.isActive ? "Đã kết nối" : "Chưa kết nối"}
-                            >
-                                <FiLink className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                    onClick={() => setModalOpen(true)}
+                                    className="p-1.5 rounded-md text-primary-600 hover:bg-primary-50 transition-colors"
+                                    title="Kết nối lại"
+                                >
+                                    <FiRefreshCw className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => onRemoveConnection(conn.id)}
+                                    className="p-1.5 rounded-md text-red-500 hover:bg-red-50 transition-colors"
+                                    title="Xoá kết nối"
+                                >
+                                    <FiTrash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -69,6 +77,7 @@ export function ZaloSettingsDrawer({ settingsOpen, onClose, connections, onAddCo
                 onClose={() => setModalOpen(false)}
                 onConnected={(connection) => {
                     onAddConnection(connection);
+                    setModalOpen(false);
                 }}
             />
         </>
