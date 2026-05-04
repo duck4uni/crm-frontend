@@ -18,6 +18,7 @@ import type {
 import {
   buildOaConnectionFromToken,
   buildZaloOAuthUrl,
+  DEV_CAPTURED_OAUTH,
   exchangeAuthorizationCode,
   fetchOaTemplates,
   getZaloAppId,
@@ -136,10 +137,16 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
   const handleMockOAuth = async () => {
     setErrorMsg("");
     setStep("exchanging");
-    const fakeCode = `dev_mock_code_${Date.now()}`;
-    console.log("[Zalo OA Modal] DEV MOCK: bypass popup, dùng code giả:", fakeCode);
+    const capturedCode = DEV_CAPTURED_OAUTH.authorizationCode;
+    console.log(
+      "[Zalo OA Modal] DEV MOCK: bypass popup, dùng captured code (OA thật:",
+      DEV_CAPTURED_OAUTH.oaName,
+      "/",
+      DEV_CAPTURED_OAUTH.oaId,
+      ")",
+    );
     try {
-      const tokenResult = await exchangeAuthorizationCode(fakeCode);
+      const tokenResult = await exchangeAuthorizationCode(capturedCode);
       const connection = buildOaConnectionFromToken(tokenResult);
       setConnectedOa(connection);
       setStep("success");

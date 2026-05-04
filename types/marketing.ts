@@ -12,6 +12,7 @@ export interface Campaign {
   failed: number;
   templateCode?: string;
   templateName?: string;
+  recipientsCount?: number;
 }
 
 export interface CampaignFormState {

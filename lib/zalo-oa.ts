@@ -30,6 +30,23 @@ export interface ExchangeOaTokenResult {
   status: "connected";
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// DEV FIXTURE: payload thật captured từ Zalo OAuth (môi trường Vercel)
+// Dùng để mock ở local cho ra OA giống prod, tiện test luồng template/gửi tin.
+// LƯU Ý: authorization_code thật của Zalo chỉ sống ~5 phút và chỉ dùng được 1 lần.
+// Mã dưới đây CHỈ để tham chiếu, KHÔNG còn đổi được token thật nữa.
+// ─────────────────────────────────────────────────────────────────────
+export const DEV_CAPTURED_OAUTH = {
+  authorizationCode:
+    "4_2A0n8Gyq9vyxb3A1NM3XVaidnA6E1pME33JdqIX5zDnUma52Ec87-oycrMUQuI38Rm6nf5gXCteC4ACNUiS6sHuN8qOB4tAvRySafeeNr4b8zBHtBzV7Ibb54vPlKiDyt314HKWNS5gyjXSWo_032fXpb_6_vA8kUoGMCM_HfAsgjyNIFrQrsidnuS6uDYVxQpL3rH_5DoivKtHG2m9J22bZSm8ELPUDBf9HfVtqvNpiiCMNBnPtU-gmyuC-5a7QwQ1r4EkBvYwE3SVTgSAHWvzrqozTeANGwG8Np0ZWHIKibTXRVksHqCikTytJPA6j1R37KV46CLXYaZ70P7RaEvE7a48cm6JADY0WHuIc0vadG0MIPU0f8jEYp16W",
+  oaId: "1298383097840805544",
+  oaName: "Công nghệ MeU Solutions Official",
+  state: "oa_1777714810253",
+  appId: "3349983058126902532",
+  redirectUri: "https://crm-frontend-nine-mu.vercel.app/zalo-oa/callback",
+  capturedAt: "2026-05-02",
+} as const;
+
 // Simulates calling backend `/api/zalo/oauth/callback` which exchanges
 // authorization_code for OA access_token + refresh_token and returns OA info.
 // Replace with a real fetch when backend is ready.
@@ -45,15 +62,19 @@ export async function exchangeAuthorizationCode(authCode: string): Promise<Excha
     throw new Error("Authorization code rỗng.");
   }
 
+  // Nếu đang dùng captured code (test local) thì trả về OA thật đã capture
+  const useCaptured = authCode === DEV_CAPTURED_OAUTH.authorizationCode;
+  const oaId = useCaptured ? DEV_CAPTURED_OAUTH.oaId : Date.now().toString().slice(-12);
+  const oaName = useCaptured ? DEV_CAPTURED_OAUTH.oaName : `OA mới ${oaId.slice(-4)}`;
+
   const expiresIn = 90000;
   const tokenExpiredAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-  const stamp = Date.now().toString().slice(-12);
 
   const result: ExchangeOaTokenResult = {
-    oaId: stamp,
-    oaName: `OA mới ${stamp.slice(-4)}`,
-    accessToken: `mock_access_${stamp}`,
-    refreshToken: `mock_refresh_${stamp}`,
+    oaId,
+    oaName,
+    accessToken: `mock_access_${oaId}`,
+    refreshToken: `mock_refresh_${oaId}`,
     expiresIn,
     tokenExpiredAt,
     status: "connected",

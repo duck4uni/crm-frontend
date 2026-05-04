@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiTrash2, FiPlay, FiToggleLeft } from "react-icons/fi";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { initialRules } from "@/mock-data/automation";
-import { initialConnections, mockConversations } from "@/mock-data/zalo-oa";
 import {
   actionOptions,
   AutomationFormState,
@@ -15,9 +13,24 @@ import {
   segmentOptions,
   triggerOptions,
 } from "@/types/automation";
+import type { OaConnection } from "@/types/zalo-oa";
+
+const CONNECTIONS_STORAGE_KEY = "crm.zaloOa.connections.v1";
+
+const loadStoredConnections = (): OaConnection[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(CONNECTIONS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as OaConnection[]) : [];
+  } catch {
+    return [];
+  }
+};
 
 const initialFormState: AutomationFormState = {
-  oaId: initialConnections[0]?.id || "",
+  oaId: "",
   name: "",
   trigger: triggerOptions[0].value,
   action: actionOptions[0].value,
@@ -26,8 +39,17 @@ const initialFormState: AutomationFormState = {
 };
 
 export function AutomationSection() {
-  const [rules, setRules] = useState<AutomationRule[]>(initialRules);
+  const [rules, setRules] = useState<AutomationRule[]>([]);
   const [form, setForm] = useState<AutomationFormState>(initialFormState);
+  const [connections, setConnections] = useState<OaConnection[]>([]);
+
+  useEffect(() => {
+    const stored = loadStoredConnections();
+    setConnections(stored);
+    if (stored[0]) {
+      setForm((prev) => ({ ...prev, oaId: prev.oaId || stored[0].id }));
+    }
+  }, []);
 
   const activeRules = useMemo(() => rules.filter((item) => item.isActive).length, [rules]);
 
@@ -39,7 +61,7 @@ export function AutomationSection() {
 
     const newRule: AutomationRule = {
       id: `rule-${Date.now()}`,
-      oaId: form.oaId || initialConnections[0]?.id,
+      oaId: form.oaId || connections[0]?.id,
       name,
       trigger: form.trigger,
       action: form.action,
@@ -84,26 +106,17 @@ export function AutomationSection() {
   };
 
   const oaOptions = useMemo(
-    () => initialConnections.map((connection) => ({ value: connection.id, label: connection.oaName })),
-    [],
+    () => connections.map((connection) => ({ value: connection.id, label: connection.oaName })),
+    [connections],
   );
 
   const oaNameById = useMemo(
     () =>
-      initialConnections.reduce<Record<string, string>>((acc, connection) => {
+      connections.reduce<Record<string, string>>((acc, connection) => {
         acc[connection.id] = connection.oaName;
         return acc;
       }, {}),
-    [],
-  );
-
-  const conversationsByOa = useMemo(
-    () =>
-      mockConversations.reduce<Record<string, number>>((acc, conversation) => {
-        acc[conversation.oaId] = (acc[conversation.oaId] || 0) + 1;
-        return acc;
-      }, {}),
-    [],
+    [connections],
   );
 
   return (
@@ -205,7 +218,6 @@ export function AutomationSection() {
                 <th className="px-3 py-2 font-medium text-gray-600">OA</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Trigger</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Action</th>
-                <th className="px-3 py-2 font-medium text-gray-600">Hội thoại</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Lần cuối chạy</th>
                 <th className="px-3 py-2 font-medium text-gray-600 w-20">Thao tác</th>
               </tr>
@@ -218,7 +230,6 @@ export function AutomationSection() {
                   <td className="px-3 py-2 text-gray-600">{oaNameById[rule.oaId || ""] || "N/A"}</td>
                   <td className="px-3 py-2 text-gray-600">{rule.trigger}</td>
                   <td className="px-3 py-2 text-gray-600">{rule.action}</td>
-                  <td className="px-3 py-2 text-gray-600">{conversationsByOa[rule.oaId || ""] || 0}</td>
                   <td className="px-3 py-2 text-gray-600">{rule.lastRun}</td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
@@ -252,7 +263,7 @@ export function AutomationSection() {
               ))}
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-gray-400">
+                  <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
                     Chưa có workflow nào
                   </td>
                 </tr>

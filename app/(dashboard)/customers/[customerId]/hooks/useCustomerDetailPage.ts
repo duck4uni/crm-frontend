@@ -23,7 +23,7 @@ import {
     resolveAssignedUsers,
 } from "../utils/customerDetailMappers";
 
-export type CustomerTab = "detail" | "chat" | "work";
+export type CustomerTab = "detail" | "chat" | "work" | "media";
 
 export function useCustomerDetailPage() {
     const params = useParams<{ customerId: string }>();
@@ -35,7 +35,7 @@ export function useCustomerDetailPage() {
     const customerId = params.customerId;
     const initialTab = (searchParams.get("tab") as CustomerTab) || "detail";
     const [activeTab, setActiveTab] = useState<CustomerTab>(
-        ["detail", "chat", "work"].includes(initialTab) ? initialTab : "detail",
+        ["detail", "chat", "work", "media"].includes(initialTab) ? initialTab : "detail",
     );
     const [isEditing, setIsEditing] = useState(searchParams.get("mode") === "edit");
 
@@ -221,6 +221,7 @@ export function useCustomerDetailPage() {
             { id: "detail", label: "Chi tiết khách" },
             { id: "chat", label: "Lịch sử chat" },
             { id: "work", label: "Lịch sử chăm sóc" },
+            { id: "media", label: "Tư liệu & ghi chú" },
         ],
         [],
     );
