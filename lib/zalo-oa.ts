@@ -261,35 +261,50 @@ async function fetchUserDetail(accessToken: string, userId: string): Promise<Zal
 export async function fetchConversations(
   accessToken: string,
   oaInternalId: string,
-  offset = 0,
-  count = 15,
   period = "L30D",
 ): Promise<ZaloConversation[]> {
-  const data = JSON.stringify({
-    offset,
-    count,
-    last_interaction_period: period,
-    is_follower: "true",
-  });
-  const res = await fetch(`/api/zalo/conversations?data=${encodeURIComponent(data)}`, {
-    headers: { "x-oa-access-token": accessToken },
-  });
-  if (!res.ok) throw new Error(`Conversations fetch failed: ${res.status}`);
-  const json = await res.json();
-  console.log("[Zalo] user/getlist response:", json);
-  if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
+  const PAGE_SIZE = 50;
+  const allUsers: { user_id: string }[] = [];
+  let offset = 0;
+  let total = Infinity;
 
-  const users: any[] = json.data?.users ?? [];
-  if (users.length === 0) return [];
+  while (offset < total) {
+    const data = JSON.stringify({
+      offset,
+      count: PAGE_SIZE,
+      last_interaction_period: period,
+      is_follower: "true",
+    });
+    const res = await fetch(`/api/zalo/conversations?data=${encodeURIComponent(data)}`, {
+      headers: { "x-oa-access-token": accessToken },
+    });
+    if (!res.ok) throw new Error(`Conversations fetch failed: ${res.status}`);
+    const json = await res.json();
+    if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
 
-  // Fetch detail for each user in parallel; failures fall back to empty detail
-  const details = await Promise.allSettled(
-    users.map((u) => fetchUserDetail(accessToken, String(u.user_id ?? ""))),
-  );
+    const page: { user_id: string }[] = json.data?.users ?? [];
+    total = json.data?.total ?? 0;
+    allUsers.push(...page);
+    offset += page.length;
 
-  return users.map((item, i) => {
-    const detail = details[i].status === "fulfilled" ? details[i].value : {};
-    const userId = String(item.user_id ?? "");
+    if (page.length === 0) break;
+  }
+
+  if (allUsers.length === 0) return [];
+
+  // Fetch detail in batches of 10 to avoid overwhelming the API
+  const BATCH = 10;
+  const details: ZaloUserDetail[] = [];
+  for (let i = 0; i < allUsers.length; i += BATCH) {
+    const results = await Promise.allSettled(
+      allUsers.slice(i, i + BATCH).map((u) => fetchUserDetail(accessToken, String(u.user_id))),
+    );
+    details.push(...results.map((r) => (r.status === "fulfilled" ? r.value : {})));
+  }
+
+  return allUsers.map((item, i) => {
+    const detail = details[i] ?? {};
+    const userId = String(item.user_id);
     return {
       id: userId,
       oaId: oaInternalId,

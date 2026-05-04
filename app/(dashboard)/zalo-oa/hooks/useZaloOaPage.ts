@@ -123,7 +123,7 @@ export function useZaloOaPage() {
 
         Promise.all(
             activeOas.map((oa) =>
-                fetchConversations(oa.accessToken!, oa.id, 0, 15, zaloPeriod).catch((err) => {
+                fetchConversations(oa.accessToken!, oa.id, zaloPeriod).catch((err) => {
                     console.error(`[Zalo] fetch conversations for OA ${oa.oaName}:`, err);
                     return [] as ZaloConversation[];
                 }),
