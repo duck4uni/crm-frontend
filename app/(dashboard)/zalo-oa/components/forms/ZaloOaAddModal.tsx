@@ -162,7 +162,7 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
     setStep("templates");
     setTemplatesLoading(true);
     try {
-      const list = await fetchOaTemplates(connectedOa.oaOfficialId);
+      const list = await fetchOaTemplates(connectedOa.oaOfficialId, connectedOa.accessToken);
       setTemplates(list);
     } finally {
       setTemplatesLoading(false);

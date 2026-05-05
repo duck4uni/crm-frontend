@@ -100,81 +100,79 @@ export async function exchangeAuthorizationCode(
   return data as ExchangeOaTokenResult;
 }
 
-// Simulates GET /api/zalo/templates?oaId={oaId}
-export async function fetchOaTemplates(oaId: string): Promise<ZbsTemplate[]> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
+interface ZaloTemplateRaw {
+  templateId?: number | string;
+  templateName?: string;
+  templateTag?: string; // ENABLE / DISABLE / PENDING_REVIEW / REJECT
+  templateQuality?: string;
+  templateType?: number | string;
+  status?: string;
+  createdTime?: number | string;
+  modifiedTime?: number | string;
+  previewUrl?: string;
+  // Một số tài khoản trả thêm các field khác — không phụ thuộc
+  [key: string]: unknown;
+}
 
-  const now = new Date().toLocaleString("vi-VN", { hour12: false });
-  return [
-    {
-      id: `tpl-${oaId}-01`,
-      oaId,
-      templateId: "1023456",
-      templateCode: "ORDER_CONFIRMED",
-      templateName: "Xác nhận đơn hàng",
-      templateType: "Giao dịch",
-      status: "approved",
-      previewContent:
-        "Chào {{customer_name}}, đơn hàng {{order_code}} trị giá {{amount}}đ đã được xác nhận. Cảm ơn quý khách!",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "order_code", type: "string", required: true, sample: "DH001" },
-        { name: "amount", type: "string", required: true, sample: "250000" },
-      ],
-      lastSyncedAt: now,
-    },
-    {
-      id: `tpl-${oaId}-02`,
-      oaId,
-      templateId: "1023457",
-      templateCode: "APPOINTMENT_REMIND",
-      templateName: "Nhắc lịch hẹn dịch vụ",
-      templateType: "Chăm sóc",
-      status: "approved",
-      previewContent:
-        "Chào {{customer_name}}, lịch hẹn của bạn vào {{appointment_time}} tại {{address}}. Vui lòng có mặt đúng giờ.",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "appointment_time", type: "datetime", required: true, sample: "08:30 ngày 02/05/2026" },
-        { name: "address", type: "string", required: true, sample: "12 Lê Lợi, Quận 1" },
-      ],
-      lastSyncedAt: now,
-    },
-    {
-      id: `tpl-${oaId}-03`,
-      oaId,
-      templateId: "1023458",
-      templateCode: "PAYMENT_RECEIVED",
-      templateName: "Xác nhận thanh toán",
-      templateType: "Giao dịch",
-      status: "pending_review",
-      previewContent:
-        "Đã nhận thanh toán {{amount}}đ cho hóa đơn {{invoice_code}}. Cảm ơn {{customer_name}}.",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "invoice_code", type: "string", required: true, sample: "HD2026-0001" },
-        { name: "amount", type: "string", required: true, sample: "1500000" },
-      ],
-      lastSyncedAt: now,
-    },
-    {
-      id: `tpl-${oaId}-04`,
-      oaId,
-      templateId: "1023459",
-      templateCode: "PROMOTION_VOUCHER",
-      templateName: "Tặng voucher khuyến mãi",
-      templateType: "Hậu mãi",
-      status: "rejected",
-      previewContent:
-        "{{customer_name}} ơi, tặng bạn voucher {{voucher_code}} giảm {{discount}} cho đơn hàng tiếp theo.",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "voucher_code", type: "string", required: true, sample: "SALE10" },
-        { name: "discount", type: "string", required: true, sample: "10%" },
-      ],
-      lastSyncedAt: now,
-    },
-  ];
+const mapTemplateStatus = (raw?: string): ZbsTemplate["status"] => {
+  const upper = (raw || "").toUpperCase();
+  if (upper === "ENABLE" || upper === "APPROVED" || upper === "ACTIVE") return "approved";
+  if (upper === "PENDING_REVIEW" || upper === "PENDING" || upper === "WAITING") return "pending_review";
+  if (upper === "REJECT" || upper === "REJECTED") return "rejected";
+  if (upper === "DISABLE" || upper === "INACTIVE" || upper === "PAUSED") return "inactive";
+  return "draft";
+};
+
+/**
+ * Lấy danh sách template ZBS / ZNS của OA đang đăng nhập.
+ * Endpoint thật: GET https://business.openapi.zalo.me/template/all (proxy qua /api/zalo/templates).
+ * Trả về [] nếu OA chưa có template nào hoặc API lỗi (không throw để UI render gracefully).
+ */
+export async function fetchOaTemplates(
+  oaId: string,
+  accessToken?: string,
+): Promise<ZbsTemplate[]> {
+  if (!accessToken) {
+    console.warn("[Zalo] fetchOaTemplates: thiếu access token, trả về danh sách rỗng");
+    return [];
+  }
+
+  try {
+    const res = await fetch(`/api/zalo/templates?status=ENABLE&offset=0&limit=100`, {
+      headers: { "x-oa-access-token": accessToken },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      console.warn(`[Zalo] fetchOaTemplates: HTTP ${res.status}`);
+      return [];
+    }
+    const json = await res.json();
+    if (json.error !== 0) {
+      console.warn("[Zalo] fetchOaTemplates: API error", json);
+      return [];
+    }
+    const list: ZaloTemplateRaw[] = Array.isArray(json.data) ? json.data : [];
+    const now = new Date().toLocaleString("vi-VN", { hour12: false });
+
+    return list.map((item, idx): ZbsTemplate => {
+      const tid = String(item.templateId ?? `idx-${idx}`);
+      return {
+        id: `tpl-${oaId}-${tid}`,
+        oaId,
+        templateId: tid,
+        templateCode: tid, // Zalo OA template chưa có concept "code", dùng template_id
+        templateName: item.templateName || `Template ${tid}`,
+        templateType: typeof item.templateType === "string" ? item.templateType : "Tin tư vấn",
+        status: mapTemplateStatus(item.templateTag || item.status),
+        previewContent: "",
+        params: [],
+        lastSyncedAt: now,
+      };
+    });
+  } catch (err) {
+    console.error("[Zalo] fetchOaTemplates failed:", err);
+    return [];
+  }
 }
 
 function normalizePhone(phone: string): string {
@@ -242,6 +240,40 @@ interface ZaloUserDetail {
   avatar?: string;
   shared_info?: { phone?: string; name?: string };
   tags_and_notes_info?: { tag_names?: string[] };
+}
+
+export interface ZaloOaInfo {
+  oaid: string;
+  name: string;
+  description?: string;
+  oa_alias?: string;
+  is_verified?: boolean;
+  oa_type?: number;
+  cate_name?: string;
+  num_follower?: number;
+  avatar?: string;
+  cover?: string;
+  package_name?: string;
+  package_valid_through_date?: string;
+  package_auto_renew_date?: string;
+  linked_ZCA?: string;
+}
+
+/** Gọi GET /v2.0/oa/getoa để lấy thông tin OA hiện tại theo access_token */
+export async function fetchOaInfo(accessToken: string): Promise<ZaloOaInfo | null> {
+  try {
+    const res = await fetch(`/api/zalo/oa/info`, {
+      headers: { "x-oa-access-token": accessToken },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.error !== 0) return null;
+    return json.data as ZaloOaInfo;
+  } catch (err) {
+    console.error("[Zalo] fetchOaInfo failed:", err);
+    return null;
+  }
 }
 
 async function fetchUserDetail(accessToken: string, userId: string): Promise<ZaloUserDetail> {

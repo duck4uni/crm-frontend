@@ -76,7 +76,7 @@ export function MarketingSection() {
     setTemplatesLoading(true);
     Promise.all(
       missing.map((c) =>
-        fetchOaTemplates(c.oaOfficialId).then((list) => ({
+        fetchOaTemplates(c.oaOfficialId, c.accessToken).then((list) => ({
           oaOfficialId: c.oaOfficialId,
           list,
         })),

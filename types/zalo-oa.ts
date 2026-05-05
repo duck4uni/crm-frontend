@@ -12,6 +12,14 @@ export interface OaConnection {
   status?: OaConnectionStatus;
   tokenExpiredAt?: string;
   accessToken?: string;
+  // Bổ sung từ API getoa
+  avatar?: string;
+  cover?: string;
+  description?: string;
+  categoryName?: string;
+  packageName?: string;
+  oaAlias?: string;
+  isVerified?: boolean;
 }
 
 export type OaConnectStep =

@@ -3,6 +3,7 @@ import {
     DEV_CAPTURED_OAUTH,
     fetchConversations,
     fetchMessages,
+    fetchOaInfo,
     sendFileMessage,
     sendImageMessage,
     sendQuoteMessage,
@@ -126,6 +127,46 @@ export function useZaloOaPage() {
 
     useEffect(() => {
         saveConnectionsToStorage(connections);
+    }, [connections]);
+
+    // Enrich connections với OA info từ Zalo (getoa) — chỉ chạy 1 lần / OA
+    const enrichedOaIds = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        const targets = connections.filter(
+            (c) => c.accessToken && !enrichedOaIds.current.has(c.id),
+        );
+        if (targets.length === 0) return;
+
+        let cancelled = false;
+        targets.forEach(async (conn) => {
+            enrichedOaIds.current.add(conn.id);
+            const info = await fetchOaInfo(conn.accessToken!);
+            if (cancelled || !info) return;
+
+            setConnections((prev) =>
+                prev.map((c) =>
+                    c.id === conn.id
+                        ? {
+                            ...c,
+                            oaName: info.name || c.oaName,
+                            oaOfficialId: info.oaid || c.oaOfficialId,
+                            avatar: info.avatar || c.avatar,
+                            cover: info.cover || c.cover,
+                            description: info.description || c.description,
+                            categoryName: info.cate_name || c.categoryName,
+                            packageName: info.package_name || c.packageName,
+                            oaAlias: info.oa_alias || c.oaAlias,
+                            isVerified: typeof info.is_verified === "boolean" ? info.is_verified : c.isVerified,
+                            followers: typeof info.num_follower === "number" ? info.num_follower : c.followers,
+                        }
+                        : c,
+                ),
+            );
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [connections]);
 
     // Load conversations from Zalo API for all active connected OAs
