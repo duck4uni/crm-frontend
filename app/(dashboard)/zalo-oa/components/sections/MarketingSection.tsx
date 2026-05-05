@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { fetchOaTemplates } from "@/lib/zalo-oa";
+import { fetchOaTemplates, sendTemplateByPhone } from "@/lib/zalo-oa";
+import { appendTemplateMessage, updateTemplateMessage } from "@/lib/zaloTemplateMessageStore";
 import {
   Campaign,
   CampaignFormState,
@@ -36,6 +37,7 @@ const initialFormState: CampaignFormState = {
   scheduledAt: "",
   message: "",
   templateCode: "",
+  mode: "development",
 };
 
 const STATUS_BADGE: Record<ZbsTemplate["status"], { label: string; className: string }> = {
@@ -58,6 +60,15 @@ export function MarketingSection() {
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [connections, setConnections] = useState<OaConnection[]>([]);
   const [recipients, setRecipients] = useState<CampaignRecipient[]>([]);
+
+  // Filter & pagination cho danh sách template
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templateStatusFilter, setTemplateStatusFilter] = useState<
+    "all" | ZbsTemplate["status"]
+  >("all");
+  const [templateOaFilter, setTemplateOaFilter] = useState<string>("all");
+  const [templatePage, setTemplatePage] = useState(1);
+  const TEMPLATE_PAGE_SIZE = 6;
 
   useEffect(() => {
     setConnections(loadStoredConnections());
@@ -132,17 +143,38 @@ export function MarketingSection() {
     [allTemplates],
   );
 
-  // Group cho dropdown / list theo OA
-  const templatesGroupedByOa = useMemo(() => {
-    const groups: { connectionId: string; oaName: string; items: TemplateWithOa[] }[] = [];
-    for (const conn of connections) {
-      const items = allTemplates.filter((t) => t.connectionId === conn.id);
-      if (items.length > 0) {
-        groups.push({ connectionId: conn.id, oaName: conn.oaName, items });
-      }
-    }
-    return groups;
-  }, [connections, allTemplates]);
+  // Số OA có ít nhất 1 template
+  const oaWithTemplatesCount = useMemo(
+    () => new Set(allTemplates.map((t) => t.connectionId)).size,
+    [allTemplates],
+  );
+
+  // Filter theo search / status / OA
+  const filteredTemplates = useMemo(() => {
+    const q = templateSearch.trim().toLowerCase();
+    return allTemplates.filter((t) => {
+      if (templateOaFilter !== "all" && t.connectionId !== templateOaFilter) return false;
+      if (templateStatusFilter !== "all" && t.status !== templateStatusFilter) return false;
+      if (!q) return true;
+      return (
+        t.templateName.toLowerCase().includes(q) ||
+        t.templateCode.toLowerCase().includes(q) ||
+        t.oaName.toLowerCase().includes(q)
+      );
+    });
+  }, [allTemplates, templateSearch, templateStatusFilter, templateOaFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTemplates.length / TEMPLATE_PAGE_SIZE));
+
+  // Reset về page 1 khi filter thay đổi và đang ở page > totalPages
+  useEffect(() => {
+    if (templatePage > totalPages) setTemplatePage(1);
+  }, [templatePage, totalPages]);
+
+  const paginatedTemplates = useMemo(() => {
+    const start = (templatePage - 1) * TEMPLATE_PAGE_SIZE;
+    return filteredTemplates.slice(start, start + TEMPLATE_PAGE_SIZE);
+  }, [filteredTemplates, templatePage]);
 
   const selectedTemplate = useMemo(
     () => allTemplates.find((t) => t.templateCode === form.templateCode) || null,
@@ -168,6 +200,7 @@ export function MarketingSection() {
     }
 
     const validRecipients = recipients.filter((r) => r.errors.length === 0);
+    const conn = connections.find((c) => c.id === selectedTemplate.connectionId);
 
     const nextCampaign: Campaign = {
       id: `camp-${Date.now()}`,
@@ -179,9 +212,17 @@ export function MarketingSection() {
       status: form.scheduledAt ? "scheduled" : "draft",
       sent: 0,
       failed: 0,
+      templateId: selectedTemplate.templateId,
       templateCode: selectedTemplate.templateCode,
       templateName: selectedTemplate.templateName,
       recipientsCount: validRecipients.length,
+      recipients: validRecipients.map((r) => ({
+        rowIndex: r.rowIndex,
+        phone: r.phone,
+        templateData: r.templateData,
+      })),
+      mode: form.mode,
+      oaOfficialId: conn?.oaOfficialId,
     };
 
     setCampaigns((prev) => [nextCampaign, ...prev]);
@@ -192,21 +233,124 @@ export function MarketingSection() {
       message: "",
       templateCode: "",
       channel: "",
+      mode: "development",
     }));
     setRecipients([]);
   };
 
-  const handleRunCampaign = (campaignId: string) => {
+  /** Trạng thái progress khi đang chạy campaign */
+  const [runningCampaignId, setRunningCampaignId] = useState<string | null>(null);
+  const [runProgress, setRunProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const handleRunCampaign = async (campaignId: string) => {
+    if (runningCampaignId) return; // tránh chạy đồng thời
+    const campaign = campaigns.find((c) => c.id === campaignId);
+    if (!campaign) return;
+
+    if (!campaign.templateId || !campaign.recipients || campaign.recipients.length === 0) {
+      alert("Chiến dịch này không có template hoặc danh sách người nhận hợp lệ.");
+      return;
+    }
+
+    const conn = connections.find((c) => c.id === campaign.channel);
+    if (!conn) {
+      alert("Không tìm thấy OA tương ứng. Có thể OA đã bị xoá kết nối.");
+      return;
+    }
+
+    setRunningCampaignId(campaignId);
     setCampaigns((prev) =>
-      prev.map((campaign) => {
-        if (campaign.id !== campaignId) {
-          return campaign;
-        }
-        const sent = Math.floor(Math.random() * 300 + 120);
-        const failed = Math.floor(sent * 0.07);
-        return { ...campaign, status: "completed", sent, failed };
-      }),
+      prev.map((c) => (c.id === campaignId ? { ...c, status: "running", sent: 0, failed: 0 } : c)),
     );
+
+    const total = campaign.recipients.length;
+    setRunProgress({ done: 0, total });
+
+    let sent = 0;
+    let failed = 0;
+    let lastQuotaRemaining: number | undefined;
+    const mode = campaign.mode || "development";
+
+    for (let i = 0; i < campaign.recipients.length; i++) {
+      const r = campaign.recipients[i];
+      const now = new Date().toISOString();
+
+      // Lưu pending log
+      const recordId = `tm-${campaign.id}-${i}-${Date.now()}`;
+      appendTemplateMessage({
+        id: recordId,
+        oaId: campaign.channel,
+        oaOfficialId: campaign.oaOfficialId,
+        templateId: campaign.templateId,
+        templateCode: campaign.templateCode,
+        templateName: campaign.templateName,
+        phone: r.phone,
+        normalizedPhone: r.phone,
+        trackingId: "",
+        mode,
+        templateData: r.templateData,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+        campaignId: campaign.id,
+      });
+
+      const result = await sendTemplateByPhone({
+        oaId: campaign.channel,
+        oaOfficialId: campaign.oaOfficialId,
+        accessToken: conn.accessToken,
+        templateId: campaign.templateId,
+        templateCode: campaign.templateCode,
+        templateName: campaign.templateName,
+        phone: r.phone,
+        templateData: r.templateData,
+        mode,
+      });
+
+      // Update log
+      updateTemplateMessage(recordId, {
+        msgId: result.msgId,
+        trackingId: result.trackingId,
+        status: result.status,
+        sentAt: result.sentAt,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        zaloErrorCode: result.zaloErrorCode,
+        quotaRemaining: result.quotaRemaining,
+        dailyQuota: result.dailyQuota,
+      });
+
+      if (result.status === "sent_to_zalo") {
+        sent += 1;
+        lastQuotaRemaining = result.quotaRemaining ?? lastQuotaRemaining;
+      } else {
+        failed += 1;
+      }
+
+      setCampaigns((prev) =>
+        prev.map((c) => (c.id === campaignId ? { ...c, sent, failed } : c)),
+      );
+      setRunProgress({ done: i + 1, total });
+
+      // Delay 200ms giữa các tin để tránh rate limit
+      if (i < campaign.recipients.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    setCampaigns((prev) =>
+      prev.map((c) =>
+        c.id === campaignId ? { ...c, status: "completed", sent, failed } : c,
+      ),
+    );
+    setRunningCampaignId(null);
+    setRunProgress(null);
+
+    if (lastQuotaRemaining !== undefined) {
+      console.log(
+        `[Marketing] Campaign "${campaign.name}" hoàn tất. Quota còn: ${lastQuotaRemaining}`,
+      );
+    }
   };
 
   const handleDeleteCampaign = (campaignId: string) => {
@@ -283,25 +427,78 @@ export function MarketingSection() {
             <p className="text-xs text-gray-500 py-4 text-center">
               Chưa có Zalo OA nào được kết nối. Vui lòng kết nối OA trước ở trang Zalo OA.
             </p>
-          ) : templatesGroupedByOa.length === 0 && !templatesLoading ? (
+          ) : allTemplates.length === 0 && !templatesLoading ? (
             <p className="text-xs text-gray-500 py-4 text-center">
               Các OA hiện chưa có template nào.
             </p>
           ) : (
-            <div className="space-y-4">
-              {templatesGroupedByOa.map((group) => (
-                <div key={group.connectionId}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded bg-primary-50 text-primary-700 text-[11px] font-semibold">
-                      {group.oaName}
-                    </span>
-                    <span className="text-[11px] text-gray-400">
-                      {group.items.filter((t) => t.status === "approved").length}/
-                      {group.items.length} đã duyệt
-                    </span>
-                  </div>
+            <div className="space-y-3">
+              {/* Filter row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  value={templateSearch}
+                  onChange={(e) => {
+                    setTemplateSearch(e.target.value);
+                    setTemplatePage(1);
+                  }}
+                  placeholder="Tìm tên / mã / OA..."
+                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100 bg-white"
+                />
+                <select
+                  value={templateStatusFilter}
+                  onChange={(e) => {
+                    setTemplateStatusFilter(e.target.value as typeof templateStatusFilter);
+                    setTemplatePage(1);
+                  }}
+                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-primary-400 bg-white"
+                >
+                  <option value="all">Tất cả trạng thái</option>
+                  <option value="approved">Đã duyệt</option>
+                  <option value="pending_review">Chờ duyệt</option>
+                  <option value="rejected">Bị từ chối</option>
+                  <option value="inactive">Ngừng dùng</option>
+                  <option value="draft">Nháp</option>
+                </select>
+                <select
+                  value={templateOaFilter}
+                  onChange={(e) => {
+                    setTemplateOaFilter(e.target.value);
+                    setTemplatePage(1);
+                  }}
+                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-primary-400 bg-white"
+                >
+                  <option value="all">Tất cả OA ({oaWithTemplatesCount})</option>
+                  {connections
+                    .filter((c) => allTemplates.some((t) => t.connectionId === c.id))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.oaName}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <p className="text-[11px] text-gray-400">
+                Hiển thị{" "}
+                {filteredTemplates.length === 0
+                  ? 0
+                  : (templatePage - 1) * TEMPLATE_PAGE_SIZE + 1}
+                –{Math.min(templatePage * TEMPLATE_PAGE_SIZE, filteredTemplates.length)} trong tổng{" "}
+                {filteredTemplates.length} template
+                {filteredTemplates.length !== allTemplates.length
+                  ? ` (đã lọc từ ${allTemplates.length})`
+                  : ""}
+              </p>
+
+              {filteredTemplates.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">
+                  Không có template nào khớp bộ lọc.
+                </p>
+              ) : (
+                <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {group.items.map((t) => {
+                    {paginatedTemplates.map((t) => {
                       const isSelected = form.templateCode === t.templateCode;
                       const canPick = t.status === "approved";
                       return (
@@ -319,6 +516,9 @@ export function MarketingSection() {
                           }`}
                         >
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 text-[10px] font-semibold">
+                              {t.oaName}
+                            </span>
                             <p className="text-xs font-semibold text-gray-800 truncate">
                               {t.templateName}
                             </p>
@@ -328,9 +528,11 @@ export function MarketingSection() {
                               {STATUS_BADGE[t.status].label}
                             </span>
                           </div>
-                          <p className="text-[11px] text-gray-500 line-clamp-2">
-                            {t.previewContent}
-                          </p>
+                          {t.previewContent && (
+                            <p className="text-[11px] text-gray-500 line-clamp-2">
+                              {t.previewContent}
+                            </p>
+                          )}
                           <p className="mt-1 text-[10px] text-gray-400">
                             {t.templateType} • {t.templateCode} • {t.params.length} biến
                           </p>
@@ -338,8 +540,50 @@ export function MarketingSection() {
                       );
                     })}
                   </div>
-                </div>
-              ))}
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <span className="text-[11px] text-gray-500">
+                        Trang {templatePage} / {totalPages}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setTemplatePage(1)}
+                          disabled={templatePage === 1}
+                          className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          «
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTemplatePage((p) => Math.max(1, p - 1))}
+                          disabled={templatePage === 1}
+                          className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          ‹ Trước
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTemplatePage((p) => Math.min(totalPages, p + 1))}
+                          disabled={templatePage >= totalPages}
+                          className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Sau ›
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTemplatePage(totalPages)}
+                          disabled={templatePage >= totalPages}
+                          className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          »
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </CardContent>
@@ -375,7 +619,7 @@ export function MarketingSection() {
               />
               <p className="mt-1 text-[11px] text-gray-400">
                 {approvedTemplates.length > 0
-                  ? `Có ${approvedTemplates.length} template đã duyệt sẵn sàng để gửi từ ${templatesGroupedByOa.length} OA.`
+                  ? `Có ${approvedTemplates.length} template đã duyệt sẵn sàng để gửi từ ${oaWithTemplatesCount} OA.`
                   : "Chưa có template nào sẵn sàng để gửi."}
               </p>
             </div>
@@ -445,6 +689,55 @@ export function MarketingSection() {
               value={form.scheduledAt}
               onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })}
             />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Chế độ gửi
+              </label>
+              <div className="flex gap-2">
+                <label
+                  className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${
+                    form.mode === "development"
+                      ? "border-amber-400 bg-amber-50 text-amber-800"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="campaign-mode"
+                    value="development"
+                    checked={form.mode === "development"}
+                    onChange={() => setForm({ ...form, mode: "development" })}
+                    className="mr-2"
+                  />
+                  <span className="font-semibold">🧪 Development</span>
+                  <p className="text-[10px] text-gray-500 mt-0.5 ml-5">
+                    Test gửi — không trừ quota, không gửi tới máy khách thật.
+                  </p>
+                </label>
+                <label
+                  className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${
+                    form.mode === "production"
+                      ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="campaign-mode"
+                    value="production"
+                    checked={form.mode === "production"}
+                    onChange={() => setForm({ ...form, mode: "production" })}
+                    className="mr-2"
+                  />
+                  <span className="font-semibold">🚀 Production</span>
+                  <p className="text-[10px] text-gray-500 mt-0.5 ml-5">
+                    Gửi thật — trừ quota OA, tin nhắn đến khách hàng.
+                  </p>
+                </label>
+              </div>
+            </div>
+
             <Button
               type="button"
               variant="primary"
@@ -453,7 +746,7 @@ export function MarketingSection() {
               disabled={!canCreate}
             >
               {validRecipientsCount > 0
-                ? `Tạo chiến dịch (${validRecipientsCount} người nhận)`
+                ? `Tạo chiến dịch (${validRecipientsCount} người nhận, ${form.mode === "development" ? "Dev" : "Prod"})`
                 : "Tạo chiến dịch"}
             </Button>
           </div>
@@ -469,6 +762,7 @@ export function MarketingSection() {
                 <th className="px-3 py-2 font-medium text-gray-600">Tên</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Kênh</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Template</th>
+                <th className="px-3 py-2 font-medium text-gray-600">Mode</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Người nhận</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Trạng thái</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Gửi / Lỗi</th>
@@ -490,37 +784,76 @@ export function MarketingSection() {
                       <span className="text-gray-400">—</span>
                     )}
                   </td>
+                  <td className="px-3 py-2">
+                    {campaign.mode === "production" ? (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium">
+                        🚀 Prod
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-medium">
+                        🧪 Dev
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-gray-600">
                     {typeof campaign.recipientsCount === "number"
                       ? campaign.recipientsCount.toLocaleString("vi-VN")
                       : "—"}
                   </td>
                   <td className="px-3 py-2">
-                    <span
-                      className={`px-2 py-1 rounded text-[10px] font-medium ${
-                        campaign.status === "draft"
-                          ? "bg-gray-100 text-gray-700"
+                    {campaign.status === "running" && runningCampaignId === campaign.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-1 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
+                          Đang gửi
+                        </span>
+                        {runProgress && (
+                          <div className="flex items-center gap-1">
+                            <div className="w-16 h-1 rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 transition-all"
+                                style={{
+                                  width: `${(runProgress.done / Math.max(1, runProgress.total)) * 100}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-gray-500">
+                              {runProgress.done}/{runProgress.total}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] font-medium ${
+                          campaign.status === "draft"
+                            ? "bg-gray-100 text-gray-700"
+                            : campaign.status === "scheduled"
+                              ? "bg-orange-100 text-orange-700"
+                              : campaign.status === "running"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {campaign.status === "draft"
+                          ? "Nháp"
                           : campaign.status === "scheduled"
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {campaign.status === "draft"
-                        ? "Nháp"
-                        : campaign.status === "scheduled"
-                          ? "Đã lịch"
-                          : "Hoàn thành"}
-                    </span>
+                            ? "Đã lịch"
+                            : campaign.status === "running"
+                              ? "Đang gửi"
+                              : "Hoàn thành"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-gray-600">
                     {campaign.sent} / {campaign.failed}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
-                      {campaign.status !== "completed" && (
+                      {campaign.status !== "completed" && campaign.status !== "running" && (
                         <button
                           onClick={() => handleRunCampaign(campaign.id)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          disabled={!!runningCampaignId}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           title="Chạy ngay"
                         >
                           <FiPlay className="w-4 h-4" />
@@ -528,7 +861,8 @@ export function MarketingSection() {
                       )}
                       <button
                         onClick={() => handleDeleteCampaign(campaign.id)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        disabled={runningCampaignId === campaign.id}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Xóa"
                       >
                         <FiTrash2 className="w-4 h-4" />
@@ -539,7 +873,7 @@ export function MarketingSection() {
               ))}
               {campaigns.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-gray-400">
+                  <td colSpan={9} className="px-3 py-6 text-center text-gray-400">
                     Chưa có chiến dịch nào
                   </td>
                 </tr>

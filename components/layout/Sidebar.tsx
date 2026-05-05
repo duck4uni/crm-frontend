@@ -56,6 +56,7 @@ const navigation: NavItem[] = [
     children: [
       { name: "Marketing", href: "/zalo-oa/marketing" },
       { name: "Automation", href: "/zalo-oa/automation" },
+      { name: "Lịch sử template", href: "/zalo-oa/template-history" },
     ],
   },
   { name: "Cài đặt", href: "/settings", icon: FiSettings },

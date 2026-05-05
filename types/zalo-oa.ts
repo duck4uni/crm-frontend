@@ -59,21 +59,66 @@ export interface ZbsTemplate {
   lastSyncedAt: string;
 }
 
+export type ZbsSendMode = "development" | "production";
+
+export type ZbsTemplateMessageStatus =
+  | "pending"
+  | "sent_to_zalo"
+  | "delivered"
+  | "failed";
+
 export interface ZbsSendByPhoneRequest {
   oaId: string;
-  templateCode: string;
+  oaOfficialId?: string;
+  accessToken?: string;
+  templateId: string;
+  templateCode?: string;
+  templateName?: string;
   phone: string;
   templateData: Record<string, string>;
-  trackingId: string;
+  trackingId?: string;
+  mode?: ZbsSendMode;
 }
 
 export interface ZbsSendByPhoneResult {
-  msgId: string;
+  id: string;
   trackingId: string;
-  status: "pending" | "success" | "failed";
+  msgId: string;
+  status: ZbsTemplateMessageStatus;
   sentAt: string;
+  mode: ZbsSendMode;
   quotaRemaining?: number;
+  dailyQuota?: number;
+  errorCode?: string;
   errorMessage?: string;
+  zaloErrorCode?: number;
+}
+
+/** Bản ghi giả lập bảng zalo_template_messages */
+export interface ZbsTemplateMessageRecord {
+  id: string;
+  oaId: string;
+  oaOfficialId?: string;
+  templateId: string;
+  templateCode?: string;
+  templateName?: string;
+  phone: string;
+  normalizedPhone: string;
+  trackingId: string;
+  mode: ZbsSendMode;
+  templateData: Record<string, string>;
+  msgId?: string;
+  status: ZbsTemplateMessageStatus;
+  errorCode?: string;
+  errorMessage?: string;
+  zaloErrorCode?: number;
+  sentAt?: string;
+  deliveryTime?: string;
+  quotaRemaining?: number;
+  dailyQuota?: number;
+  createdAt: string;
+  updatedAt: string;
+  campaignId?: string;
 }
 
 export interface ZaloConversation {

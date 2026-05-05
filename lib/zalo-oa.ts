@@ -4,6 +4,7 @@ import type {
   ZaloConversation,
   ZbsSendByPhoneRequest,
   ZbsSendByPhoneResult,
+  ZbsSendMode,
   ZbsTemplate,
 } from "@/types/zalo-oa";
 
@@ -103,14 +104,15 @@ export async function exchangeAuthorizationCode(
 interface ZaloTemplateRaw {
   templateId?: number | string;
   templateName?: string;
-  templateTag?: string; // ENABLE / DISABLE / PENDING_REVIEW / REJECT
-  templateQuality?: string;
-  templateType?: number | string;
+  // Theo spec Zalo: response trả `status` dạng string ENABLE/PENDING_REVIEW/REJECT/DISABLE.
+  // Một số phiên bản còn dùng `templateTag` — giữ cả hai để tương thích.
   status?: string;
+  templateTag?: string;
+  templateQuality?: string; // HIGH / MEDIUM / LOW / UNDEFINED
+  templateType?: number | string;
   createdTime?: number | string;
   modifiedTime?: number | string;
   previewUrl?: string;
-  // Một số tài khoản trả thêm các field khác — không phụ thuộc
   [key: string]: unknown;
 }
 
@@ -127,19 +129,32 @@ const mapTemplateStatus = (raw?: string): ZbsTemplate["status"] => {
  * Lấy danh sách template ZBS / ZNS của OA đang đăng nhập.
  * Endpoint thật: GET https://business.openapi.zalo.me/template/all (proxy qua /api/zalo/templates).
  * Trả về [] nếu OA chưa có template nào hoặc API lỗi (không throw để UI render gracefully).
+ *
+ * Trong môi trường dev, nếu caller không truyền `accessToken` thì auto fallback
+ * sang `NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN` để tiện test ngay khi chưa có popup OAuth thật.
  */
 export async function fetchOaTemplates(
   oaId: string,
   accessToken?: string,
 ): Promise<ZbsTemplate[]> {
-  if (!accessToken) {
+  let token = accessToken;
+  if (!token && process.env.NODE_ENV !== "production") {
+    token = process.env.NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN || undefined;
+    if (token) {
+      console.log("[Zalo] fetchOaTemplates: dùng dev token từ env để test");
+    }
+  }
+
+  if (!token) {
     console.warn("[Zalo] fetchOaTemplates: thiếu access token, trả về danh sách rỗng");
     return [];
   }
 
   try {
-    const res = await fetch(`/api/zalo/templates?status=ENABLE&offset=0&limit=100`, {
-      headers: { "x-oa-access-token": accessToken },
+    // KHÔNG truyền status để Zalo trả về template ở mọi trạng thái
+    // (Enable / Pending review / Reject / Disable). status là INT 1/2/3/4 nếu cần lọc.
+    const res = await fetch(`/api/zalo/templates?offset=0&limit=100`, {
+      headers: { "x-oa-access-token": token },
       cache: "no-store",
     });
     if (!res.ok) {
@@ -163,7 +178,7 @@ export async function fetchOaTemplates(
         templateCode: tid, // Zalo OA template chưa có concept "code", dùng template_id
         templateName: item.templateName || `Template ${tid}`,
         templateType: typeof item.templateType === "string" ? item.templateType : "Tin tư vấn",
-        status: mapTemplateStatus(item.templateTag || item.status),
+        status: mapTemplateStatus(item.status || item.templateTag),
         previewContent: "",
         params: [],
         lastSyncedAt: now,
@@ -175,37 +190,144 @@ export async function fetchOaTemplates(
   }
 }
 
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
+/** Chuẩn hoá phone về dạng 84xxxxxxxxx (Zalo expect) */
+export function normalizeVietnamPhone(phone: string): string {
+  const digits = phone.replace(/[^0-9]/g, "");
   if (digits.startsWith("84")) return digits;
   if (digits.startsWith("0")) return `84${digits.slice(1)}`;
+  // Nếu chỉ có 9 số (không 0/84) — vẫn cho 84 lên đầu
+  if (digits.length >= 9 && digits.length <= 10) return `84${digits}`;
   return digits;
 }
 
-// Simulates POST /api/zalo/messages/send-by-phone
+const VN_PHONE_REGEX = /^84[0-9]{9,10}$/;
+
+/** Sinh tracking_id mặc định gắn với template + timestamp */
+export function buildDefaultTrackingId(prefix: string, templateId: string): string {
+  const safePrefix = prefix.replace(/[^A-Z0-9_]/gi, "_").toUpperCase() || "TPL";
+  return `${safePrefix}_${templateId}_${Date.now()}`;
+}
+
+/**
+ * Gửi tin template qua số điện thoại (ZBS Template Message).
+ * Endpoint thật: POST https://business.openapi.zalo.me/message/template
+ * Proxy: /api/zalo/templates/send
+ */
 export async function sendTemplateByPhone(
   payload: ZbsSendByPhoneRequest,
 ): Promise<ZbsSendByPhoneResult> {
-  await new Promise((resolve) => setTimeout(resolve, 700));
+  // Resolve token (trong dev fallback env như fetchOaTemplates)
+  let token = payload.accessToken;
+  if (!token && process.env.NODE_ENV !== "production") {
+    token = process.env.NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN || undefined;
+  }
 
-  const normalized = normalizePhone(payload.phone);
-  if (normalized.length < 11 || !normalized.startsWith("84")) {
+  const trackingId =
+    payload.trackingId?.trim() ||
+    buildDefaultTrackingId(payload.templateCode || "TPL", payload.templateId);
+  const mode: ZbsSendMode = payload.mode === "development" ? "development" : "production";
+  const normalized = normalizeVietnamPhone(payload.phone);
+  const id = `tm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  if (!token) {
     return {
+      id,
+      trackingId,
       msgId: "",
-      trackingId: payload.trackingId,
       status: "failed",
       sentAt: new Date().toISOString(),
-      errorMessage: "Số điện thoại không hợp lệ.",
+      mode,
+      errorCode: "MISSING_TOKEN",
+      errorMessage: "OA chưa kết nối hoặc thiếu access token.",
     };
   }
 
-  return {
-    msgId: `msg_${Date.now()}`,
-    trackingId: payload.trackingId,
-    status: "success",
-    sentAt: new Date().toISOString(),
-    quotaRemaining: 998,
-  };
+  if (!VN_PHONE_REGEX.test(normalized)) {
+    return {
+      id,
+      trackingId,
+      msgId: "",
+      status: "failed",
+      sentAt: new Date().toISOString(),
+      mode,
+      errorCode: "INVALID_PHONE_FORMAT",
+      errorMessage: "Số điện thoại không hợp lệ (cần dạng 84xxxxxxxxx hoặc 09xxxxxxxx).",
+    };
+  }
+
+  if (!payload.templateId) {
+    return {
+      id,
+      trackingId,
+      msgId: "",
+      status: "failed",
+      sentAt: new Date().toISOString(),
+      mode,
+      errorCode: "TEMPLATE_ID_REQUIRED",
+      errorMessage: "Thiếu template_id.",
+    };
+  }
+
+  try {
+    const res = await fetch("/api/zalo/templates/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-oa-access-token": token,
+      },
+      body: JSON.stringify({
+        phone: normalized,
+        templateId: payload.templateId,
+        templateData: payload.templateData,
+        trackingId,
+        mode,
+      }),
+    });
+    const json = await res.json();
+    console.log("[Zalo] sendTemplateByPhone result:", json);
+
+    if (!res.ok || !json.success) {
+      const err = json.error || {};
+      return {
+        id,
+        trackingId,
+        msgId: "",
+        status: "failed",
+        sentAt: new Date().toISOString(),
+        mode,
+        errorCode: err.code || "ZALO_TEMPLATE_SEND_FAILED",
+        errorMessage: mapZaloError(err.zaloErrorCode, err.message || err.zaloMessage).message,
+        zaloErrorCode: err.zaloErrorCode,
+      };
+    }
+
+    const data = json.data || {};
+    const quota = data.quota || {};
+    return {
+      id,
+      trackingId: data.trackingId || trackingId,
+      msgId: data.msgId || "",
+      status: "sent_to_zalo",
+      sentAt: data.sentTime
+        ? new Date(Number(data.sentTime)).toISOString()
+        : new Date().toISOString(),
+      mode,
+      quotaRemaining: quota.remainingQuota ? Number(quota.remainingQuota) : undefined,
+      dailyQuota: quota.dailyQuota ? Number(quota.dailyQuota) : undefined,
+    };
+  } catch (err) {
+    console.error("[Zalo] sendTemplateByPhone failed:", err);
+    return {
+      id,
+      trackingId,
+      msgId: "",
+      status: "failed",
+      sentAt: new Date().toISOString(),
+      mode,
+      errorCode: "NETWORK_ERROR",
+      errorMessage: err instanceof Error ? err.message : "Lỗi mạng khi gửi template.",
+    };
+  }
 }
 
 export function buildOaConnectionFromToken(result: ExchangeOaTokenResult): OaConnection {

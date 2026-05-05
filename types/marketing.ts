@@ -1,5 +1,11 @@
 export type CampaignStatus = "draft" | "scheduled" | "running" | "completed";
 
+export interface CampaignRecipientSnapshot {
+  rowIndex: number;
+  phone: string;
+  templateData: Record<string, string>;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -10,9 +16,13 @@ export interface Campaign {
   status: CampaignStatus;
   sent: number;
   failed: number;
+  templateId?: string;
   templateCode?: string;
   templateName?: string;
   recipientsCount?: number;
+  recipients?: CampaignRecipientSnapshot[];
+  mode?: "development" | "production";
+  oaOfficialId?: string;
 }
 
 export interface CampaignFormState {
@@ -22,6 +32,7 @@ export interface CampaignFormState {
   scheduledAt: string;
   message: string;
   templateCode: string;
+  mode: "development" | "production";
 }
 
 export const statusVariant: Record<CampaignStatus, "default" | "info" | "warning" | "success"> = {
