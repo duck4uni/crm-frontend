@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import { useRef, useState } from "react";
-import { FiCornerDownLeft, FiImage, FiPaperclip, FiSend, FiX } from "react-icons/fi";
+import { FiCornerDownLeft, FiImage, FiPaperclip, FiSend, FiSidebar, FiX } from "react-icons/fi";
 import type { ZaloChatMessage, ZaloConversation } from "@/types/zalo-oa";
 import { ChatMessageRow } from "./ChatMessageRow";
 import { EmptyState } from "./EmptyState";
+import { UserDetailPanel } from "./UserDetailPanel";
 
 interface ZaloInteractionPanelProps {
     selectedConversation: ZaloConversation | null;
@@ -20,6 +21,8 @@ interface ZaloInteractionPanelProps {
     replyingTo: ZaloChatMessage | null;
     onStartQuote: (message: ZaloChatMessage) => void;
     onCancelQuote: () => void;
+    accessToken?: string;
+    onConversationUpdated?: (patch: Partial<ZaloConversation>) => void;
 }
 
 export function ZaloInteractionPanel({
@@ -35,11 +38,14 @@ export function ZaloInteractionPanel({
     replyingTo,
     onStartQuote,
     onCancelQuote,
+    accessToken,
+    onConversationUpdated,
 }: ZaloInteractionPanelProps) {
     const imageInputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const [detailOpen, setDetailOpen] = useState(false);
 
     if (!selectedConversation) {
         return (
@@ -99,8 +105,15 @@ export function ZaloInteractionPanel({
 
     const canSubmit = !!pendingImage || !!pendingFile || !!chatComposerValue.trim();
 
+    const phoneDisplay = (() => {
+        const p = selectedConversation.customerPhone;
+        if (!p || p === "0" || Number(p) === 0) return null;
+        return String(p);
+    })();
+
     return (
-        <div className="flex h-full flex-col">
+        <div className="flex h-full overflow-hidden">
+            <div className="flex flex-1 flex-col min-w-0">
             <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3">
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="relative h-10 w-10 rounded-full bg-primary-500 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -120,11 +133,22 @@ export function ZaloInteractionPanel({
                     <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">{selectedConversation.name}</p>
                         <p className="text-xs text-gray-500 truncate">
-                            {selectedConversation.customerPhone || "Chưa có số điện thoại"}
+                            {phoneDisplay || "Chưa có số điện thoại"}
                             {selectedOaName ? ` • ${selectedOaName}` : ""}
                         </p>
                     </div>
                 </div>
+                <button
+                    onClick={() => setDetailOpen((v) => !v)}
+                    className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                        detailOpen
+                            ? "text-primary-600 bg-primary-50"
+                            : "text-gray-400 hover:text-primary-600 hover:bg-gray-100"
+                    }`}
+                    title="Thông tin khách hàng"
+                >
+                    <FiSidebar className="w-4 h-4" />
+                </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -277,6 +301,16 @@ export function ZaloInteractionPanel({
                     Nhấn Enter để gửi, Shift + Enter để xuống dòng. Ảnh ≤ 5MB, file ≤ 25MB.
                 </p>
             </div>
+            </div>
+
+            {detailOpen && accessToken && (
+                <UserDetailPanel
+                    conversation={selectedConversation}
+                    oaName={selectedOaName}
+                    accessToken={accessToken}
+                    onUpdated={(patch) => onConversationUpdated?.(patch)}
+                />
+            )}
         </div>
     );
 }

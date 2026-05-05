@@ -55,7 +55,7 @@ const navigation: NavItem[] = [
     icon: FiLink,
     children: [
       { name: "Marketing", href: "/zalo-oa/marketing" },
-      { name: "Automation", href: "/zalo-oa/automation" },
+      //  { name: "Automation", href: "/zalo-oa/automation" },
       { name: "Lịch sử template", href: "/zalo-oa/template-history" },
     ],
   },

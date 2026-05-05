@@ -326,6 +326,10 @@ export function useZaloOaPage() {
         setConnections((prev) => prev.filter((c) => c.id !== id));
     };
 
+    const handleUpdateConversation = (id: string, patch: Partial<ZaloConversation>) => {
+        setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    };
+
     const openConfigForm = () => {
         setSettingsOpen(false);
         setConfigFormOpen(true);
@@ -682,6 +686,7 @@ export function useZaloOaPage() {
         handleAddConfig,
         handleAddConnection,
         handleRemoveConnection,
+        handleUpdateConversation,
         periodPreset,
         setPeriodPreset,
         customDays,

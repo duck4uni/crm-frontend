@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FiTrash2, FiPlay } from "react-icons/fi";
+import Link from "next/link";
+import { FiPlus, FiTrash2, FiPlay } from "react-icons/fi";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -21,6 +22,7 @@ import {
   CampaignRecipientsImport,
   type CampaignRecipient,
 } from "./CampaignRecipientsImport";
+
 
 const CONNECTIONS_STORAGE_KEY = "crm.zaloOa.connections.v1";
 
@@ -528,12 +530,24 @@ export function MarketingSection() {
             <h3 className="text-sm font-semibold text-gray-800">
               Template từ tất cả Zalo OA
             </h3>
-            {templatesLoading && (
-              <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-primary-600" />
-                Đang đồng bộ...
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {templatesLoading && (
+                <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-primary-600" />
+                  Đang đồng bộ...
+                </span>
+              )}
+              {/* <Link
+                href="/zalo-oa/tao-template"
+                className={`inline-flex items-center rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2${connections.length === 0 ? " pointer-events-none opacity-50" : ""
+                  }`}
+                aria-disabled={connections.length === 0}
+                tabIndex={connections.length === 0 ? -1 : undefined}
+              >
+                <FiPlus className="mr-1.5 h-3.5 w-3.5" />
+                Tạo template
+              </Link> */}
+            </div>
           </div>
 
           {!hasConnections ? (
@@ -633,13 +647,12 @@ export function MarketingSection() {
                             canPick && handleTemplateChange(t.templateCode)
                           }
                           disabled={!canPick}
-                          className={`text-left rounded-lg border p-3 transition-colors ${
-                            isSelected
-                              ? "border-primary-500 bg-primary-50/40"
-                              : canPick
-                                ? "border-gray-200 hover:border-primary-300 bg-white"
-                                : "border-gray-100 bg-gray-50 cursor-not-allowed opacity-60"
-                          }`}
+                          className={`text-left rounded-lg border p-3 transition-colors ${isSelected
+                            ? "border-primary-500 bg-primary-50/40"
+                            : canPick
+                              ? "border-gray-200 hover:border-primary-300 bg-white"
+                              : "border-gray-100 bg-gray-50 cursor-not-allowed opacity-60"
+                            }`}
                         >
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 text-[10px] font-semibold">
@@ -871,11 +884,10 @@ export function MarketingSection() {
               </label>
               <div className="flex gap-2">
                 <label
-                  className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${
-                    form.mode === "development"
-                      ? "border-amber-400 bg-amber-50 text-amber-800"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
+                  className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${form.mode === "development"
+                    ? "border-amber-400 bg-amber-50 text-amber-800"
+                    : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
                 >
                   <input
                     type="radio"
@@ -891,11 +903,10 @@ export function MarketingSection() {
                   </p>
                 </label>
                 <label
-                  className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${
-                    form.mode === "production"
-                      ? "border-emerald-400 bg-emerald-50 text-emerald-800"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
+                  className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${form.mode === "production"
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                    : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
                 >
                   <input
                     type="radio"
@@ -994,7 +1005,7 @@ export function MarketingSection() {
                   </td>
                   <td className="px-3 py-2">
                     {campaign.status === "running" &&
-                    runningCampaignId === campaign.id ? (
+                      runningCampaignId === campaign.id ? (
                       <div className="flex items-center gap-1.5">
                         <span className="px-2 py-1 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
                           Đang gửi
@@ -1017,15 +1028,14 @@ export function MarketingSection() {
                       </div>
                     ) : (
                       <span
-                        className={`px-2 py-1 rounded text-[10px] font-medium ${
-                          campaign.status === "draft"
-                            ? "bg-gray-100 text-gray-700"
-                            : campaign.status === "scheduled"
-                              ? "bg-orange-100 text-orange-700"
-                              : campaign.status === "running"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-green-100 text-green-700"
-                        }`}
+                        className={`px-2 py-1 rounded text-[10px] font-medium ${campaign.status === "draft"
+                          ? "bg-gray-100 text-gray-700"
+                          : campaign.status === "scheduled"
+                            ? "bg-orange-100 text-orange-700"
+                            : campaign.status === "running"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
                       >
                         {campaign.status === "draft"
                           ? "Nháp"
@@ -1079,6 +1089,7 @@ export function MarketingSection() {
           </table>
         </div>
       </div>
+
     </div>
   );
 }
