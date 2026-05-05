@@ -6,15 +6,21 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { fetchOaTemplates, sendTemplateByPhone } from "@/lib/zalo-oa";
-import { appendTemplateMessage, updateTemplateMessage } from "@/lib/zaloTemplateMessageStore";
 import {
-  Campaign,
-  CampaignFormState,
-  segmentOptions,
-} from "@/types/marketing";
+  fetchOaTemplates,
+  fetchTemplateInfo,
+  sendTemplateByPhone,
+} from "@/lib/zalo-oa";
+import {
+  appendTemplateMessage,
+  updateTemplateMessage,
+} from "@/lib/zaloTemplateMessageStore";
+import { Campaign, CampaignFormState, segmentOptions } from "@/types/marketing";
 import type { OaConnection, ZbsTemplate } from "@/types/zalo-oa";
-import { CampaignRecipientsImport, type CampaignRecipient } from "./CampaignRecipientsImport";
+import {
+  CampaignRecipientsImport,
+  type CampaignRecipient,
+} from "./CampaignRecipientsImport";
 
 const CONNECTIONS_STORAGE_KEY = "crm.zaloOa.connections.v1";
 
@@ -40,9 +46,15 @@ const initialFormState: CampaignFormState = {
   mode: "development",
 };
 
-const STATUS_BADGE: Record<ZbsTemplate["status"], { label: string; className: string }> = {
+const STATUS_BADGE: Record<
+  ZbsTemplate["status"],
+  { label: string; className: string }
+> = {
   approved: { label: "Đã duyệt", className: "bg-green-100 text-green-700" },
-  pending_review: { label: "Chờ duyệt", className: "bg-amber-100 text-amber-700" },
+  pending_review: {
+    label: "Chờ duyệt",
+    className: "bg-amber-100 text-amber-700",
+  },
   rejected: { label: "Bị từ chối", className: "bg-red-100 text-red-700" },
   draft: { label: "Nháp", className: "bg-gray-100 text-gray-600" },
   inactive: { label: "Ngừng dùng", className: "bg-gray-100 text-gray-500" },
@@ -56,10 +68,18 @@ interface TemplateWithOa extends ZbsTemplate {
 export function MarketingSection() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [form, setForm] = useState<CampaignFormState>(initialFormState);
-  const [templatesByOa, setTemplatesByOa] = useState<Record<string, ZbsTemplate[]>>({});
+  const [templatesByOa, setTemplatesByOa] = useState<
+    Record<string, ZbsTemplate[]>
+  >({});
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [connections, setConnections] = useState<OaConnection[]>([]);
   const [recipients, setRecipients] = useState<CampaignRecipient[]>([]);
+
+  // Thông tin biến (listParams) của template đang chọn
+  const [templateInfoLoading, setTemplateInfoLoading] = useState(false);
+  const [templateInfoError, setTemplateInfoError] = useState<string>("");
+  // Cho phép user nhập tay danh sách tên biến nếu API không trả (mỗi dòng 1 tên)
+  const [manualParamNames, setManualParamNames] = useState<string>("");
 
   // Filter & pagination cho danh sách template
   const [templateSearch, setTemplateSearch] = useState("");
@@ -79,9 +99,7 @@ export function MarketingSection() {
     if (connections.length === 0) return;
 
     let cancelled = false;
-    const missing = connections.filter(
-      (c) => !templatesByOa[c.oaOfficialId],
-    );
+    const missing = connections.filter((c) => !templatesByOa[c.oaOfficialId]);
     if (missing.length === 0) return;
 
     setTemplatesLoading(true);
@@ -153,8 +171,10 @@ export function MarketingSection() {
   const filteredTemplates = useMemo(() => {
     const q = templateSearch.trim().toLowerCase();
     return allTemplates.filter((t) => {
-      if (templateOaFilter !== "all" && t.connectionId !== templateOaFilter) return false;
-      if (templateStatusFilter !== "all" && t.status !== templateStatusFilter) return false;
+      if (templateOaFilter !== "all" && t.connectionId !== templateOaFilter)
+        return false;
+      if (templateStatusFilter !== "all" && t.status !== templateStatusFilter)
+        return false;
       if (!q) return true;
       return (
         t.templateName.toLowerCase().includes(q) ||
@@ -164,7 +184,10 @@ export function MarketingSection() {
     });
   }, [allTemplates, templateSearch, templateStatusFilter, templateOaFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredTemplates.length / TEMPLATE_PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTemplates.length / TEMPLATE_PAGE_SIZE),
+  );
 
   // Reset về page 1 khi filter thay đổi và đang ở page > totalPages
   useEffect(() => {
@@ -177,7 +200,8 @@ export function MarketingSection() {
   }, [filteredTemplates, templatePage]);
 
   const selectedTemplate = useMemo(
-    () => allTemplates.find((t) => t.templateCode === form.templateCode) || null,
+    () =>
+      allTemplates.find((t) => t.templateCode === form.templateCode) || null,
     [allTemplates, form.templateCode],
   );
 
@@ -191,6 +215,67 @@ export function MarketingSection() {
       message: template ? template.previewContent : "",
     }));
     setRecipients([]); // reset danh sách khi đổi template (vì cột biến có thể khác)
+    setTemplateInfoError("");
+    setManualParamNames("");
+
+    if (!template) return;
+    if (template.params.length > 0) return;
+
+    const conn = connections.find((c) => c.id === template.connectionId);
+    if (!conn) return;
+
+    setTemplateInfoLoading(true);
+    fetchTemplateInfo(template.templateId, conn.accessToken)
+      .then((result) => {
+        if (result.params.length > 0) {
+          setTemplatesByOa((prev) => {
+            const list = prev[template.oaId] ?? [];
+            const next = list.map((t) =>
+              t.templateId === template.templateId
+                ? { ...t, params: result.params }
+                : t,
+            );
+            return { ...prev, [template.oaId]: next };
+          });
+          return;
+        }
+        setTemplateInfoError(
+          result.errorMessage
+            ? `Zalo: ${result.errorMessage}${result.errorCode !== undefined ? ` (code ${result.errorCode})` : ""}`
+            : "Không lấy được danh sách biến của template.",
+        );
+      })
+      .finally(() => setTemplateInfoLoading(false));
+  };
+
+  // Áp dụng danh sách biến nhập tay (fallback khi API /template/info không khả dụng)
+  const handleApplyManualParams = () => {
+    if (!selectedTemplate) return;
+    const names = manualParamNames
+      .split(/[\n,;]/)
+      .map((s) => s.trim())
+      .filter((s) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(s));
+    if (names.length === 0) {
+      setTemplateInfoError(
+        "Hãy nhập ít nhất 1 tên biến hợp lệ (chữ/số/_, không bắt đầu bằng số).",
+      );
+      return;
+    }
+    const params: typeof selectedTemplate.params = names.map((name) => ({
+      name,
+      type: "string" as const,
+      required: true,
+      sample: "Giá trị mẫu",
+    }));
+    setTemplatesByOa((prev) => {
+      const list = prev[selectedTemplate.oaId] ?? [];
+      const next = list.map((t) =>
+        t.templateId === selectedTemplate.templateId ? { ...t, params } : t,
+      );
+      return { ...prev, [selectedTemplate.oaId]: next };
+    });
+    setTemplateInfoError("");
+    setRecipients([]);
   };
 
   const handleCreateCampaign = () => {
@@ -200,7 +285,9 @@ export function MarketingSection() {
     }
 
     const validRecipients = recipients.filter((r) => r.errors.length === 0);
-    const conn = connections.find((c) => c.id === selectedTemplate.connectionId);
+    const conn = connections.find(
+      (c) => c.id === selectedTemplate.connectionId,
+    );
 
     const nextCampaign: Campaign = {
       id: `camp-${Date.now()}`,
@@ -239,16 +326,27 @@ export function MarketingSection() {
   };
 
   /** Trạng thái progress khi đang chạy campaign */
-  const [runningCampaignId, setRunningCampaignId] = useState<string | null>(null);
-  const [runProgress, setRunProgress] = useState<{ done: number; total: number } | null>(null);
+  const [runningCampaignId, setRunningCampaignId] = useState<string | null>(
+    null,
+  );
+  const [runProgress, setRunProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
 
   const handleRunCampaign = async (campaignId: string) => {
     if (runningCampaignId) return; // tránh chạy đồng thời
     const campaign = campaigns.find((c) => c.id === campaignId);
     if (!campaign) return;
 
-    if (!campaign.templateId || !campaign.recipients || campaign.recipients.length === 0) {
-      alert("Chiến dịch này không có template hoặc danh sách người nhận hợp lệ.");
+    if (
+      !campaign.templateId ||
+      !campaign.recipients ||
+      campaign.recipients.length === 0
+    ) {
+      alert(
+        "Chiến dịch này không có template hoặc danh sách người nhận hợp lệ.",
+      );
       return;
     }
 
@@ -260,7 +358,11 @@ export function MarketingSection() {
 
     setRunningCampaignId(campaignId);
     setCampaigns((prev) =>
-      prev.map((c) => (c.id === campaignId ? { ...c, status: "running", sent: 0, failed: 0 } : c)),
+      prev.map((c) =>
+        c.id === campaignId
+          ? { ...c, status: "running", sent: 0, failed: 0 }
+          : c,
+      ),
     );
 
     const total = campaign.recipients.length;
@@ -354,10 +456,14 @@ export function MarketingSection() {
   };
 
   const handleDeleteCampaign = (campaignId: string) => {
-    setCampaigns((prev) => prev.filter((campaign) => campaign.id !== campaignId));
+    setCampaigns((prev) =>
+      prev.filter((campaign) => campaign.id !== campaignId),
+    );
   };
 
-  const validRecipientsCount = recipients.filter((r) => r.errors.length === 0).length;
+  const validRecipientsCount = recipients.filter(
+    (r) => r.errors.length === 0,
+  ).length;
   const canCreate =
     !!form.name.trim() && !!selectedTemplate && validRecipientsCount > 0;
   const hasConnections = connections.length > 0;
@@ -367,7 +473,8 @@ export function MarketingSection() {
       <div>
         <h2 className="text-sm font-semibold text-gray-800">Marketing</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Tạo chiến dịch broadcast cho Zalo OA — gộp template từ tất cả OA đã kết nối
+          Tạo chiến dịch broadcast cho Zalo OA — gộp template từ tất cả OA đã
+          kết nối
         </p>
       </div>
 
@@ -375,14 +482,20 @@ export function MarketingSection() {
         <Card>
           <CardContent className="py-3">
             <p className="text-xs text-gray-500">Tổng chiến dịch</p>
-            <p className="mt-1 text-lg font-bold text-gray-900">{campaigns.length}</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
+              {campaigns.length}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-3">
             <p className="text-xs text-gray-500">Đang chạy / đã lịch</p>
             <p className="mt-1 text-lg font-bold text-orange-600">
-              {campaigns.filter((c) => c.status === "running" || c.status === "scheduled").length}
+              {
+                campaigns.filter(
+                  (c) => c.status === "running" || c.status === "scheduled",
+                ).length
+              }
             </p>
           </CardContent>
         </Card>
@@ -425,7 +538,8 @@ export function MarketingSection() {
 
           {!hasConnections ? (
             <p className="text-xs text-gray-500 py-4 text-center">
-              Chưa có Zalo OA nào được kết nối. Vui lòng kết nối OA trước ở trang Zalo OA.
+              Chưa có Zalo OA nào được kết nối. Vui lòng kết nối OA trước ở
+              trang Zalo OA.
             </p>
           ) : allTemplates.length === 0 && !templatesLoading ? (
             <p className="text-xs text-gray-500 py-4 text-center">
@@ -448,7 +562,9 @@ export function MarketingSection() {
                 <select
                   value={templateStatusFilter}
                   onChange={(e) => {
-                    setTemplateStatusFilter(e.target.value as typeof templateStatusFilter);
+                    setTemplateStatusFilter(
+                      e.target.value as typeof templateStatusFilter,
+                    );
                     setTemplatePage(1);
                   }}
                   className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-primary-400 bg-white"
@@ -468,9 +584,13 @@ export function MarketingSection() {
                   }}
                   className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-primary-400 bg-white"
                 >
-                  <option value="all">Tất cả OA ({oaWithTemplatesCount})</option>
+                  <option value="all">
+                    Tất cả OA ({oaWithTemplatesCount})
+                  </option>
                   {connections
-                    .filter((c) => allTemplates.some((t) => t.connectionId === c.id))
+                    .filter((c) =>
+                      allTemplates.some((t) => t.connectionId === c.id),
+                    )
                     .map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.oaName}
@@ -484,8 +604,12 @@ export function MarketingSection() {
                 {filteredTemplates.length === 0
                   ? 0
                   : (templatePage - 1) * TEMPLATE_PAGE_SIZE + 1}
-                –{Math.min(templatePage * TEMPLATE_PAGE_SIZE, filteredTemplates.length)} trong tổng{" "}
-                {filteredTemplates.length} template
+                –
+                {Math.min(
+                  templatePage * TEMPLATE_PAGE_SIZE,
+                  filteredTemplates.length,
+                )}{" "}
+                trong tổng {filteredTemplates.length} template
                 {filteredTemplates.length !== allTemplates.length
                   ? ` (đã lọc từ ${allTemplates.length})`
                   : ""}
@@ -505,7 +629,9 @@ export function MarketingSection() {
                         <button
                           key={`${t.connectionId}-${t.id}`}
                           type="button"
-                          onClick={() => canPick && handleTemplateChange(t.templateCode)}
+                          onClick={() =>
+                            canPick && handleTemplateChange(t.templateCode)
+                          }
                           disabled={!canPick}
                           className={`text-left rounded-lg border p-3 transition-colors ${
                             isSelected
@@ -534,7 +660,8 @@ export function MarketingSection() {
                             </p>
                           )}
                           <p className="mt-1 text-[10px] text-gray-400">
-                            {t.templateType} • {t.templateCode} • {t.params.length} biến
+                            {t.templateType} • {t.templateCode} •{" "}
+                            {t.params.length} biến
                           </p>
                         </button>
                       );
@@ -557,7 +684,9 @@ export function MarketingSection() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setTemplatePage((p) => Math.max(1, p - 1))}
+                          onClick={() =>
+                            setTemplatePage((p) => Math.max(1, p - 1))
+                          }
                           disabled={templatePage === 1}
                           className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -565,7 +694,9 @@ export function MarketingSection() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setTemplatePage((p) => Math.min(totalPages, p + 1))}
+                          onClick={() =>
+                            setTemplatePage((p) => Math.min(totalPages, p + 1))
+                          }
                           disabled={templatePage >= totalPages}
                           className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -591,7 +722,9 @@ export function MarketingSection() {
 
       <Card>
         <CardContent className="p-4">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Tạo chiến dịch mới</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">
+            Tạo chiến dịch mới
+          </h3>
           <div className="space-y-3">
             <Input
               label="Tên chiến dịch"
@@ -602,7 +735,10 @@ export function MarketingSection() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Template ZBS <span className="text-gray-400 font-normal">(từ tất cả OA)</span>
+                Template ZBS{" "}
+                <span className="text-gray-400 font-normal">
+                  (từ tất cả OA)
+                </span>
               </label>
               <Select
                 value={form.templateCode}
@@ -651,13 +787,19 @@ export function MarketingSection() {
                     {STATUS_BADGE[selectedTemplate.status].label}
                   </span>
                   <span className="text-[10px] text-gray-400">
-                    {selectedTemplate.templateType} • Template ID: {selectedTemplate.templateId}
+                    {selectedTemplate.templateType} • Template ID:{" "}
+                    {selectedTemplate.templateId}
                   </span>
                 </div>
                 <p className="text-xs text-gray-600 whitespace-pre-line">
                   {selectedTemplate.previewContent}
                 </p>
-                {selectedTemplate.params.length > 0 && (
+                {templateInfoLoading ? (
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1.5">
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-primary-600" />
+                    Đang tải danh sách biến của template...
+                  </p>
+                ) : selectedTemplate.params.length > 0 ? (
                   <p className="text-[11px] text-gray-500">
                     Biến cần truyền:{" "}
                     {selectedTemplate.params.map((p) => (
@@ -666,28 +808,61 @@ export function MarketingSection() {
                         className="inline-block mr-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-mono text-gray-700"
                       >
                         {p.name}
+                        {p.required ? " *" : ""}
                       </span>
                     ))}
                   </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-amber-700">
+                      ⚠️{" "}
+                      {templateInfoError ||
+                        "Không lấy được danh sách biến từ Zalo. Hãy nhập tay tên biến của template:"}
+                    </p>
+                    <textarea
+                      value={manualParamNames}
+                      onChange={(e) => setManualParamNames(e.target.value)}
+                      placeholder={`Mỗi dòng 1 tên biến, ví dụ:\ncustomer_name\norder_code\namount`}
+                      rows={4}
+                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-[11px] font-mono outline-none focus:border-primary-400 bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyManualParams}
+                      className="px-3 py-1 text-[11px] rounded border border-primary-300 text-primary-700 hover:bg-primary-50"
+                    >
+                      Áp dụng danh sách biến
+                    </button>
+                    <p className="text-[10px] text-gray-400">
+                      Mẹo: vào Zalo Business → Template → bấm vào template để
+                      xem các biến (vd: <code>customer_name</code>,{" "}
+                      <code>order_code</code>, <code>amount</code>
+                      ).
+                    </p>
+                  </div>
                 )}
               </div>
             )}
 
-            {selectedTemplate && (
-              <CampaignRecipientsImport
-                params={selectedTemplate.params}
-                recipients={recipients}
-                onChange={setRecipients}
-                templateName={selectedTemplate.templateName}
-                templateCode={selectedTemplate.templateCode}
-              />
-            )}
+            {selectedTemplate &&
+              !templateInfoLoading &&
+              selectedTemplate.params.length > 0 && (
+                <CampaignRecipientsImport
+                  params={selectedTemplate.params}
+                  recipients={recipients}
+                  onChange={setRecipients}
+                  templateName={selectedTemplate.templateName}
+                  templateCode={selectedTemplate.templateCode}
+                />
+              )}
 
             <Input
               label="Lịch gửi (nếu có)"
               type="datetime-local"
               value={form.scheduledAt}
-              onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, scheduledAt: e.target.value })
+              }
             />
 
             <div>
@@ -761,25 +936,42 @@ export function MarketingSection() {
                 <th className="px-3 py-2 font-medium text-gray-600">#</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Tên</th>
                 <th className="px-3 py-2 font-medium text-gray-600">Kênh</th>
-                <th className="px-3 py-2 font-medium text-gray-600">Template</th>
+                <th className="px-3 py-2 font-medium text-gray-600">
+                  Template
+                </th>
                 <th className="px-3 py-2 font-medium text-gray-600">Mode</th>
-                <th className="px-3 py-2 font-medium text-gray-600">Người nhận</th>
-                <th className="px-3 py-2 font-medium text-gray-600">Trạng thái</th>
-                <th className="px-3 py-2 font-medium text-gray-600">Gửi / Lỗi</th>
-                <th className="px-3 py-2 font-medium text-gray-600 w-20">Thao tác</th>
+                <th className="px-3 py-2 font-medium text-gray-600">
+                  Người nhận
+                </th>
+                <th className="px-3 py-2 font-medium text-gray-600">
+                  Trạng thái
+                </th>
+                <th className="px-3 py-2 font-medium text-gray-600">
+                  Gửi / Lỗi
+                </th>
+                <th className="px-3 py-2 font-medium text-gray-600 w-20">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody>
               {campaigns.map((campaign, idx) => (
-                <tr key={campaign.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 text-xs">
+                <tr
+                  key={campaign.id}
+                  className="border-b border-gray-100 last:border-0 hover:bg-gray-50 text-xs"
+                >
                   <td className="px-3 py-2 text-gray-500">{idx + 1}</td>
-                  <td className="px-3 py-2 font-medium text-gray-800">{campaign.name}</td>
+                  <td className="px-3 py-2 font-medium text-gray-800">
+                    {campaign.name}
+                  </td>
                   <td className="px-3 py-2 text-gray-600">
                     {channelLabelById[campaign.channel] || campaign.channel}
                   </td>
                   <td className="px-3 py-2 text-gray-600">
                     {campaign.templateName ? (
-                      <span title={campaign.templateCode}>{campaign.templateName}</span>
+                      <span title={campaign.templateCode}>
+                        {campaign.templateName}
+                      </span>
                     ) : (
                       <span className="text-gray-400">—</span>
                     )}
@@ -801,7 +993,8 @@ export function MarketingSection() {
                       : "—"}
                   </td>
                   <td className="px-3 py-2">
-                    {campaign.status === "running" && runningCampaignId === campaign.id ? (
+                    {campaign.status === "running" &&
+                    runningCampaignId === campaign.id ? (
                       <div className="flex items-center gap-1.5">
                         <span className="px-2 py-1 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
                           Đang gửi
@@ -849,16 +1042,17 @@ export function MarketingSection() {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
-                      {campaign.status !== "completed" && campaign.status !== "running" && (
-                        <button
-                          onClick={() => handleRunCampaign(campaign.id)}
-                          disabled={!!runningCampaignId}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          title="Chạy ngay"
-                        >
-                          <FiPlay className="w-4 h-4" />
-                        </button>
-                      )}
+                      {campaign.status !== "completed" &&
+                        campaign.status !== "running" && (
+                          <button
+                            onClick={() => handleRunCampaign(campaign.id)}
+                            disabled={!!runningCampaignId}
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Chạy ngay"
+                          >
+                            <FiPlay className="w-4 h-4" />
+                          </button>
+                        )}
                       <button
                         onClick={() => handleDeleteCampaign(campaign.id)}
                         disabled={runningCampaignId === campaign.id}
@@ -873,7 +1067,10 @@ export function MarketingSection() {
               ))}
               {campaigns.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-gray-400">
+                  <td
+                    colSpan={9}
+                    className="px-3 py-6 text-center text-gray-400"
+                  >
                     Chưa có chiến dịch nào
                   </td>
                 </tr>
