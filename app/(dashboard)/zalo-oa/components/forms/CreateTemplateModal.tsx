@@ -401,13 +401,12 @@ export function CreateTemplateModal({ isOpen, connections, onClose, onCreated }:
         {[1, 2, 3].map((s) => (
           <div key={s} className="flex items-center gap-1 flex-1">
             <div
-              className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                step === s
+              className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${step === s
                   ? "bg-primary-600 text-white"
                   : s < step
                     ? "bg-green-500 text-white"
                     : "bg-gray-100 text-gray-400"
-              }`}
+                }`}
             >
               {s}
             </div>
@@ -425,7 +424,7 @@ export function CreateTemplateModal({ isOpen, connections, onClose, onCreated }:
             <span className="text-green-600 text-xl font-bold">✓</span>
           </div>
           <p className="font-semibold text-gray-800">Template đã được gửi lên Zalo để kiểm duyệt!</p>
-          <p className="text-xs text-gray-500">Sau khi duyệt, template sẽ chuyển sang trạng thái "Đã duyệt" và có thể dùng để gửi tin.</p>
+          <p className="text-xs text-gray-500">Sau khi duyệt, template sẽ chuyển sang trạng thái &ldquo;Đã duyệt&rdquo; và có thể dùng để gửi tin.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -512,7 +511,7 @@ export function CreateTemplateModal({ isOpen, connections, onClose, onCreated }:
                 </div>
                 {form.bodyComponents.length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-4 rounded-lg border border-dashed border-gray-200">
-                    Chưa có component nào. Nhấn "Thêm component" để bắt đầu.
+                    Chưa có component nào. Nhấn &ldquo;Thêm component&rdquo; để bắt đầu.
                   </p>
                 ) : (
                   <div className="space-y-2">
