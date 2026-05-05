@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { FiSend } from "react-icons/fi";
+import { useRef, useState } from "react";
+import { FiCornerDownLeft, FiImage, FiPaperclip, FiSend, FiX } from "react-icons/fi";
 import type { ZaloChatMessage, ZaloConversation } from "@/types/zalo-oa";
 import { ChatMessageRow } from "./ChatMessageRow";
 import { EmptyState } from "./EmptyState";
@@ -12,7 +13,13 @@ interface ZaloInteractionPanelProps {
     selectedMessages: ZaloChatMessage[];
     chatComposerValue: string;
     onChatComposerValueChange: (value: string) => void;
-    onSendMessage: () => void;
+    onSendText: () => void;
+    onSendImage: (file: File, caption?: string) => void;
+    onSendFile: (file: File, caption?: string) => void;
+    onRetryMessage: (messageId: string) => void;
+    replyingTo: ZaloChatMessage | null;
+    onStartQuote: (message: ZaloChatMessage) => void;
+    onCancelQuote: () => void;
 }
 
 export function ZaloInteractionPanel({
@@ -21,8 +28,19 @@ export function ZaloInteractionPanel({
     selectedMessages,
     chatComposerValue,
     onChatComposerValueChange,
-    onSendMessage,
+    onSendText,
+    onSendImage,
+    onSendFile,
+    onRetryMessage,
+    replyingTo,
+    onStartQuote,
+    onCancelQuote,
 }: ZaloInteractionPanelProps) {
+    const imageInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
+
     if (!selectedConversation) {
         return (
             <div className="flex-1 flex items-center justify-center">
@@ -30,6 +48,56 @@ export function ZaloInteractionPanel({
             </div>
         );
     }
+
+    const handlePickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+        if (!file.type.startsWith("image/")) return;
+        if (file.size > 5 * 1024 * 1024) {
+            alert("Ảnh vượt quá 5MB");
+            return;
+        }
+        setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+        setPendingFile(null);
+    };
+
+    const handlePickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+        if (file.size > 25 * 1024 * 1024) {
+            alert("File vượt quá 25MB");
+            return;
+        }
+        setPendingFile(file);
+        setPendingImage(null);
+    };
+
+    const handleSubmit = () => {
+        if (pendingImage) {
+            onSendImage(pendingImage.file, chatComposerValue.trim() || undefined);
+            URL.revokeObjectURL(pendingImage.previewUrl);
+            setPendingImage(null);
+            onChatComposerValueChange("");
+            return;
+        }
+        if (pendingFile) {
+            onSendFile(pendingFile, chatComposerValue.trim() || undefined);
+            setPendingFile(null);
+            onChatComposerValueChange("");
+            return;
+        }
+        if (!chatComposerValue.trim()) return;
+        onSendText();
+    };
+
+    const removePendingImage = () => {
+        if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+        setPendingImage(null);
+    };
+
+    const canSubmit = !!pendingImage || !!pendingFile || !!chatComposerValue.trim();
 
     return (
         <div className="flex h-full flex-col">
@@ -64,37 +132,150 @@ export function ZaloInteractionPanel({
                     <p className="text-sm text-gray-400 text-center pt-8">Chưa có tin nhắn trong hội thoại này.</p>
                 ) : (
                     selectedMessages.map((message) => (
-                        <ChatMessageRow key={message.id} message={message} />
+                        <ChatMessageRow
+                            key={message.id}
+                            message={message}
+                            onQuote={onStartQuote}
+                            onRetry={onRetryMessage}
+                        />
                     ))
                 )}
             </div>
 
             <div className="border-t border-gray-200 bg-white p-3">
+                {replyingTo && (
+                    <div className="mb-2 flex items-start gap-2 rounded-lg bg-primary-50 border border-primary-100 px-3 py-2">
+                        <FiCornerDownLeft className="mt-0.5 h-3.5 w-3.5 text-primary-600 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-semibold text-primary-700">
+                                Đang trả lời{" "}
+                                {replyingTo.sender === "agent" ? "tin của bạn" : "tin khách hàng"}
+                            </p>
+                            <p className="text-xs text-gray-600 truncate">
+                                {replyingTo.content || "[Tệp đính kèm]"}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onCancelQuote}
+                            className="text-gray-400 hover:text-red-500"
+                            title="Huỷ trả lời"
+                        >
+                            <FiX className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                )}
+
+                {pendingImage && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={pendingImage.previewUrl}
+                            alt={pendingImage.file.name}
+                            className="h-12 w-12 rounded object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-700 truncate">
+                                {pendingImage.file.name}
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                                {(pendingImage.file.size / 1024).toFixed(1)} KB
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={removePendingImage}
+                            className="text-gray-400 hover:text-red-500"
+                            title="Bỏ ảnh"
+                        >
+                            <FiX className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
+
+                {pendingFile && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 p-2">
+                        <div className="h-10 w-10 rounded bg-primary-100 text-primary-700 flex items-center justify-center flex-shrink-0">
+                            <FiPaperclip className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-700 truncate">{pendingFile.name}</p>
+                            <p className="text-[11px] text-gray-500">
+                                {(pendingFile.size / 1024).toFixed(1)} KB
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setPendingFile(null)}
+                            className="text-gray-400 hover:text-red-500"
+                            title="Bỏ file"
+                        >
+                            <FiX className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex items-end gap-2">
+                    <button
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-primary-600"
+                        title="Gửi ảnh"
+                    >
+                        <FiImage className="h-4 w-4" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-primary-600"
+                        title="Gửi file"
+                    >
+                        <FiPaperclip className="h-4 w-4" />
+                    </button>
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePickImage}
+                        className="hidden"
+                    />
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        onChange={handlePickFile}
+                        className="hidden"
+                    />
+
                     <textarea
                         value={chatComposerValue}
                         onChange={(event) => onChatComposerValueChange(event.target.value)}
                         onKeyDown={(event) => {
                             if (event.key === "Enter" && !event.shiftKey) {
                                 event.preventDefault();
-                                onSendMessage();
+                                handleSubmit();
                             }
                         }}
-                        placeholder="Nhập nội dung tin nhắn..."
+                        placeholder={
+                            pendingImage || pendingFile
+                                ? "Mô tả cho tệp đính kèm (tuỳ chọn)..."
+                                : "Nhập nội dung tin nhắn..."
+                        }
                         rows={2}
                         className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
                     />
                     <button
                         type="button"
-                        onClick={onSendMessage}
-                        disabled={!chatComposerValue.trim()}
+                        onClick={handleSubmit}
+                        disabled={!canSubmit}
                         className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary-600 text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                         title="Gửi tin nhắn"
                     >
                         <FiSend className="h-4 w-4" />
                     </button>
                 </div>
-                <p className="mt-2 text-[11px] text-gray-400">Nhấn Enter để gửi, Shift + Enter để xuống dòng.</p>
+                <p className="mt-2 text-[11px] text-gray-400">
+                    Nhấn Enter để gửi, Shift + Enter để xuống dòng. Ảnh ≤ 5MB, file ≤ 25MB.
+                </p>
             </div>
         </div>
     );

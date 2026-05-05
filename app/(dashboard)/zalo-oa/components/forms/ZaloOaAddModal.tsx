@@ -24,6 +24,7 @@ import {
   getZaloAppId,
   sendTemplateByPhone,
 } from "@/lib/zalo-oa";
+import { appendTemplateMessage } from "@/lib/zaloTemplateMessageStore";
 
 interface ZaloOaAddModalProps {
   open: boolean;
@@ -52,6 +53,7 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
   const [templateData, setTemplateData] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<ZbsSendByPhoneResult | null>(null);
+  const [sendMode, setSendMode] = useState<"development" | "production">("development");
 
   useEffect(() => {
     if (!open) {
@@ -162,7 +164,7 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
     setStep("templates");
     setTemplatesLoading(true);
     try {
-      const list = await fetchOaTemplates(connectedOa.oaOfficialId);
+      const list = await fetchOaTemplates(connectedOa.oaOfficialId, connectedOa.accessToken);
       setTemplates(list);
     } finally {
       setTemplatesLoading(false);
@@ -203,12 +205,43 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
     setSendResult(null);
     try {
       const result = await sendTemplateByPhone({
-        oaId: connectedOa.oaOfficialId,
+        oaId: connectedOa.id,
+        oaOfficialId: connectedOa.oaOfficialId,
+        accessToken: connectedOa.accessToken,
+        templateId: selectedTemplate.templateId,
         templateCode: selectedTemplate.templateCode,
+        templateName: selectedTemplate.templateName,
         phone: phone.trim(),
         templateData,
-        trackingId: `${selectedTemplate.templateCode}_${Date.now()}`,
+        mode: sendMode,
       });
+
+      // Lưu lịch sử
+      const now = new Date().toISOString();
+      appendTemplateMessage({
+        id: result.id,
+        oaId: connectedOa.id,
+        oaOfficialId: connectedOa.oaOfficialId,
+        templateId: selectedTemplate.templateId,
+        templateCode: selectedTemplate.templateCode,
+        templateName: selectedTemplate.templateName,
+        phone: phone.trim(),
+        normalizedPhone: phone.trim(),
+        trackingId: result.trackingId,
+        mode: result.mode,
+        templateData,
+        msgId: result.msgId,
+        status: result.status,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        zaloErrorCode: result.zaloErrorCode,
+        sentAt: result.sentAt,
+        quotaRemaining: result.quotaRemaining,
+        dailyQuota: result.dailyQuota,
+        createdAt: now,
+        updatedAt: now,
+      });
+
       setSendResult(result);
       setStep("sent");
     } finally {
@@ -308,6 +341,8 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
               onSubmit={handleSend}
               sending={sending}
               canSubmit={canSubmitSend}
+              mode={sendMode}
+              onModeChange={setSendMode}
             />
           ) : step === "sent" && sendResult ? (
             <SendResultStep
@@ -484,6 +519,8 @@ interface SendByPhoneStepProps {
   onSubmit: () => void;
   sending: boolean;
   canSubmit: boolean;
+  mode: "development" | "production";
+  onModeChange: (mode: "development" | "production") => void;
 }
 
 function SendByPhoneStep({
@@ -496,6 +533,8 @@ function SendByPhoneStep({
   onSubmit,
   sending,
   canSubmit,
+  mode,
+  onModeChange,
 }: SendByPhoneStepProps) {
   const preview = useMemo(() => {
     return template.previewContent.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -560,6 +599,52 @@ function SendByPhoneStep({
         </div>
       </div>
 
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Chế độ gửi</label>
+        <div className="flex gap-2">
+          <label
+            className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${
+              mode === "development"
+                ? "border-amber-400 bg-amber-50 text-amber-800"
+                : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            <input
+              type="radio"
+              name="send-by-phone-mode"
+              value="development"
+              checked={mode === "development"}
+              onChange={() => onModeChange("development")}
+              className="mr-2"
+            />
+            <span className="font-semibold">🧪 Development</span>
+            <p className="text-[10px] text-gray-500 mt-0.5 ml-5">
+              Test — không trừ quota, không gửi thật.
+            </p>
+          </label>
+          <label
+            className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-xs ${
+              mode === "production"
+                ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            <input
+              type="radio"
+              name="send-by-phone-mode"
+              value="production"
+              checked={mode === "production"}
+              onChange={() => onModeChange("production")}
+              className="mr-2"
+            />
+            <span className="font-semibold">🚀 Production</span>
+            <p className="text-[10px] text-gray-500 mt-0.5 ml-5">
+              Gửi thật — trừ quota, đến máy khách.
+            </p>
+          </label>
+        </div>
+      </div>
+
       <div className="flex justify-end gap-2 pt-1">
         <button
           onClick={onSubmit}
@@ -570,7 +655,11 @@ function SendByPhoneStep({
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
           )}
           <FiSend className="h-3.5 w-3.5" />
-          {sending ? "Đang gửi..." : "Gửi tin"}
+          {sending
+            ? "Đang gửi..."
+            : mode === "development"
+              ? "Gửi tin (Dev)"
+              : "Gửi tin"}
         </button>
       </div>
     </div>
@@ -590,7 +679,7 @@ function SendResultStep({
   onBackToTemplates,
   onClose,
 }: SendResultStepProps) {
-  const isSuccess = result.status === "success";
+  const isSuccess = result.status === "sent_to_zalo" || result.status === "delivered";
   return (
     <div className="space-y-4">
       <div
@@ -626,10 +715,23 @@ function SendResultStep({
         <dd className="col-span-2 text-gray-800">
           {new Date(result.sentAt).toLocaleString("vi-VN", { hour12: false })}
         </dd>
+        <dt className="text-gray-400">mode</dt>
+        <dd className="col-span-2 text-gray-800">
+          {result.mode === "development" ? "🧪 Development" : "🚀 Production"}
+        </dd>
         {typeof result.quotaRemaining === "number" && (
           <>
-            <dt className="text-gray-400">quota</dt>
-            <dd className="col-span-2 text-gray-800">{result.quotaRemaining}</dd>
+            <dt className="text-gray-400">quota còn</dt>
+            <dd className="col-span-2 text-gray-800">
+              {result.quotaRemaining}
+              {typeof result.dailyQuota === "number" ? ` / ${result.dailyQuota}` : ""}
+            </dd>
+          </>
+        )}
+        {result.errorCode && (
+          <>
+            <dt className="text-gray-400">error_code</dt>
+            <dd className="col-span-2 text-red-600 font-mono">{result.errorCode}</dd>
           </>
         )}
       </dl>

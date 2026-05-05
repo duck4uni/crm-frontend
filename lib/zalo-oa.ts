@@ -4,16 +4,23 @@ import type {
   ZaloConversation,
   ZbsSendByPhoneRequest,
   ZbsSendByPhoneResult,
+  ZbsSendMode,
   ZbsTemplate,
+  ZbsTemplateParam,
 } from "@/types/zalo-oa";
 
-export const ZALO_OAUTH_PERMISSION_URL = "https://oauth.zaloapp.com/v4/oa/permission";
+export const ZALO_OAUTH_PERMISSION_URL =
+  "https://oauth.zaloapp.com/v4/oa/permission";
 
 export function getZaloAppId(): string {
   return process.env.NEXT_PUBLIC_ZALO_APP_ID || "";
 }
 
-export function buildZaloOAuthUrl(params: { appId: string; redirectUri: string; state: string }): string {
+export function buildZaloOAuthUrl(params: {
+  appId: string;
+  redirectUri: string;
+  state: string;
+}): string {
   const search = new URLSearchParams({
     app_id: params.appId,
     redirect_uri: params.redirectUri,
@@ -100,117 +107,366 @@ export async function exchangeAuthorizationCode(
   return data as ExchangeOaTokenResult;
 }
 
-// Simulates GET /api/zalo/templates?oaId={oaId}
-export async function fetchOaTemplates(oaId: string): Promise<ZbsTemplate[]> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  const now = new Date().toLocaleString("vi-VN", { hour12: false });
-  return [
-    {
-      id: `tpl-${oaId}-01`,
-      oaId,
-      templateId: "1023456",
-      templateCode: "ORDER_CONFIRMED",
-      templateName: "Xác nhận đơn hàng",
-      templateType: "Giao dịch",
-      status: "approved",
-      previewContent:
-        "Chào {{customer_name}}, đơn hàng {{order_code}} trị giá {{amount}}đ đã được xác nhận. Cảm ơn quý khách!",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "order_code", type: "string", required: true, sample: "DH001" },
-        { name: "amount", type: "string", required: true, sample: "250000" },
-      ],
-      lastSyncedAt: now,
-    },
-    {
-      id: `tpl-${oaId}-02`,
-      oaId,
-      templateId: "1023457",
-      templateCode: "APPOINTMENT_REMIND",
-      templateName: "Nhắc lịch hẹn dịch vụ",
-      templateType: "Chăm sóc",
-      status: "approved",
-      previewContent:
-        "Chào {{customer_name}}, lịch hẹn của bạn vào {{appointment_time}} tại {{address}}. Vui lòng có mặt đúng giờ.",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "appointment_time", type: "datetime", required: true, sample: "08:30 ngày 02/05/2026" },
-        { name: "address", type: "string", required: true, sample: "12 Lê Lợi, Quận 1" },
-      ],
-      lastSyncedAt: now,
-    },
-    {
-      id: `tpl-${oaId}-03`,
-      oaId,
-      templateId: "1023458",
-      templateCode: "PAYMENT_RECEIVED",
-      templateName: "Xác nhận thanh toán",
-      templateType: "Giao dịch",
-      status: "pending_review",
-      previewContent:
-        "Đã nhận thanh toán {{amount}}đ cho hóa đơn {{invoice_code}}. Cảm ơn {{customer_name}}.",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "invoice_code", type: "string", required: true, sample: "HD2026-0001" },
-        { name: "amount", type: "string", required: true, sample: "1500000" },
-      ],
-      lastSyncedAt: now,
-    },
-    {
-      id: `tpl-${oaId}-04`,
-      oaId,
-      templateId: "1023459",
-      templateCode: "PROMOTION_VOUCHER",
-      templateName: "Tặng voucher khuyến mãi",
-      templateType: "Hậu mãi",
-      status: "rejected",
-      previewContent:
-        "{{customer_name}} ơi, tặng bạn voucher {{voucher_code}} giảm {{discount}} cho đơn hàng tiếp theo.",
-      params: [
-        { name: "customer_name", type: "string", required: true, sample: "Nguyễn Văn A" },
-        { name: "voucher_code", type: "string", required: true, sample: "SALE10" },
-        { name: "discount", type: "string", required: true, sample: "10%" },
-      ],
-      lastSyncedAt: now,
-    },
-  ];
+interface ZaloTemplateRaw {
+  templateId?: number | string;
+  templateName?: string;
+  // Theo spec Zalo: response trả `status` dạng string ENABLE/PENDING_REVIEW/REJECT/DISABLE.
+  // Một số phiên bản còn dùng `templateTag` — giữ cả hai để tương thích.
+  status?: string;
+  templateTag?: string;
+  templateQuality?: string; // HIGH / MEDIUM / LOW / UNDEFINED
+  templateType?: number | string;
+  createdTime?: number | string;
+  modifiedTime?: number | string;
+  previewUrl?: string;
+  [key: string]: unknown;
 }
 
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
+const mapTemplateStatus = (raw?: string): ZbsTemplate["status"] => {
+  const upper = (raw || "").toUpperCase();
+  if (upper === "ENABLE" || upper === "APPROVED" || upper === "ACTIVE")
+    return "approved";
+  if (upper === "PENDING_REVIEW" || upper === "PENDING" || upper === "WAITING")
+    return "pending_review";
+  if (upper === "REJECT" || upper === "REJECTED") return "rejected";
+  if (upper === "DISABLE" || upper === "INACTIVE" || upper === "PAUSED")
+    return "inactive";
+  return "draft";
+};
+
+/**
+ * Lấy danh sách template ZBS / ZNS của OA đang đăng nhập.
+ * Endpoint thật: GET https://business.openapi.zalo.me/template/all (proxy qua /api/zalo/templates).
+ * Trả về [] nếu OA chưa có template nào hoặc API lỗi (không throw để UI render gracefully).
+ *
+ * Trong môi trường dev, nếu caller không truyền `accessToken` thì auto fallback
+ * sang `NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN` để tiện test ngay khi chưa có popup OAuth thật.
+ */
+export async function fetchOaTemplates(
+  oaId: string,
+  accessToken?: string,
+): Promise<ZbsTemplate[]> {
+  let token = accessToken;
+  if (!token && process.env.NODE_ENV !== "production") {
+    token = process.env.NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN || undefined;
+    if (token) {
+      console.log("[Zalo] fetchOaTemplates: dùng dev token từ env để test");
+    }
+  }
+
+  if (!token) {
+    console.warn(
+      "[Zalo] fetchOaTemplates: thiếu access token, trả về danh sách rỗng",
+    );
+    return [];
+  }
+
+  try {
+    // KHÔNG truyền status để Zalo trả về template ở mọi trạng thái
+    // (Enable / Pending review / Reject / Disable). status là INT 1/2/3/4 nếu cần lọc.
+    const res = await fetch(`/api/zalo/templates?offset=0&limit=100`, {
+      headers: { "x-oa-access-token": token },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      console.warn(`[Zalo] fetchOaTemplates: HTTP ${res.status}`);
+      return [];
+    }
+    const json = await res.json();
+    if (json.error !== 0) {
+      console.warn("[Zalo] fetchOaTemplates: API error", json);
+      return [];
+    }
+    const list: ZaloTemplateRaw[] = Array.isArray(json.data) ? json.data : [];
+    const now = new Date().toLocaleString("vi-VN", { hour12: false });
+
+    return list.map((item, idx): ZbsTemplate => {
+      const tid = String(item.templateId ?? `idx-${idx}`);
+      return {
+        id: `tpl-${oaId}-${tid}`,
+        oaId,
+        templateId: tid,
+        templateCode: tid, // Zalo OA template chưa có concept "code", dùng template_id
+        templateName: item.templateName || `Template ${tid}`,
+        templateType:
+          typeof item.templateType === "string"
+            ? item.templateType
+            : "Tin tư vấn",
+        status: mapTemplateStatus(item.status || item.templateTag),
+        previewContent: "",
+        params: [],
+        lastSyncedAt: now,
+      };
+    });
+  } catch (err) {
+    console.error("[Zalo] fetchOaTemplates failed:", err);
+    return [];
+  }
+}
+
+interface ZaloTemplateInfoParamRaw {
+  name?: string;
+  require?: boolean;
+  type?: string;
+  maxLength?: number | string;
+  minLength?: number | string;
+  acceptNull?: boolean;
+  sample?: string;
+  [key: string]: unknown;
+}
+
+const mapParamType = (raw?: string): ZbsTemplateParam["type"] => {
+  const upper = (raw || "").toUpperCase();
+  if (upper === "NUMBER" || upper === "CURRENCY") return "number";
+  if (upper === "DATE" || upper === "DATETIME") return "datetime";
+  return "string";
+};
+
+const sampleForType = (
+  type: ZbsTemplateParam["type"],
+  name: string,
+): string => {
+  if (type === "number") return "100000";
+  if (type === "datetime") return "2026-05-05 10:00";
+  const lower = name.toLowerCase();
+  if (lower.includes("name")) return "Nguyễn Văn A";
+  if (lower.includes("code") || lower.includes("order")) return "DH001";
+  if (
+    lower.includes("amount") ||
+    lower.includes("price") ||
+    lower.includes("total")
+  )
+    return "500000";
+  if (lower.includes("phone")) return "0901234567";
+  if (lower.includes("date") || lower.includes("time")) return "05/05/2026";
+  if (lower.includes("address")) return "123 Nguyễn Huệ, TP.HCM";
+  return "Giá trị mẫu";
+};
+
+export interface FetchTemplateInfoResult {
+  params: ZbsTemplateParam[];
+  errorCode?: number;
+  errorMessage?: string;
+  /** Nguồn data: "info-v2" | "sample-data" — debug */
+  source?: string;
+}
+
+/**
+ * Lấy danh sách biến của 1 template (gọi /template/info/v2, fallback sample-data).
+ * Proxy: GET /api/zalo/templates/info?template_id=...
+ */
+export async function fetchTemplateInfo(
+  templateId: string,
+  accessToken?: string,
+): Promise<FetchTemplateInfoResult> {
+  let token = accessToken;
+  if (!token && process.env.NODE_ENV !== "production") {
+    token = process.env.NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN || undefined;
+  }
+
+  if (!token) {
+    return { params: [], errorCode: 1, errorMessage: "Thiếu access token OA." };
+  }
+  if (!templateId) {
+    return { params: [], errorCode: 1, errorMessage: "Thiếu template_id." };
+  }
+
+  try {
+    const res = await fetch(
+      `/api/zalo/templates/info?template_id=${encodeURIComponent(templateId)}`,
+      { headers: { "x-oa-access-token": token }, cache: "no-store" },
+    );
+    const json = await res.json();
+    if (!res.ok || json.error !== 0) {
+      return {
+        params: [],
+        errorCode: json.error,
+        errorMessage: json.message || `HTTP ${res.status}`,
+      };
+    }
+    const data = (json.data || {}) as {
+      listParams?: ZaloTemplateInfoParamRaw[];
+      source?: string;
+    };
+    const list = Array.isArray(data.listParams) ? data.listParams : [];
+    const params = list
+      .filter((p) => typeof p.name === "string" && p.name.length > 0)
+      .map((p): ZbsTemplateParam => {
+        const type = mapParamType(p.type);
+        return {
+          name: String(p.name),
+          type,
+          required: p.require !== false && p.acceptNull !== true,
+          sample:
+            p.sample && String(p.sample).length > 0
+              ? String(p.sample)
+              : sampleForType(type, String(p.name)),
+        };
+      });
+    return { params, source: data.source || "info-v2" };
+  } catch (err) {
+    return {
+      params: [],
+      errorCode: -1,
+      errorMessage: err instanceof Error ? err.message : "Network error",
+    };
+  }
+}
+
+/** Chuẩn hoá phone về dạng 84xxxxxxxxx (Zalo expect) */
+export function normalizeVietnamPhone(phone: string): string {
+  const digits = phone.replace(/[^0-9]/g, "");
   if (digits.startsWith("84")) return digits;
   if (digits.startsWith("0")) return `84${digits.slice(1)}`;
+  // Nếu chỉ có 9 số (không 0/84) — vẫn cho 84 lên đầu
+  if (digits.length >= 9 && digits.length <= 10) return `84${digits}`;
   return digits;
 }
 
-// Simulates POST /api/zalo/messages/send-by-phone
+const VN_PHONE_REGEX = /^84[0-9]{9,10}$/;
+
+/** Sinh tracking_id mặc định gắn với template + timestamp */
+export function buildDefaultTrackingId(
+  prefix: string,
+  templateId: string,
+): string {
+  const safePrefix = prefix.replace(/[^A-Z0-9_]/gi, "_").toUpperCase() || "TPL";
+  return `${safePrefix}_${templateId}_${Date.now()}`;
+}
+
+/**
+ * Gửi tin template qua số điện thoại (ZBS Template Message).
+ * Endpoint thật: POST https://business.openapi.zalo.me/message/template
+ * Proxy: /api/zalo/templates/send
+ */
 export async function sendTemplateByPhone(
   payload: ZbsSendByPhoneRequest,
 ): Promise<ZbsSendByPhoneResult> {
-  await new Promise((resolve) => setTimeout(resolve, 700));
+  // Resolve token (trong dev fallback env như fetchOaTemplates)
+  let token = payload.accessToken;
+  if (!token && process.env.NODE_ENV !== "production") {
+    token = process.env.NEXT_PUBLIC_ZALO_DEV_ACCESS_TOKEN || undefined;
+  }
+  console.log("[Zalo] sendTemplateByPhone: payload:", payload);
+  const trackingId =
+    payload.trackingId?.trim() ||
+    buildDefaultTrackingId(payload.templateCode || "TPL", payload.templateId);
+  const mode: ZbsSendMode =
+    payload.mode === "development" ? "development" : "production";
+  const normalized = normalizeVietnamPhone(payload.phone);
+  const id = `tm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-  const normalized = normalizePhone(payload.phone);
-  if (normalized.length < 11 || !normalized.startsWith("84")) {
+  if (!token) {
     return {
+      id,
+      trackingId,
       msgId: "",
-      trackingId: payload.trackingId,
       status: "failed",
       sentAt: new Date().toISOString(),
-      errorMessage: "Số điện thoại không hợp lệ.",
+      mode,
+      errorCode: "MISSING_TOKEN",
+      errorMessage: "OA chưa kết nối hoặc thiếu access token.",
     };
   }
 
-  return {
-    msgId: `msg_${Date.now()}`,
-    trackingId: payload.trackingId,
-    status: "success",
-    sentAt: new Date().toISOString(),
-    quotaRemaining: 998,
-  };
+  if (!VN_PHONE_REGEX.test(normalized)) {
+    return {
+      id,
+      trackingId,
+      msgId: "",
+      status: "failed",
+      sentAt: new Date().toISOString(),
+      mode,
+      errorCode: "INVALID_PHONE_FORMAT",
+      errorMessage:
+        "Số điện thoại không hợp lệ (cần dạng 84xxxxxxxxx hoặc 09xxxxxxxx).",
+    };
+  }
+
+  if (!payload.templateId) {
+    return {
+      id,
+      trackingId,
+      msgId: "",
+      status: "failed",
+      sentAt: new Date().toISOString(),
+      mode,
+      errorCode: "TEMPLATE_ID_REQUIRED",
+      errorMessage: "Thiếu template_id.",
+    };
+  }
+
+  try {
+    const res = await fetch("/api/zalo/templates/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-oa-access-token": token,
+      },
+      body: JSON.stringify({
+        phone: normalized,
+        templateId: payload.templateId,
+        templateData: payload.templateData,
+        trackingId,
+        mode,
+      }),
+    });
+    const json = await res.json();
+    console.log("[Zalo] sendTemplateByPhone result:", json);
+
+    if (!res.ok || !json.success) {
+      const err = json.error || {};
+      return {
+        id,
+        trackingId,
+        msgId: "",
+        status: "failed",
+        sentAt: new Date().toISOString(),
+        mode,
+        errorCode: err.code || "ZALO_TEMPLATE_SEND_FAILED",
+        errorMessage: mapZaloError(
+          err.zaloErrorCode,
+          err.message || err.zaloMessage,
+        ).message,
+        zaloErrorCode: err.zaloErrorCode,
+      };
+    }
+
+    const data = json.data || {};
+    const quota = data.quota || {};
+    return {
+      id,
+      trackingId: data.trackingId || trackingId,
+      msgId: data.msgId || "",
+      status: "sent_to_zalo",
+      sentAt: data.sentTime
+        ? new Date(Number(data.sentTime)).toISOString()
+        : new Date().toISOString(),
+      mode,
+      quotaRemaining: quota.remainingQuota
+        ? Number(quota.remainingQuota)
+        : undefined,
+      dailyQuota: quota.dailyQuota ? Number(quota.dailyQuota) : undefined,
+    };
+  } catch (err) {
+    console.error("[Zalo] sendTemplateByPhone failed:", err);
+    return {
+      id,
+      trackingId,
+      msgId: "",
+      status: "failed",
+      sentAt: new Date().toISOString(),
+      mode,
+      errorCode: "NETWORK_ERROR",
+      errorMessage:
+        err instanceof Error ? err.message : "Lỗi mạng khi gửi template.",
+    };
+  }
 }
 
-export function buildOaConnectionFromToken(result: ExchangeOaTokenResult): OaConnection {
+export function buildOaConnectionFromToken(
+  result: ExchangeOaTokenResult,
+): OaConnection {
   return {
     id: `oa-${result.oaId}`,
     oaName: result.oaName,
@@ -231,44 +487,147 @@ function formatZaloTimestamp(ms?: number): string {
   const d = new Date(ms);
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
-  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   if (isToday) return time;
-  const day = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  const day = d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+  });
   return `${day} ${time}`;
+}
+
+interface ZaloUserDetail {
+  display_name?: string;
+  avatar?: string;
+  shared_info?: { phone?: string; name?: string };
+  tags_and_notes_info?: { tag_names?: string[] };
+}
+
+export interface ZaloOaInfo {
+  oaid: string;
+  name: string;
+  description?: string;
+  oa_alias?: string;
+  is_verified?: boolean;
+  oa_type?: number;
+  cate_name?: string;
+  num_follower?: number;
+  avatar?: string;
+  cover?: string;
+  package_name?: string;
+  package_valid_through_date?: string;
+  package_auto_renew_date?: string;
+  linked_ZCA?: string;
+}
+
+/** Gọi GET /v2.0/oa/getoa để lấy thông tin OA hiện tại theo access_token */
+export async function fetchOaInfo(
+  accessToken: string,
+): Promise<ZaloOaInfo | null> {
+  try {
+    const res = await fetch(`/api/zalo/oa/info`, {
+      headers: { "x-oa-access-token": accessToken },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.error !== 0) return null;
+    return json.data as ZaloOaInfo;
+  } catch (err) {
+    console.error("[Zalo] fetchOaInfo failed:", err);
+    return null;
+  }
+}
+
+async function fetchUserDetail(
+  accessToken: string,
+  userId: string,
+): Promise<ZaloUserDetail> {
+  try {
+    const res = await fetch(
+      `/api/zalo/user/detail?user_id=${encodeURIComponent(userId)}`,
+      {
+        headers: { "x-oa-access-token": accessToken },
+      },
+    );
+    if (!res.ok) return {};
+    const json = await res.json();
+    if (json.error !== 0) return {};
+    return json.data as ZaloUserDetail;
+  } catch {
+    return {};
+  }
 }
 
 export async function fetchConversations(
   accessToken: string,
   oaInternalId: string,
-  offset = 0,
-  count = 15,
+  period = "L30D",
 ): Promise<ZaloConversation[]> {
-  const data = JSON.stringify({
-    offset,
-    count,
-    last_interaction_period: "WITHIN_7_DAYS",
-    is_follower: "true",
-  });
-  const res = await fetch(`/api/zalo/conversations?data=${encodeURIComponent(data)}`, {
-    headers: { "x-oa-access-token": accessToken },
-  });
-  if (!res.ok) throw new Error(`Conversations fetch failed: ${res.status}`);
-  const json = await res.json();
-  console.log("[Zalo] user/getlist response:", json);
-  if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
+  const PAGE_SIZE = 50;
+  const allUsers: { user_id: string }[] = [];
+  let offset = 0;
+  let total = Infinity;
 
-  // v3.0 user/getlist: data.users[]
-  const users: any[] = json.data?.users ?? [];
-  return users.map((item) => ({
-    id: String(item.user_id ?? ""),
-    oaId: oaInternalId,
-    name: item.display_name || `Zalo-${item.user_id ?? ""}`,
-    avatar: item.avatar || undefined,
-    customerPhone: undefined,
-    lastMessage: "",
-    timestamp: item.last_interaction_date ?? "",
-    unreadCount: 0,
-  }));
+  while (offset < total) {
+    const data = JSON.stringify({
+      offset,
+      count: PAGE_SIZE,
+      last_interaction_period: period,
+      is_follower: "true",
+    });
+    const res = await fetch(
+      `/api/zalo/conversations?data=${encodeURIComponent(data)}`,
+      {
+        headers: { "x-oa-access-token": accessToken },
+      },
+    );
+    if (!res.ok) throw new Error(`Conversations fetch failed: ${res.status}`);
+    const json = await res.json();
+    if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
+
+    const page: { user_id: string }[] = json.data?.users ?? [];
+    total = json.data?.total ?? 0;
+    allUsers.push(...page);
+    offset += page.length;
+
+    if (page.length === 0) break;
+  }
+
+  if (allUsers.length === 0) return [];
+
+  // Fetch detail in batches of 10 to avoid overwhelming the API
+  const BATCH = 10;
+  const details: ZaloUserDetail[] = [];
+  for (let i = 0; i < allUsers.length; i += BATCH) {
+    const results = await Promise.allSettled(
+      allUsers
+        .slice(i, i + BATCH)
+        .map((u) => fetchUserDetail(accessToken, String(u.user_id))),
+    );
+    details.push(
+      ...results.map((r) => (r.status === "fulfilled" ? r.value : {})),
+    );
+  }
+
+  return allUsers.map((item, i) => {
+    const detail = details[i] ?? {};
+    const userId = String(item.user_id);
+    return {
+      id: userId,
+      oaId: oaInternalId,
+      name: detail.display_name || `Zalo-${userId}`,
+      avatar: detail.avatar || undefined,
+      customerPhone: detail.shared_info?.phone,
+      tags: detail.tags_and_notes_info?.tag_names ?? [],
+      lastMessage: "",
+      timestamp: "",
+      unreadCount: 0,
+    };
+  });
 }
 
 export async function fetchMessages(
@@ -280,21 +639,261 @@ export async function fetchMessages(
 ): Promise<ZaloChatMessage[]> {
   // v2.0 takes `user_id`, not `conversation_id`
   const data = JSON.stringify({ user_id: userId, offset, count });
-  const res = await fetch(`/api/zalo/messages?data=${encodeURIComponent(data)}`, {
-    headers: { "x-oa-access-token": accessToken },
-  });
+  const res = await fetch(
+    `/api/zalo/messages?data=${encodeURIComponent(data)}`,
+    {
+      headers: { "x-oa-access-token": accessToken },
+    },
+  );
   if (!res.ok) throw new Error(`Messages fetch failed: ${res.status}`);
   const json = await res.json();
   console.log("[Zalo] conversation response:", json);
   if (json.error !== 0) throw new Error(json.message ?? "Zalo API error");
 
-  const messages: any[] = json.data?.messages ?? json.data?.items ?? [];
-  return messages.map((item) => ({
-    id: String(item.msg_id ?? item.message_id ?? ""),
-    conversationId: userId,
-    sender: item.src === 1 ? "agent" : "customer",
-    content: item.message ?? item.content ?? "",
-    // v2.0 uses `time`, v3.0 uses `send_time`
-    timestamp: formatZaloTimestamp(item.time ?? item.send_time ?? item.timestamp),
-  }));
+  const messages: {
+    msg_id?: string | number;
+    message_id?: string | number;
+    src?: number;
+    message?: string;
+    content?: string;
+    time?: number;
+    send_time?: number;
+    timestamp?: number;
+    type?: string;
+    url?: string;
+    thumb?: string;
+    file_name?: string;
+  }[] = json.data?.messages ?? json.data?.items ?? [];
+  return messages.map((item) => {
+    const id = String(item.msg_id ?? item.message_id ?? "");
+    const messageType: ZaloChatMessage["messageType"] =
+      item.type === "image" || item.type === "photo"
+        ? "image"
+        : item.type === "file"
+          ? "file"
+          : "text";
+    return {
+      id,
+      conversationId: userId,
+      sender: (item.src === 1
+        ? "agent"
+        : "customer") as ZaloChatMessage["sender"],
+      content: item.message ?? item.content ?? "",
+      timestamp: formatZaloTimestamp(
+        item.time ?? item.send_time ?? item.timestamp,
+      ),
+      messageType,
+      sendStatus: "sent" as const,
+      zaloMessageId: id,
+      attachmentUrl:
+        messageType !== "text" ? item.url || item.thumb : undefined,
+      attachmentName: messageType === "file" ? item.file_name : undefined,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Send Message helpers (theo Tai_lieu_gui_tin_nhan_Zalo_OA_API.docx)
+// ─────────────────────────────────────────────────────────────────────
+
+export class ZaloApiError extends Error {
+  code: string;
+  zaloErrorCode?: number;
+  zaloMessage?: string;
+
+  constructor(
+    message: string,
+    code: string,
+    zaloErrorCode?: number,
+    zaloMessage?: string,
+  ) {
+    super(message);
+    this.name = "ZaloApiError";
+    this.code = code;
+    this.zaloErrorCode = zaloErrorCode;
+    this.zaloMessage = zaloMessage;
+  }
+}
+
+/** Map Zalo error code → mã lỗi nội bộ + message tiếng Việt theo §8.2 */
+function mapZaloError(
+  zaloErrorCode: number | undefined,
+  zaloMessage?: string,
+): ZaloApiError {
+  switch (zaloErrorCode) {
+    case -212:
+      return new ZaloApiError(
+        "App chưa đăng ký quyền API. Vui lòng liên hệ admin để cấp quyền.",
+        "ZALO_APP_NOT_REGISTERED_API",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    case -224:
+      return new ZaloApiError(
+        "OA chưa đủ gói để gửi loại tin này.",
+        "OA_PACKAGE_NOT_ELIGIBLE",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    case -213:
+    case -216:
+      return new ZaloApiError(
+        "Khách hàng không đủ điều kiện nhận tin tư vấn (đã quá 48h chưa tương tác).",
+        "USER_NOT_ELIGIBLE",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    case -32: // token expired
+      return new ZaloApiError(
+        "Access token đã hết hạn, vui lòng kết nối lại OA.",
+        "TOKEN_EXPIRED",
+        zaloErrorCode,
+        zaloMessage,
+      );
+    default:
+      return new ZaloApiError(
+        zaloMessage || "Gửi tin thất bại.",
+        "ZALO_API_ERROR",
+        zaloErrorCode,
+        zaloMessage,
+      );
+  }
+}
+
+interface SendMessageResult {
+  msgId: string;
+  sentAt: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+}
+
+async function postZaloApi(
+  url: string,
+  accessToken: string,
+  body: object,
+): Promise<SendMessageResult> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-oa-access-token": accessToken,
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  console.log(`[Zalo Send] ${url} response:`, json);
+
+  if (!res.ok || !json.success) {
+    const err = json.error || {};
+    throw mapZaloError(err.zaloErrorCode, err.message || err.zaloMessage);
+  }
+
+  return {
+    msgId: json.data?.message_id || json.data?.msg_id || "",
+    sentAt: json.data?.sentAt || new Date().toISOString(),
+    attachmentUrl: json.data?.attachmentUrl,
+    attachmentName: json.data?.attachmentName,
+  };
+}
+
+async function postMultipartZaloApi(
+  url: string,
+  accessToken: string,
+  formData: FormData,
+): Promise<SendMessageResult> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "x-oa-access-token": accessToken,
+    },
+    body: formData,
+  });
+  const json = await res.json();
+  console.log(`[Zalo Send Multipart] ${url} response:`, json);
+
+  if (!res.ok || !json.success) {
+    const err = json.error || {};
+    throw mapZaloError(err.zaloErrorCode, err.message || err.zaloMessage);
+  }
+
+  return {
+    msgId: json.data?.message_id || json.data?.msg_id || "",
+    sentAt: json.data?.sentAt || new Date().toISOString(),
+    attachmentUrl: json.data?.attachmentUrl,
+    attachmentName: json.data?.attachmentName,
+  };
+}
+
+export interface SendTextParams {
+  accessToken: string;
+  userId: string;
+  text: string;
+}
+
+export async function sendTextMessage(
+  params: SendTextParams,
+): Promise<SendMessageResult> {
+  return postZaloApi("/api/zalo/messages/text", params.accessToken, {
+    userId: params.userId,
+    text: params.text,
+  });
+}
+
+export interface SendImageParams {
+  accessToken: string;
+  userId: string;
+  file: File;
+  text?: string;
+}
+
+export async function sendImageMessage(
+  params: SendImageParams,
+): Promise<SendMessageResult> {
+  const fd = new FormData();
+  fd.append("file", params.file);
+  fd.append("userId", params.userId);
+  if (params.text) fd.append("text", params.text);
+  return postMultipartZaloApi(
+    "/api/zalo/messages/image",
+    params.accessToken,
+    fd,
+  );
+}
+
+export interface SendFileParams {
+  accessToken: string;
+  userId: string;
+  file: File;
+  text?: string;
+}
+
+export async function sendFileMessage(
+  params: SendFileParams,
+): Promise<SendMessageResult> {
+  const fd = new FormData();
+  fd.append("file", params.file);
+  fd.append("userId", params.userId);
+  if (params.text) fd.append("text", params.text);
+  return postMultipartZaloApi(
+    "/api/zalo/messages/file",
+    params.accessToken,
+    fd,
+  );
+}
+
+export interface SendQuoteParams {
+  accessToken: string;
+  userId: string;
+  text: string;
+  quoteMessageId: string;
+}
+
+export async function sendQuoteMessage(
+  params: SendQuoteParams,
+): Promise<SendMessageResult> {
+  return postZaloApi("/api/zalo/messages/quote", params.accessToken, {
+    userId: params.userId,
+    text: params.text,
+    quoteMessageId: params.quoteMessageId,
+  });
 }

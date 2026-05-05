@@ -1,6 +1,6 @@
 "use client";
 
-import { useZaloOaPage } from "../../hooks/useZaloOaPage";
+import { useZaloOaPage, type PeriodPreset } from "../../hooks/useZaloOaPage";
 import { ZaloAutoConfigPanel } from "./ZaloAutoConfigPanel";
 import { ZaloConfigFormDrawer } from "./ZaloConfigFormDrawer";
 import { ZaloInteractionPanel } from "./ZaloInteractionPanel";
@@ -35,9 +35,20 @@ export function ZaloOaView() {
         isLoadingConversations,
         handleAddConfig,
         handleAddConnection,
+        handleRemoveConnection,
+        periodPreset,
+        setPeriodPreset,
+        customDays,
+        setCustomDays,
         openSettings,
         openConfigForm,
-        handleSendMockMessage,
+        handleSendText,
+        handleSendImage,
+        handleSendFile,
+        handleRetryMessage,
+        replyingTo,
+        handleStartQuote,
+        handleCancelQuote,
     } = useZaloOaPage();
 
     return (
@@ -59,6 +70,10 @@ export function ZaloOaView() {
                     setActiveTab("tuong-tac");
                 }}
                 isLoadingConversations={isLoadingConversations}
+                periodPreset={periodPreset}
+                onPeriodPresetChange={(p: PeriodPreset) => setPeriodPreset(p)}
+                customDays={customDays}
+                onCustomDaysChange={setCustomDays}
             />
 
             <div className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 min-w-0">
@@ -69,7 +84,13 @@ export function ZaloOaView() {
                         selectedMessages={selectedMessages}
                         chatComposerValue={chatComposerValue}
                         onChatComposerValueChange={setChatComposerValue}
-                        onSendMessage={handleSendMockMessage}
+                        onSendText={handleSendText}
+                        onSendImage={handleSendImage}
+                        onSendFile={handleSendFile}
+                        onRetryMessage={handleRetryMessage}
+                        replyingTo={replyingTo}
+                        onStartQuote={handleStartQuote}
+                        onCancelQuote={handleCancelQuote}
                     />
                 ) : (
                     <ZaloAutoConfigPanel
@@ -86,6 +107,7 @@ export function ZaloOaView() {
                     onClose={() => setSettingsOpen(false)}
                     connections={connections}
                     onAddConnection={handleAddConnection}
+                    onRemoveConnection={handleRemoveConnection}
                 />
 
                 <ZaloConfigFormDrawer

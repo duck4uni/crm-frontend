@@ -1,9 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { FiSearch, FiSettings } from "react-icons/fi";
 import { Select } from "@/components/ui/Select";
 import type { OaConnection, ZaloConversation } from "@/types/zalo-oa";
+import type { PeriodPreset } from "../../hooks/useZaloOaPage";
 import { ConversationRow } from "./ConversationRow";
+
+const PERIOD_PRESETS: { value: PeriodPreset; label: string }[] = [
+    { value: "TODAY", label: "Hôm nay" },
+    { value: "YESTERDAY", label: "Hôm qua" },
+    { value: "L7D", label: "7 ngày" },
+    { value: "L30D", label: "30 ngày" },
+    { value: "CUSTOM", label: "Tuỳ chọn" },
+];
 
 interface ZaloSidebarProps {
     selectedOaFilter: string;
@@ -19,6 +29,10 @@ interface ZaloSidebarProps {
     selectedConvId: string | null;
     onSelectConversation: (conversationId: string) => void;
     isLoadingConversations?: boolean;
+    periodPreset: PeriodPreset;
+    onPeriodPresetChange: (preset: PeriodPreset) => void;
+    customDays: number;
+    onCustomDaysChange: (days: number) => void;
 }
 
 export function ZaloSidebar({
@@ -35,7 +49,12 @@ export function ZaloSidebar({
     selectedConvId,
     onSelectConversation,
     isLoadingConversations = false,
+    periodPreset,
+    onPeriodPresetChange,
+    customDays,
+    onCustomDaysChange,
 }: ZaloSidebarProps) {
+    const [draftDays, setDraftDays] = useState(String(customDays));
     return (
         <div className="w-[320px] flex-shrink-0 flex flex-col bg-white border-r border-gray-200">
             <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 flex-shrink-0">
@@ -102,6 +121,46 @@ export function ZaloSidebar({
                         className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100 placeholder:text-gray-400 bg-white"
                     />
                 </div>
+            </div>
+
+            <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0 space-y-1.5">
+                <div className="flex gap-1 flex-wrap">
+                    {PERIOD_PRESETS.map((p) => (
+                        <button
+                            key={p.value}
+                            onClick={() => onPeriodPresetChange(p.value)}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                                periodPreset === p.value
+                                    ? "bg-primary-600 text-white"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+                {periodPreset === "CUSTOM" && (
+                    <div className="flex items-center gap-1.5">
+                        <input
+                            type="number"
+                            min={1}
+                            max={3650}
+                            value={draftDays}
+                            onChange={(e) => setDraftDays(e.target.value)}
+                            className="w-20 px-2 py-1 text-xs border border-gray-300 rounded-md outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100"
+                        />
+                        <span className="text-xs text-gray-500">ngày gần nhất</span>
+                        <button
+                            onClick={() => {
+                                const n = parseInt(draftDays, 10);
+                                if (n > 0) onCustomDaysChange(n);
+                            }}
+                            className="px-2.5 py-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-medium rounded-md transition-colors"
+                        >
+                            Áp dụng
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto min-h-0">
