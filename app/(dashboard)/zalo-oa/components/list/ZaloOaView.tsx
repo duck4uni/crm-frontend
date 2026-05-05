@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useZaloOaPage, type PeriodPreset } from "../../hooks/useZaloOaPage";
 import { ZaloAutoConfigPanel } from "./ZaloAutoConfigPanel";
 import { ZaloConfigFormDrawer } from "./ZaloConfigFormDrawer";
@@ -36,6 +37,7 @@ export function ZaloOaView() {
         handleAddConfig,
         handleAddConnection,
         handleRemoveConnection,
+        handleUpdateConversation,
         periodPreset,
         setPeriodPreset,
         customDays,
@@ -50,6 +52,11 @@ export function ZaloOaView() {
         handleStartQuote,
         handleCancelQuote,
     } = useZaloOaPage();
+
+    const selectedOaAccessToken = useMemo(
+        () => connections.find((c) => c.id === selectedConversation?.oaId)?.accessToken,
+        [connections, selectedConversation],
+    );
 
     return (
         <div className="flex h-full overflow-hidden bg-white">
@@ -91,6 +98,10 @@ export function ZaloOaView() {
                         replyingTo={replyingTo}
                         onStartQuote={handleStartQuote}
                         onCancelQuote={handleCancelQuote}
+                        accessToken={selectedOaAccessToken}
+                        onConversationUpdated={(patch) =>
+                            selectedConversation && handleUpdateConversation(selectedConversation.id, patch)
+                        }
                     />
                 ) : (
                     <ZaloAutoConfigPanel
