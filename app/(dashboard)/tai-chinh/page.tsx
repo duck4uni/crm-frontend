@@ -9,6 +9,8 @@ import { formatVND, formatVNDShort, formatDateVN } from "@/lib/utils";
 import { useFinanceState, useFinanceStore } from "@/hooks/useFinanceStore";
 import { PhieuThuFormModal } from "./phieu-thu/components/PhieuThuFormModal";
 import { PhieuChiFormModal } from "./phieu-chi/components/PhieuChiFormModal";
+import { CongNoDetailDrawer } from "./cong-no/components/CongNoDetailDrawer";
+import type { KhachHangCongNo } from "@/services/finance/types";
 
 type Period = "month" | "quarter" | "year";
 
@@ -19,6 +21,7 @@ export default function FinanceHomePage() {
   const [period, setPeriod] = useState<Period>("month");
   const [showThuForm, setShowThuForm] = useState(false);
   const [showChiForm, setShowChiForm] = useState(false);
+  const [detailKH, setDetailKH] = useState<KhachHangCongNo | null>(null);
 
   const { from } = useMemo(() => {
     const now = new Date();
@@ -43,6 +46,10 @@ export default function FinanceHomePage() {
     store.reset();
     toast.success("Đã reset dữ liệu mock");
   };
+
+  if (detailKH) {
+    return <FinanceDetailPage kh={detailKH} onClose={() => setDetailKH(null)} />;
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -88,18 +95,13 @@ export default function FinanceHomePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Cán cân thu chi */}
-        {/* Cán cân thu chi */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-semibold mb-3">Cán cân thu chi</h3>
-          <Donut thu={totalThu} chi={totalChi} />
+          <DonutCard phieuThu={state.phieuThu} phieuChi={state.phieuChi} />
         </div>
 
         {/* Cơ cấu doanh thu */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-semibold mb-3">Cơ cấu doanh thu theo sản phẩm</h3>
-          <div className="text-center text-gray-400 py-8 text-sm">
-            Chưa có dữ liệu sản phẩm
-          </div>
+          <CoCoauDoanhThu />
         </div>
 
         {/* Hoạt động gần nhất */}
@@ -123,8 +125,8 @@ export default function FinanceHomePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Tồn quỹ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Tồn quỹ — 1/3 */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Tồn quỹ</h3>
@@ -142,30 +144,47 @@ export default function FinanceHomePage() {
           </ul>
         </div>
 
-        {/* Công nợ */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        {/* Công nợ — 2/3 */}
+        <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Công nợ</h3>
-            <Link href="/tai-chinh/cong-no" className="text-sm text-primary-600 hover:underline">
+            <Link href="/tai-chinh/cong-no" className="text-sm text-orange-500 hover:underline font-medium">
               Xem tất cả
             </Link>
           </div>
           <table className="w-full text-sm">
-            <thead className="text-xs text-gray-500">
-              <tr>
-                <th className="text-left py-1">Tên công ty</th>
-                <th className="text-right py-1">Phải thu</th>
-                <th className="text-right py-1">Phải trả</th>
+            <thead>
+              <tr className="bg-gray-50 text-xs text-gray-600 font-medium">
+                <th className="text-left px-3 py-2 w-8">#</th>
+                <th className="text-left px-3 py-2">Tên công ty</th>
+                <th className="text-right px-3 py-2">Công Nợ Phải Thu</th>
+                <th className="text-right px-3 py-2">Công nợ phải trả</th>
               </tr>
             </thead>
             <tbody>
-              {state.congNo.slice(0, 6).map((kh) => (
-                <tr key={kh.id} className="border-t border-gray-100">
-                  <td className="py-2">{kh.ten}</td>
-                  <td className="py-2 text-right text-orange-600">
-                    {formatVND(kh.phaiThu)}
+              {state.congNo.slice(0, 9).map((kh, i) => (
+                <tr
+                  key={kh.id}
+                  onClick={() => setDetailKH(kh)}
+                  className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-3 py-2.5 text-gray-500 text-xs">{i + 1}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span className="text-blue-600 font-medium text-xs">{kh.ten}</span>
+                    </div>
                   </td>
-                  <td className="py-2 text-right">{formatVND(kh.phaiTra)}</td>
+                  <td className="px-3 py-2.5 text-right text-orange-500 text-xs font-medium">
+                    {kh.phaiThu.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-orange-500 text-xs font-medium">
+                    {kh.phaiTra.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -189,6 +208,15 @@ export default function FinanceHomePage() {
         onClose={() => setShowChiForm(false)}
         editing={null}
       />
+
+    </div>
+  );
+}
+
+function FinanceDetailPage({ kh, onClose }: { kh: KhachHangCongNo; onClose: () => void }) {
+  return (
+    <div className="p-6">
+      <CongNoDetailDrawer kh={kh} onClose={onClose} />
     </div>
   );
 }
@@ -214,6 +242,145 @@ function KpiCard({
       <div className="text-xs font-medium opacity-80">{label}</div>
       <div className="text-2xl font-bold mt-1">{formatVNDShort(value)}</div>
       <div className="text-xs mt-1 opacity-70">{formatVND(value)}</div>
+    </div>
+  );
+}
+
+// ── Cơ cấu doanh thu theo sản phẩm ──────────────────────────────────────────
+
+const PERIOD_OPTIONS = [
+  { value: "month", label: "Tháng này" },
+  { value: "quarter", label: "Quý này" },
+  { value: "year", label: "Năm nay" },
+];
+
+const MOCK_PRODUCTS = [
+  { name: "Khoá học IELST", color: "#2563eb", pct: 55.59 },
+  { name: "DDC1",           color: "#f59e0b", pct: 22.60 },
+  { name: "Center City",    color: "#ef4444", pct: 12.20 },
+  { name: "Xe honda Future",color: "#a78bfa", pct:  4.58 },
+  { name: "Tủ bếp",         color: "#ec4899", pct:  3.16 },
+  { name: "Khác",           color: "#84cc16", pct:  1.87 },
+];
+
+function PieChart({ slices }: { slices: { color: string; pct: number }[] }) {
+  const r = 80;
+  const cx = 110;
+  const cy = 100;
+  let cumulative = 0;
+
+  const paths = slices.map((s) => {
+    const startAngle = (cumulative / 100) * 2 * Math.PI - Math.PI / 2;
+    cumulative += s.pct;
+    const endAngle = (cumulative / 100) * 2 * Math.PI - Math.PI / 2;
+    const large = s.pct > 50 ? 1 : 0;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    // label position (midpoint of arc)
+    const midAngle = startAngle + (endAngle - startAngle) / 2;
+    const lr = r * 0.65;
+    const lx = cx + lr * Math.cos(midAngle);
+    const ly = cy + lr * Math.sin(midAngle);
+    return { d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`, color: s.color, pct: s.pct, lx, ly };
+  });
+
+  return (
+    <svg viewBox="0 0 220 200" className="w-full max-w-[220px]">
+      {paths.map((p, i) => (
+        <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth={1.5} />
+      ))}
+      {paths.map((p, i) =>
+        p.pct >= 5 ? (
+          <text key={i} x={p.lx} y={p.ly} textAnchor="middle" dominantBaseline="middle" fontSize={9} fill="white" fontWeight="600">
+            {p.pct.toFixed(2)}%
+          </text>
+        ) : null
+      )}
+    </svg>
+  );
+}
+
+function CoCoauDoanhThu() {
+  const [period, setPeriod] = useState("year");
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold">Cơ cấu doanh thu theo sản phẩm</h3>
+        <div className="flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1 text-xs text-gray-600">
+          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+          </svg>
+          <span>Thời gian:</span>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="bg-transparent focus:outline-none text-xs font-medium text-gray-700"
+          >
+            {PERIOD_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <PieChart slices={MOCK_PRODUCTS} />
+        <ul className="space-y-1.5 text-xs min-w-0">
+          {MOCK_PRODUCTS.map((p) => (
+            <li key={p.name} className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: p.color }} />
+              <span className="truncate text-gray-700">{p.name}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function DonutCard({
+  phieuThu,
+  phieuChi,
+}: {
+  phieuThu: { ngayYeuCau: string; soTien: number }[];
+  phieuChi: { ngayYeuCau: string; soTien: number }[];
+}) {
+  const now = new Date();
+  // build last 12 months options
+  const monthOptions = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+    return { value, label };
+  });
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(monthOptions[0].value);
+
+  const thu = phieuThu
+    .filter((p) => p.ngayYeuCau.startsWith(selectedMonth))
+    .reduce((s, p) => s + p.soTien, 0);
+  const chi = phieuChi
+    .filter((p) => p.ngayYeuCau.startsWith(selectedMonth))
+    .reduce((s, p) => s + p.soTien, 0);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold">Cán cân thu chi</h3>
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary-400"
+        >
+          {monthOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+      <Donut thu={thu} chi={chi} />
     </div>
   );
 }

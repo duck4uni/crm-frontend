@@ -66,6 +66,14 @@ export default function CongNoPage() {
     );
   }, [list]);
 
+  if (detail) {
+    return (
+      <div className="p-6">
+        <CongNoDetailDrawer kh={detail} onClose={() => setDetail(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
@@ -208,7 +216,6 @@ export default function CongNoPage() {
         </div>
       )}
 
-      <CongNoDetailDrawer kh={detail} onClose={() => setDetail(null)} />
     </div>
   );
 }
