@@ -18,6 +18,7 @@ import {
   FiFolder,
   FiFileText,
   FiLink,
+  FiDollarSign,
   FiChevronDown,
 } from "react-icons/fi";
 import { clearAuthSession } from "@/lib/auth-session";
@@ -55,8 +56,23 @@ const navigation: NavItem[] = [
     icon: FiLink,
     children: [
       { name: "Marketing", href: "/zalo-oa/marketing" },
-      //  { name: "Automation", href: "/zalo-oa/automation" },
+      { name: "Automation", href: "/zalo-oa/automation" },
       { name: "Lịch sử template", href: "/zalo-oa/template-history" },
+    ],
+  },
+  {
+    name: "Tài chính",
+    icon: FiDollarSign,
+    children: [
+      { name: "Trang chủ", href: "/tai-chinh" },
+      { name: "Phiếu thu", href: "/tai-chinh/phieu-thu" },
+      { name: "Phiếu chi", href: "/tai-chinh/phieu-chi" },
+      { name: "Quỹ", href: "/tai-chinh/quy" },
+      { name: "Ngân sách", href: "/tai-chinh/ngan-sach" },
+      { name: "Yêu cầu chi phí", href: "/tai-chinh/yeu-cau-chi-phi" },
+      { name: "Công nợ", href: "/tai-chinh/cong-no" },
+      { name: "Sổ cái", href: "/tai-chinh/so-cai" },
+      { name: "Báo cáo tài chính", href: "/tai-chinh/bao-cao" },
     ],
   },
   { name: "Cài đặt", href: "/settings", icon: FiSettings },
@@ -82,15 +98,24 @@ function isExactPathMatch(pathname: string, href: string): boolean {
   return pathname === href;
 }
 
-function getActiveChildHref(pathname: string, children: NavChild[]): string | null {
-  const sortedChildren = [...children].sort((a, b) => b.href.length - a.href.length);
-  const matchedChild = sortedChildren.find((child) => isPathMatch(pathname, child.href));
+function getActiveChildHref(
+  pathname: string,
+  children: NavChild[],
+): string | null {
+  const sortedChildren = [...children].sort(
+    (a, b) => b.href.length - a.href.length,
+  );
+  const matchedChild = sortedChildren.find((child) =>
+    isPathMatch(pathname, child.href),
+  );
   return matchedChild?.href ?? null;
 }
 
 function isGroupRouteActive(pathname: string, item: NavItem): boolean {
   const matchesSelf = item.href ? isPathMatch(pathname, item.href) : false;
-  const matchesChild = item.children ? Boolean(getActiveChildHref(pathname, item.children)) : false;
+  const matchesChild = item.children
+    ? Boolean(getActiveChildHref(pathname, item.children))
+    : false;
   return matchesSelf || matchesChild;
 }
 
@@ -160,7 +185,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
       try {
         await authService.logout();
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Đăng xuất thất bại";
+        const message =
+          error instanceof Error ? error.message : "Đăng xuất thất bại";
         toast.warning("Không thể xác nhận đăng xuất", message);
       } finally {
         clearAuthSession();
@@ -213,7 +239,9 @@ export function Sidebar({ isOpen }: SidebarProps) {
             const isExpanded = expandedItems.has(item.name);
             const activeChildHref = getActiveChild(item);
             const isGroupActive = isGroupRouteActive(pathname, item);
-            const isParentRouteActive = item.href ? isExactPathMatch(pathname, item.href) : false;
+            const isParentRouteActive = item.href
+              ? isExactPathMatch(pathname, item.href)
+              : false;
 
             if (!isOpen) {
               // Collapsed sidebar: clicking the icon navigates to parent route if present.
@@ -292,9 +320,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
           }
 
           // Regular nav item (no children) - exclude paths that are child paths of expandable items
-          const isActive = item.href
-            ? isPathMatch(pathname, item.href)
-            : false;
+          const isActive = item.href ? isPathMatch(pathname, item.href) : false;
 
           return (
             <Link
@@ -304,20 +330,33 @@ export function Sidebar({ isOpen }: SidebarProps) {
               aria-label={item.name}
               className={cn(
                 "flex items-center text-sm font-medium rounded-lg transition-colors",
-                isOpen ? "px-4 py-3" : "mx-auto h-10 w-10 justify-center p-0 rounded-xl",
+                isOpen
+                  ? "px-4 py-3"
+                  : "mx-auto h-10 w-10 justify-center p-0 rounded-xl",
                 isActive
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-900/50"
                   : "text-indigo-200 hover:bg-indigo-800/60 hover:text-white",
               )}
             >
-              <Icon className={cn("h-5 w-5 shrink-0", isOpen ? "mr-3" : "mr-0")} />
-              {isOpen ? <span className="truncate">{item.name}</span> : <span className="sr-only">{item.name}</span>}
+              <Icon
+                className={cn("h-5 w-5 shrink-0", isOpen ? "mr-3" : "mr-0")}
+              />
+              {isOpen ? (
+                <span className="truncate">{item.name}</span>
+              ) : (
+                <span className="sr-only">{item.name}</span>
+              )}
             </Link>
           );
         })}
       </nav>
 
-      <div className={cn("shrink-0 border-t border-indigo-800/50 pb-6 pt-4", isOpen ? "px-4" : "px-1")}>
+      <div
+        className={cn(
+          "shrink-0 border-t border-indigo-800/50 pb-6 pt-4",
+          isOpen ? "px-4" : "px-1",
+        )}
+      >
         <button
           type="button"
           onClick={handleLogout}
@@ -326,13 +365,19 @@ export function Sidebar({ isOpen }: SidebarProps) {
           aria-label="Đăng xuất"
           className={cn(
             "flex w-full items-center rounded-lg text-sm font-medium transition-colors",
-            isOpen ? "px-4 py-3" : "mx-auto h-10 w-10 justify-center p-0 rounded-xl",
+            isOpen
+              ? "px-4 py-3"
+              : "mx-auto h-10 w-10 justify-center p-0 rounded-xl",
             "text-indigo-200 hover:bg-indigo-800/60 hover:text-white disabled:opacity-60",
           )}
         >
-          <FiLogOut className={cn("h-5 w-5 shrink-0", isOpen ? "mr-3" : "mr-0")} />
+          <FiLogOut
+            className={cn("h-5 w-5 shrink-0", isOpen ? "mr-3" : "mr-0")}
+          />
           {isOpen ? (
-            <span className="truncate">{isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</span>
+            <span className="truncate">
+              {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
+            </span>
           ) : (
             <span className="sr-only">Đăng xuất</span>
           )}

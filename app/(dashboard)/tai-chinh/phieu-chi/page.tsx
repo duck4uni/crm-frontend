@@ -1,0 +1,189 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { useToast } from "@/components/ui/ToastProvider";
+import { formatVND, formatDateVNDateOnly } from "@/lib/utils";
+import { useFinanceState, useFinanceStore } from "@/hooks/useFinanceStore";
+import {
+  NGUON_CHI_LABEL,
+  type PhieuChi,
+  type NguonChi,
+} from "@/services/finance/types";
+import { FiPlus, FiEye, FiEdit2, FiTrash2 } from "react-icons/fi";
+import { PhieuChiFormModal } from "./components/PhieuChiFormModal";
+import { PhieuChiDetailModal } from "./components/PhieuChiDetailModal";
+import { useEffect } from "react";
+
+export default function PhieuChiPage() {
+  const state = useFinanceState();
+  const store = useFinanceStore();
+  const toast = useToast();
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState("");
+  const [quyFilter, setQuyFilter] = useState("");
+  const [nguonFilter, setNguonFilter] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<PhieuChi | null>(null);
+  const [detail, setDetail] = useState<PhieuChi | null>(null);
+  const [prefillYccpId, setPrefillYccpId] = useState<string | null>(null);
+
+  // Pre-open form if redirected from YCCP
+  useEffect(() => {
+    const yccpId = searchParams.get("from-yccp");
+    if (yccpId) {
+      setPrefillYccpId(yccpId);
+      setEditing(null);
+      setShowForm(true);
+    }
+  }, [searchParams]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return state.phieuChi.filter((p) => {
+      if (q && !(p.soChungTu.toLowerCase().includes(q) || p.noiDung.toLowerCase().includes(q))) {
+        return false;
+      }
+      if (quyFilter && p.quyId !== quyFilter) return false;
+      if (nguonFilter && p.nguon !== nguonFilter) return false;
+      return true;
+    });
+  }, [state.phieuChi, search, quyFilter, nguonFilter]);
+
+  const total = filtered.reduce((s, p) => s + p.soTien, 0);
+
+  return (
+    <div className="p-6">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <Input
+          placeholder="Số CT / Nội dung"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <div className="w-48">
+          <Select
+            value={quyFilter}
+            onChange={(e) => setQuyFilter(e.target.value)}
+            options={state.quy.map((q) => ({ value: q.id, label: q.ten }))}
+            placeholder="Tất cả quỹ"
+          />
+        </div>
+        <div className="w-48">
+          <Select
+            value={nguonFilter}
+            onChange={(e) => setNguonFilter(e.target.value)}
+            options={Object.entries(NGUON_CHI_LABEL).map(([v, l]) => ({
+              value: v,
+              label: l,
+            }))}
+            placeholder="Tất cả nguồn"
+          />
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-sm text-gray-600">
+            Tổng:{" "}
+            <span className="font-semibold text-primary-700">
+              {formatVND(total)}
+            </span>
+          </span>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setPrefillYccpId(null);
+              setShowForm(true);
+            }}
+          >
+            <FiPlus className="w-4 h-4 mr-1" /> Tạo phiếu chi
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium">Số CT</th>
+              <th className="text-left px-4 py-3 font-medium">Ngày</th>
+              <th className="text-left px-4 py-3 font-medium">Nội dung</th>
+              <th className="text-left px-4 py-3 font-medium">Quỹ</th>
+              <th className="text-left px-4 py-3 font-medium">Nguồn</th>
+              <th className="text-left px-4 py-3 font-medium">Đối tượng</th>
+              <th className="text-right px-4 py-3 font-medium">Số tiền</th>
+              <th className="text-right px-4 py-3 font-medium">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={8} className="text-center py-8 text-gray-500">
+                  Chưa có phiếu chi
+                </td>
+              </tr>
+            )}
+            {filtered.map((p) => {
+              const quy = state.quy.find((q) => q.id === p.quyId);
+              return (
+                <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-primary-700">{p.soChungTu}</td>
+                  <td className="px-4 py-3">{formatDateVNDateOnly(p.ngayYeuCau)}</td>
+                  <td className="px-4 py-3">{p.noiDung}</td>
+                  <td className="px-4 py-3 text-gray-600">{quy?.ten ?? "-"}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {NGUON_CHI_LABEL[p.nguon as NguonChi]}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{p.doiTuongTen ?? "-"}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-orange-600">
+                    {formatVND(p.soTien)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => setDetail(p)}
+                      className="text-gray-500 hover:text-primary-600 mr-2"
+                    >
+                      <FiEye className="w-4 h-4 inline" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditing(p);
+                        setPrefillYccpId(null);
+                        setShowForm(true);
+                      }}
+                      className="text-gray-500 hover:text-primary-600 mr-2"
+                    >
+                      <FiEdit2 className="w-4 h-4 inline" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!confirm(`Xóa phiếu ${p.soChungTu}?`)) return;
+                        store.deletePhieuChi(p.id);
+                        toast.success("Đã xóa phiếu chi");
+                      }}
+                      className="text-gray-500 hover:text-red-600"
+                    >
+                      <FiTrash2 className="w-4 h-4 inline" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <PhieuChiFormModal
+        isOpen={showForm}
+        onClose={() => {
+          setShowForm(false);
+          setPrefillYccpId(null);
+        }}
+        editing={editing}
+        prefillYccpId={prefillYccpId}
+      />
+      <PhieuChiDetailModal phieu={detail} onClose={() => setDetail(null)} />
+    </div>
+  );
+}

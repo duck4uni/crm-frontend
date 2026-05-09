@@ -14,6 +14,27 @@ export function formatCurrency(
   }).format(amount);
 }
 
+export function formatVND(amount: number): string {
+  if (!Number.isFinite(amount)) return "0 ₫";
+  return new Intl.NumberFormat("vi-VN").format(Math.round(amount)) + " ₫";
+}
+
+export function formatVNDShort(amount: number): string {
+  if (!Number.isFinite(amount)) return "0";
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  if (abs >= 1_000_000_000) {
+    return sign + (abs / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "") + " tỷ";
+  }
+  if (abs >= 1_000_000) {
+    return sign + (abs / 1_000_000).toFixed(1).replace(/\.0$/, "") + " triệu";
+  }
+  if (abs >= 1_000) {
+    return sign + (abs / 1_000).toFixed(0) + "k";
+  }
+  return sign + abs.toString();
+}
+
 export function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("en-US", {
