@@ -212,7 +212,7 @@ export default function CongNoPage() {
       )}
       {tab === "chi-tiet" && (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
-          <p>Chọn khách hàng từ tab "Công nợ" để xem chi tiết phát sinh.</p>
+          <p>Chọn khách hàng từ tab &ldquo;Công nợ&rdquo; để xem chi tiết phát sinh.</p>
         </div>
       )}
 
