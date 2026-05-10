@@ -22,6 +22,7 @@ import {
   exchangeAuthorizationCode,
   fetchOaTemplates,
   getZaloAppId,
+  saveOaConnection,
   sendTemplateByPhone,
 } from "@/lib/zalo-oa";
 import { appendTemplateMessage } from "@/lib/zaloTemplateMessageStore";
@@ -92,6 +93,7 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
       setStep("exchanging");
       try {
         const tokenResult = await exchangeAuthorizationCode(event.data.code, event.data.oaId);
+        await saveOaConnection(tokenResult);
         const connection = buildOaConnectionFromToken(tokenResult);
         console.log("[Zalo OA Modal] connection sau khi đổi token:", connection);
         setConnectedOa(connection);
@@ -149,6 +151,7 @@ export function ZaloOaAddModal({ open, onClose, onConnected }: ZaloOaAddModalPro
     );
     try {
       const tokenResult = await exchangeAuthorizationCode(capturedCode);
+      await saveOaConnection(tokenResult);
       const connection = buildOaConnectionFromToken(tokenResult);
       setConnectedOa(connection);
       setStep("success");

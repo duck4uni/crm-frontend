@@ -8,6 +8,7 @@ import type {
   ZbsTemplate,
   ZbsTemplateParam,
 } from "@/types/zalo-oa";
+import { apiClient } from "@/lib/api-client";
 
 export const ZALO_OAUTH_PERMISSION_URL =
   "https://oauth.zaloapp.com/v4/oa/permission";
@@ -480,6 +481,26 @@ export function buildOaConnectionFromToken(
     tokenExpiredAt: result.tokenExpiredAt,
     accessToken: result.accessToken,
   };
+}
+
+export async function saveOaConnection(
+  result: ExchangeOaTokenResult,
+): Promise<void> {
+  try {
+    await apiClient.post("/api/v1.0/zalo_oa_connections", {
+      oaId: result.oaId,
+      oaName: result.oaName,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn,
+      tokenExpiredAt: result.tokenExpiredAt,
+      status: result.status,
+    });
+    console.log("[Zalo OA] saveOaConnection: lưu thành công");
+  } catch (err) {
+    console.error("[Zalo OA] saveOaConnection failed:", err);
+    throw err;
+  }
 }
 
 function formatZaloTimestamp(ms?: number): string {
