@@ -12,6 +12,7 @@ import {
   fetchTemplateInfo,
   sendTemplateByPhone,
 } from "@/lib/zalo-oa";
+import { apiClient } from "@/lib/api-client";
 import {
   appendTemplateMessage,
   updateTemplateMessage,
@@ -449,6 +450,29 @@ export function MarketingSection() {
     );
     setRunningCampaignId(null);
     setRunProgress(null);
+
+    try {
+      await apiClient.post("/api/v1.0/marketing", {
+        id: campaign.id,
+        name: campaign.name,
+        channel: campaign.channel,
+        segment: campaign.segment,
+        scheduledAt: campaign.scheduledAt,
+        message: campaign.message,
+        status: "completed",
+        sent,
+        failed,
+        templateId: campaign.templateId,
+        templateCode: campaign.templateCode,
+        templateName: campaign.templateName,
+        recipientsCount: total,
+        mode,
+        oaOfficialId: campaign.oaOfficialId,
+      });
+      console.log(`[Marketing] Campaign "${campaign.name}" đã lưu lên server.`);
+    } catch (err) {
+      console.error("[Marketing] Lưu campaign lên server thất bại:", err);
+    }
 
     if (lastQuotaRemaining !== undefined) {
       console.log(
